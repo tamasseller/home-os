@@ -57,8 +57,6 @@ SECTIONS
     	PROVIDE( sstack = . );
         . += 512;
         PROVIDE( mstack = . );
-		. += 512;
-		PROVIDE( pstack = . );
 		PROVIDE( estack = . );
 
         . = ALIGN(4);

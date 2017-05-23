@@ -1,0 +1,3 @@
+[submodule "ultimate-makefile"]
+	path = ultimate-makefile
+	url = http://github.com/tamasseller/ultimate-makefile

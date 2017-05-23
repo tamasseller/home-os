@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+extern "C" {
 extern unsigned int sidata;
 extern unsigned int sdata;
 extern unsigned int edata;
@@ -16,13 +17,12 @@ extern unsigned int init_array_start;
 extern unsigned int init_array_end;
 extern unsigned int fini_array_start;
 extern unsigned int fini_array_end;
+}
 
-void clockError();
 int main();
 uint32_t SystemCoreClock = 48000000;
 
-__attribute__ ((naked))
-void Reset_Handler(){
+void Reset_Handler() {
 	__IO uint32_t StartUpCounter = 0, HSEStatus = 0;
 
 	RCC->CR |= (uint32_t) 0x00000001;
@@ -69,14 +69,8 @@ void Reset_Handler(){
 
 		while ((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)RCC_CFGR_SWS_PLL) { }
 	}else{
-		clockError();
+		for(;;){}
 	}
-
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-#ifndef DISCO
-	SYSCFG->CFGR1 |= SYSCFG_CFGR1_PA11_PA12_RMP;
-#endif
 
 	unsigned int *in, *out;
 
