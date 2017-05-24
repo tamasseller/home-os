@@ -5,6 +5,9 @@ SOURCES += main.cpp
 SOURCES += startup.cpp
 SOURCES += vectors.cpp
 
+SOURCES += os/ports/gcc/cortex-m0/Profile.cpp
+SOURCES += os/ports/gcc/cortex-m0/Interrupts.cpp
+
 SOURCES += st/stdperiph/src/stm32f0xx_pwr.c
 SOURCES += st/stdperiph/src/stm32f0xx_i2c.c
 SOURCES += st/stdperiph/src/stm32f0xx_spi.c
@@ -33,6 +36,8 @@ INCLUDE_DIRS += .
 INCLUDE_DIRS += st/cmsis/Include
 INCLUDE_DIRS += st/stdperiph/inc
 INCLUDE_DIRS += st/cmsis/Device/ST/STM32F0xx/Include
+INCLUDE_DIRS += os
+INCLUDE_DIRS += os/ports/gcc/cortex-m0
 
 COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
