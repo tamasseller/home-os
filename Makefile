@@ -35,6 +35,7 @@ INCLUDE_DIRS += .
 INCLUDE_DIRS += st/cmsis/Include
 INCLUDE_DIRS += st/stdperiph/inc
 INCLUDE_DIRS += st/cmsis/Device/ST/STM32F0xx/Include
+INCLUDE_DIRS += pet
 INCLUDE_DIRS += os
 INCLUDE_DIRS += os/ports/gcc/cortex-m0
 

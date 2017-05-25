@@ -43,69 +43,65 @@ public:
 	Ticker(): next(Os::getTick()) {}
 	inline bool check() {
 		if((int)(next - Os::getTick()) < 0) {
-			next += period;
-			return true;
+			GPIO_SetBits(GPIOC, LEDB_PIN);
+			GPIO_ResetBits(GPIOC, LEDB_PIN);
 		}
 
 		return false;
 	}
 };
 
+Os::Mutex mutex;
+
 struct T1: public TaskHelper<T1> {
 	void run() {
-		Ticker<1000> t;
-		for(int n = 10; n;) {
-			if(t.check()) {
-				GPIO_WriteBit(GPIOC, LEDB_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDB_PIN));
-				n--;
-			}
+		while(1) {
+			mutex.lock();
+			GPIO_SetBits(GPIOC, LEDR_PIN);
+
+			for(volatile int i = 0xffff; --i;)
+				Os::yield();
+
+			GPIO_ResetBits(GPIOC, LEDR_PIN);
+			mutex.unlock();
+			Os::yield();
 		}
-		GPIO_SetBits(GPIOC, LEDB_PIN);
+
 	}
 } t1;
 
 struct T2: public TaskHelper<T2> {
 	void run() {
-		Ticker<800> t;
-		for(int n = 10; n;) {
-			if(t.check()) {
-				GPIO_WriteBit(GPIOC, LEDO_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDO_PIN));
-				n--;
-			}
+		while(1) {
+			mutex.lock();
+			GPIO_SetBits(GPIOC, LEDB_PIN);
+
+			for(volatile int i = 0xffff; --i;)
+				Os::yield();
+
+			GPIO_ResetBits(GPIOC, LEDB_PIN);
+			mutex.unlock();
+			Os::yield();
 		}
-		GPIO_SetBits(GPIOC, LEDO_PIN);
 	}
 } t2;
 
+
 struct T3: public TaskHelper<T3> {
 	void run() {
-		Ticker<1200> t;
-		for(int n = 10; n;) {
-			if(t.check()) {
-				GPIO_WriteBit(GPIOC, LEDG_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDG_PIN));
-				n--;
-			} else
-				Os::yield();
-		}
+		while(1) {
+			mutex.lock();
+			GPIO_SetBits(GPIOC, LEDG_PIN);
 
-		GPIO_SetBits(GPIOC, LEDG_PIN);
+			for(volatile int i = 0xffff; --i;)
+				Os::yield();
+
+			GPIO_ResetBits(GPIOC, LEDG_PIN);
+			mutex.unlock();
+			Os::yield();
+		}
 	}
 } t3;
-
-struct T4: public TaskHelper<T4> {
-	void run() {
-		Ticker<1500> t;
-		for(int n = 10; n;) {
-			if(t.check()) {
-				GPIO_WriteBit(GPIOC, LEDR_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDR_PIN));
-				n--;
-			} else
-				Os::yield();
-		}
-
-		GPIO_SetBits(GPIOC, LEDR_PIN);
-	}
-} t4;
 
 int main()
 {
@@ -120,11 +116,10 @@ int main()
 	SysTick_Config(48000);
 	NVIC_SetPriority(SysTick_IRQn, 0);
 
+	mutex.init();
 	t1.start();
 	t2.start();
 	t3.start();
-	t4.start();
-
 	Os::start();
 
 	GPIO_ResetBits(GPIOC, LEDR_PIN | LEDG_PIN | LEDB_PIN | LEDO_PIN);

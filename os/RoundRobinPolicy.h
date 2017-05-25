@@ -38,6 +38,10 @@ class RoundRobinPolicy {
 		}
 	}
 
+	bool canRunMore(Task* task) {
+		return true;
+	}
+
 	Task* getNext() {
 		Task* ret = first;
 		first = first->next;
