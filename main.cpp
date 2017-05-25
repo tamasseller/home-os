@@ -27,7 +27,9 @@ typedef Scheduler<ProfileCortexM0, RoundRobinPolicy> Os;
 template<class Child>
 struct TaskHelper: public Os::Task<Child> {
 	static uint32_t stack[128];
-	TaskHelper(): Os::Task<Child>(stack, sizeof(stack)) {}
+	void start() {
+		Os::Task<Child>::start(stack, sizeof(stack));
+	}
 };
 
 template<class Child>
@@ -38,6 +40,7 @@ template<uint32_t period>
 class Ticker {
 	uint32_t next = 0;
 public:
+	Ticker(): next(Os::getTick()) {}
 	inline bool check() {
 		if((int)(next - Os::getTick()) < 0) {
 			next += period;
@@ -50,53 +53,57 @@ public:
 
 struct T1: public TaskHelper<T1> {
 	void run() {
-		GPIO_SetBits(GPIOC, LEDB_PIN);
-		/*Ticker<1000> t;
-		for(;;) {
-			if(t.check())
+		Ticker<1000> t;
+		for(int n = 10; n;) {
+			if(t.check()) {
 				GPIO_WriteBit(GPIOC, LEDB_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDB_PIN));
-			else
-				Os::yield();
-		}*/
+				n--;
+			}
+		}
+		GPIO_SetBits(GPIOC, LEDB_PIN);
 	}
 } t1;
 
 struct T2: public TaskHelper<T2> {
 	void run() {
-		GPIO_SetBits(GPIOC, LEDO_PIN);
-		/*Ticker<800> t;
-		for(;;) {
-			if(t.check())
+		Ticker<800> t;
+		for(int n = 10; n;) {
+			if(t.check()) {
 				GPIO_WriteBit(GPIOC, LEDO_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDO_PIN));
-			else
-				Os::yield();
-		}*/
+				n--;
+			}
+		}
+		GPIO_SetBits(GPIOC, LEDO_PIN);
 	}
 } t2;
 
 struct T3: public TaskHelper<T3> {
 	void run() {
-		GPIO_SetBits(GPIOC, LEDG_PIN);
-		/*Ticker<1200> t;
-		for(;;) {
-			if(t.check())
+		Ticker<1200> t;
+		for(int n = 10; n;) {
+			if(t.check()) {
 				GPIO_WriteBit(GPIOC, LEDG_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDG_PIN));
-			else
+				n--;
+			} else
 				Os::yield();
-		}*/
+		}
+
+		GPIO_SetBits(GPIOC, LEDG_PIN);
 	}
 } t3;
 
 struct T4: public TaskHelper<T4> {
 	void run() {
-		GPIO_SetBits(GPIOC, LEDR_PIN);
-		/*Ticker<1500> t;
-		for(;;) {
-			if(t.check())
+		Ticker<1500> t;
+		for(int n = 10; n;) {
+			if(t.check()) {
 				GPIO_WriteBit(GPIOC, LEDR_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDR_PIN));
-			else
+				n--;
+			} else
 				Os::yield();
-		}*/
+		}
+
+		GPIO_SetBits(GPIOC, LEDR_PIN);
 	}
 } t4;
 

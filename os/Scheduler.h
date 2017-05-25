@@ -8,7 +8,6 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
-
 template<class Profile, class Policy>
 class Scheduler {
 	static Policy policy;
@@ -23,28 +22,26 @@ class Scheduler {
 		return reinterpret_cast<T*>(x);
 	}
 
-public:
 	class TaskBase: Profile::Task, Policy::Task {
 		friend Scheduler;
 	};
 
+public:
+
 	template<class Child>
 	class Task: public TaskBase {
-
 	public:
-		inline Task(void* stack, uint32_t stackSize) {
+		inline void start(void* stack, uint32_t stackSize) {
 			Profile::Task::template initialize<
 				Child,
 				&Child::run,
 				&Scheduler::exit
 			> (stack, stackSize, static_cast<Child*>(this));
-		}
 
-		inline void start() {
 			Profile::CallGate::sync(&Scheduler::doStartTask, detypePtr(static_cast<TaskBase*>(this)));
 		}
 	};
-protected:
+private:
 	static TaskBase* currentTask;
 
 	inline static bool switchToNext()
@@ -89,6 +86,8 @@ public:
 		Profile::CallGate::sync(&Scheduler::doExit);
 	}
 };
+
+
 
 template<class Profile, class Policy>
 class SchedulerInternalAccessor: private Scheduler<Profile, Policy> {

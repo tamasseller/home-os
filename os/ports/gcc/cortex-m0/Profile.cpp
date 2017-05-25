@@ -31,79 +31,83 @@ void ProfileCortexM0::Task::startFirst()
 		"pop {r0-r5}		\n"
 		"mov lr, r5			\n"
 		"cpsie i			\n"
-		"pop {pc}			\n"
-			: /* No outputs */
-			: "r" ((uint32_t*)sp + 4)
-			: /* No clobbers */
+		"pop {pc}			\n" : : "r" ((uint32_t*)sp + 4) :
 	);
 }
 
 void ProfileCortexM0::Task::finishLast()
 {
-	struct DummySvc {
-		static void immediateReturn() {
+	struct ReturnTaskStub {
+		static void restoreMasterState() {
 			asm volatile (
 				"movs r0, #0		\n"
 				"msr CONTROL, r0	\n"
 				"isb				\n"
 				"pop {r4-r7}		\n"
-				"mov r8, r4				\n"
-				"mov r9, r5				\n"
-				"mov r10, r6			\n"
-				"mov r11, r7			\n"
-				"pop {r4-r7, pc}	\n"
+				"mov r8, r4			\n"
+				"mov r9, r5			\n"
+				"mov r10, r6		\n"
+				"mov r11, r7		\n"
+				"pop {r4-r7, pc}	\n" : : :
 			);
 		}
 	};
 
 	void **psp;
 	asm volatile ("MRS %0, psp\n"  : "=r" (psp));
-	psp[6] = (void*)&DummySvc::immediateReturn;
+	psp[6] = (void*)&ReturnTaskStub::restoreMasterState;
 }
 
+__attribute__((naked))
 uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t (*f)())
 {
 	asm volatile (
-		"mov r12, r0\n"
-		"svc 0\n"
-		"bx lr\n" : : : "r12"
+		"mov r12, r0	\n"
+		"svc 0			\n"
+		"bx lr			\n" : : :
 	);
 }
 
+__attribute__((naked))
 uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t))
 {
 	asm volatile (
-		"mov r12, r1\n"
-		"svc 0\n"
-		"bx lr\n" : : : "r12"
+		"mov r12, r1	\n"
+		"svc 0			\n"
+		"bx lr			\n" : : :
 	);
 }
 
+__attribute__((naked))
 uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t))
 {
 	asm volatile (
-		"mov r12, r2\n"
-		"svc 0\n"
-		"bx lr\n" : : : "r12"
+		"mov r12, r2	\n"
+		"svc 0			\n"
+		"bx lr			\n" : : :
 	);
 }
 
+__attribute__((naked))
 uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t))
 {
 	asm volatile (
-		"mov r12, r3\n"
-		"svc 0\n"
-		"bx lr\n" : : : "r12"
+		"mov r12, r3	\n"
+		"svc 0			\n"
+		"bx lr			\n" : : :
 	);
 }
 
+__attribute__((naked))
 uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))
 {
 	asm volatile (
-		"ldr r4, [sp, #0]\n"
-		"mov r4, r12\n"
-		"svc 0\n"
-		"bx lr\n" : : : "r4", "12"
+		"push {r4}			\n"
+		"ldr r4, [sp, #4]	\n"
+		"mov r4, r12		\n"
+		"svc 0				\n"
+		"pop {r4}			\n"
+		"bx lr				\n" : : : "r4"
 	);
 }
 
@@ -140,13 +144,14 @@ void PendSV_Handler() {
 		"sub %[in], %[in], #32	\n" /* Go back down for the low regs */
 		"ldmia %[in]!, {r4-r7}	\n" /* Load low regs*/
 		"bx lr					\n" /* Return */
-			: /* No outputs */
-			: [in] "r" (ProfileCortexM0::Task::newContext), [out] "r" (ProfileCortexM0::Task::oldContext)
-			: /* No clobbers */
+			: :
+			[in] "r" (ProfileCortexM0::Task::newContext),
+			[out] "r" (ProfileCortexM0::Task::oldContext) :
 	);
 }
 
 void SysTick_Handler()
 {
-	ProfileCortexM0::Timer::tick++;
+	if(ProfileCortexM0::Scb::Syst::triggeredByCounter())
+		ProfileCortexM0::Timer::tick++;
 }

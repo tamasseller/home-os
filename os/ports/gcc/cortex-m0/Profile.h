@@ -10,18 +10,40 @@
 
 #include <stdint.h>
 
-namespace DetailsForProfileCortexM0 {
-
-	inline void triggerPendSV()
-	{
-		static auto &ScbIcsr = *((volatile uint32_t *)0xE000ED04);
-		static constexpr uint32_t ScbIcsrPendsvSet = 0x10000000;
-		ScbIcsr = ScbIcsrPendsvSet;
-	}
-}
-
 class ProfileCortexM0
 {
+	class Scb {
+		friend void SysTick_Handler();
+		friend ProfileCortexM0;
+		class Icsr {
+			static constexpr auto reg = ((volatile uint32_t *)0xE000ED04);
+			static constexpr uint32_t PendSvSet = 1u << 28;
+			static constexpr uint32_t PendStSet = 1u << 26;
+
+		public:
+			static inline void triggerPendSV()
+			{
+				*reg = PendSvSet;
+			}
+
+			static inline void triggerSysTick()
+			{
+				*reg = PendStSet;
+			}
+		};
+
+		class Syst {
+			friend void SysTick_Handler();
+			static constexpr auto reg = ((volatile uint32_t *)0xE000E010);
+			static constexpr uint32_t Countflag = 1u << 16;
+		public:
+			static inline bool triggeredByCounter()
+			{
+				return *reg & Countflag;
+			}
+		};
+	};
+
 	inline void triggerPendSV();
 
 	template<class, class> friend class Scheduler;
@@ -80,9 +102,8 @@ class ProfileCortexM0
 		}
 
 		static inline void async() {
-			return DetailsForProfileCortexM0::triggerPendSV();
+			return Scb::Icsr::triggerSysTick();
 		}
-
 	};
 };
 
@@ -115,7 +136,7 @@ inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize, T
 inline void ProfileCortexM0::Task::switchTo(Task* replacement) {
 	oldContext = &sp;
 	newContext = replacement->sp;
-	DetailsForProfileCortexM0::triggerPendSV();
+	Scb::Icsr::triggerPendSV();
 }
 
 inline ProfileCortexM0::Timer::TickType ProfileCortexM0::Timer::getTick()
