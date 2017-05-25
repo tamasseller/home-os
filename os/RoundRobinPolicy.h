@@ -18,7 +18,7 @@ class RoundRobinPolicy {
 
 	Task* first;
 
-	bool addRunnable(Task* task) {
+	void addRunnable(Task* task) {
 		Task** next = &first;
 		while(*next)
 			next = &((*next)->next);
@@ -27,13 +27,23 @@ class RoundRobinPolicy {
 		task->next = nullptr;
 	}
 
+	void removeRunnable(Task* task) {
+		Task** next = &first;
+		while(*next) {
+			if(*next == task) {
+				*next = task->next;
+				return;
+			}
+			next = &((*next)->next);
+		}
+	}
+
 	Task* getNext() {
 		Task* ret = first;
 		first = first->next;
 		return ret;
 	}
 
-	bool removeRunnable(Task*);
 };
 
 #endif /* ROUNDROBINPOLICY_H_ */

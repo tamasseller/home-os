@@ -13,37 +13,58 @@ template<class Profile, class Policy>
 class Scheduler {
 	static Policy policy;
 
+	template<class T>
+	static uintptr_t detypePtr(T* x) {
+		return reinterpret_cast<uintptr_t>(x);
+	}
+
+	template<class T>
+	static T* entypePtr(uintptr_t  x) {
+		return reinterpret_cast<T*>(x);
+	}
+
 public:
-	class Task: Profile::Task, Policy::Task {
+	class TaskBase: Profile::Task, Policy::Task {
 		friend Scheduler;
+	};
 
-		static void entry(void* self) {
-			((Task*)self)->run();
-		}
+	template<class Child>
+	class Task: public TaskBase {
 
-		static void exit() {}
-
-		virtual void run() = 0;
 	public:
 		inline Task(void* stack, uint32_t stackSize) {
-			Profile::Task::template initialize<&Task::entry, &Task::exit>(stack, stackSize, this);
+			Profile::Task::template initialize<
+				Child,
+				&Child::run,
+				&Scheduler::exit
+			> (stack, stackSize, static_cast<Child*>(this));
 		}
 
 		inline void start() {
-			startTask(this);
+			Profile::CallGate::sync(&Scheduler::doStartTask, detypePtr(static_cast<TaskBase*>(this)));
 		}
 	};
 protected:
-	static Task* currentTask;
+	static TaskBase* currentTask;
 
-	static void startTask(Task* task) {
-		policy.addRunnable(task);
+	inline static bool switchToNext()
+	{
+		if(TaskBase* newTask = static_cast<TaskBase*>(policy.getNext())) {
+			currentTask->switchTo(newTask);
+			currentTask = newTask;
+			return true;
+		}
+
+		return false;
 	}
 
-	inline static void switchToNext() {
-		Task* oldTask = currentTask;
-		currentTask = static_cast<Task*>(policy.getNext());
-		oldTask->switchTo(currentTask);
+	static uintptr_t doStartTask(uintptr_t task) {
+		policy.addRunnable(entypePtr<TaskBase>(task));
+	}
+
+	static uintptr_t doExit() {
+		if(!switchToNext())
+			currentTask->finishLast();
 	}
 
 	static uintptr_t doYield() {
@@ -52,7 +73,7 @@ protected:
 	}
 public:
 	static void start() {
-		currentTask = static_cast<Task*>(policy.getNext());
+		currentTask = static_cast<TaskBase*>(policy.getNext());
 		currentTask->startFirst();
 	}
 
@@ -61,7 +82,11 @@ public:
 	}
 
 	inline static void yield() {
-		Profile::CallGate::issue(&Scheduler::doYield);
+		Profile::CallGate::sync(&Scheduler::doYield);
+	}
+
+	inline static void exit() {
+		Profile::CallGate::sync(&Scheduler::doExit);
 	}
 };
 
@@ -75,7 +100,7 @@ template<class Profile, class Policy>
 Policy Scheduler<Profile, Policy>::policy;
 
 template<class Profile, class Policy>
-typename Scheduler<Profile, Policy>::Task* Scheduler<Profile, Policy>::currentTask;
+typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::currentTask;
 
 
 #endif /* SCHEDULER_H_ */

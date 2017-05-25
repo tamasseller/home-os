@@ -25,11 +25,9 @@ typedef Scheduler<ProfileCortexM0, RoundRobinPolicy> Os;
 #define LEDO_PIN GPIO_Pin_8
 
 template<class Child>
-struct TaskHelper: public Os::Task {
+struct TaskHelper: public Os::Task<Child> {
 	static uint32_t stack[128];
-	TaskHelper(): Task(stack, sizeof(stack)) {}
-
-	inline virtual ~TaskHelper() {}
+	TaskHelper(): Os::Task<Child>(stack, sizeof(stack)) {}
 };
 
 template<class Child>
@@ -51,59 +49,55 @@ public:
 };
 
 struct T1: public TaskHelper<T1> {
-	virtual void run() {
-		Ticker<1000> t;
+	void run() {
+		GPIO_SetBits(GPIOC, LEDB_PIN);
+		/*Ticker<1000> t;
 		for(;;) {
 			if(t.check())
 				GPIO_WriteBit(GPIOC, LEDB_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDB_PIN));
 			else
 				Os::yield();
-		}
+		}*/
 	}
-
-	inline virtual ~T1() {}
 } t1;
 
 struct T2: public TaskHelper<T2> {
-	virtual void run() {
-		Ticker<800> t;
+	void run() {
+		GPIO_SetBits(GPIOC, LEDO_PIN);
+		/*Ticker<800> t;
 		for(;;) {
 			if(t.check())
 				GPIO_WriteBit(GPIOC, LEDO_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDO_PIN));
 			else
 				Os::yield();
-		}
+		}*/
 	}
-
-	inline virtual ~T2() {}
 } t2;
 
 struct T3: public TaskHelper<T3> {
-	virtual void run() {
-		Ticker<1200> t;
+	void run() {
+		GPIO_SetBits(GPIOC, LEDG_PIN);
+		/*Ticker<1200> t;
 		for(;;) {
 			if(t.check())
 				GPIO_WriteBit(GPIOC, LEDG_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDG_PIN));
 			else
 				Os::yield();
-		}
+		}*/
 	}
-
-	inline virtual ~T3() {}
 } t3;
 
 struct T4: public TaskHelper<T4> {
-	virtual void run() {
-		Ticker<1500> t;
+	void run() {
+		GPIO_SetBits(GPIOC, LEDR_PIN);
+		/*Ticker<1500> t;
 		for(;;) {
 			if(t.check())
 				GPIO_WriteBit(GPIOC, LEDR_PIN, (BitAction)!GPIO_ReadOutputDataBit(GPIOC, LEDR_PIN));
 			else
 				Os::yield();
-		}
+		}*/
 	}
-
-	inline virtual ~T4() {}
 } t4;
 
 int main()
@@ -125,6 +119,8 @@ int main()
 	t4.start();
 
 	Os::start();
+
+	GPIO_ResetBits(GPIOC, LEDR_PIN | LEDG_PIN | LEDB_PIN | LEDO_PIN);
 
 	for(;;) {}
 }

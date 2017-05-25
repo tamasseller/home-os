@@ -6,7 +6,6 @@ SOURCES += startup.cpp
 SOURCES += vectors.cpp
 
 SOURCES += os/ports/gcc/cortex-m0/Profile.cpp
-SOURCES += os/ports/gcc/cortex-m0/Interrupts.cpp
 
 SOURCES += st/stdperiph/src/stm32f0xx_pwr.c
 SOURCES += st/stdperiph/src/stm32f0xx_i2c.c
