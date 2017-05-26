@@ -11,9 +11,12 @@ volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 
 void* volatile ProfileCortexM0::Task::newContext;
 void** volatile ProfileCortexM0::Task::oldContext;
+volatile bool ProfileCortexM0::CallGate::isAsyncActive = false;
+void (*ProfileCortexM0::CallGate::asyncCallHandler)();
 
 void ProfileCortexM0::Task::startFirst()
 {
+
 	asm volatile (
 		"push {r4-r7, lr}	\n"
 		"mov r4, r8			\n"
@@ -54,7 +57,7 @@ void ProfileCortexM0::Task::finishLast()
 	};
 
 	void **psp;
-	asm volatile ("MRS %0, psp\n"  : "=r" (psp));
+	asm volatile ("mrs %0, psp\n"  : "=r" (psp));
 	psp[6] = (void*)&ReturnTaskStub::restoreMasterState;
 }
 
@@ -114,13 +117,19 @@ uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, ui
 __attribute__((naked))
 void SVC_Handler() {
 	asm volatile (
-		"bx r12\n" : : :
+		"push {r4, lr}		\n"
+		"mrs r4, psp		\n"
+		"ldmia r4, {r0-r4}	\n" // Load stored regs (r0, r1, r2, r3, r12)
+		"blx r4				\n"	// Call the one that is stored in the caller r12
+		"mrs r1, psp		\n" // Save r0 to the caller frame
+		"str r0, [r1, #0]	\n"
+		"pop {r4, pc}		\n" : : :
 	);
 }
 
 __attribute__((naked))
 void PendSV_Handler() {
-
+	using Task = ProfileCortexM0::Internals::Task;
 	asm volatile (
 		"mrs r0, psp			\n"
 		"sub r0, r0, #32		\n"
@@ -145,13 +154,29 @@ void PendSV_Handler() {
 		"ldmia %[in]!, {r4-r7}	\n" /* Load low regs*/
 		"bx lr					\n" /* Return */
 			: :
-			[in] "r" (ProfileCortexM0::Task::newContext),
-			[out] "r" (ProfileCortexM0::Task::oldContext) :
+			[in] "r" (Task::newContext),
+			[out] "r" (Task::oldContext) :
 	);
 }
 
 void SysTick_Handler()
 {
-	if(ProfileCortexM0::Scb::Syst::triggeredByCounter())
-		ProfileCortexM0::Timer::tick++;
+	using Timer = ProfileCortexM0::Internals::Timer;
+	using CallGate = ProfileCortexM0::Internals::CallGate;
+	using Scb = ProfileCortexM0::Internals::Scb;
+
+	while(true) {
+		if(Scb::Syst::triggeredByCounter()) {
+			Timer::tick++;
+			continue;
+		};
+
+		if(CallGate::isAsyncActive) {
+			CallGate::isAsyncActive = false;
+			CallGate::asyncCallHandler();
+			continue;
+		}
+
+		break;
+	}
 }

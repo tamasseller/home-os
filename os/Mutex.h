@@ -10,51 +10,62 @@
 
 #include "Helpers.h"
 
-template<class Profile, class Policy>
-class Scheduler<Profile, Policy>::Mutex: public MutexBase {
+#include "data/DoubleList.h"
+
+/**
+ * Mutex front-end object.
+ */
+template<class Profile, template<class> class Policy>
+class Scheduler<Profile, Policy>::
+Mutex: public MutexBase {
 public:
 	void init();
 	void lock();
 	void unlock();
 };
 
+template<class Profile, template<class> class Policy>
+void Scheduler<Profile, Policy>::
+Mutex::init() {
+	MutexBase::init();
+}
 
-template<class Profile, class Policy>
-class Scheduler<Profile, Policy>::MutexBase {
+template<class Profile, template<class> class Policy>
+void Scheduler<Profile, Policy>::
+Mutex::lock() {
+	Profile::CallGate::sync(&Scheduler::doLock, detypePtr(static_cast<MutexBase*>(this)));
+}
+
+template<class Profile, template<class> class Policy>
+void Scheduler<Profile, Policy>::
+Mutex::unlock() {
+	Profile::CallGate::sync(&Scheduler::doUnlock, detypePtr(static_cast<MutexBase*>(this)));
+}
+
+/**
+ * Internal mutex object.
+ */
+template<class Profile, template<class> class Policy>
+class Scheduler<Profile, Policy>::
+MutexBase {
 	friend Scheduler;
 	TaskBase *owner;
-	pet::LinkedList<TaskBase> waiters;
+	pet::DoubleList<TaskBase> waiters;
 	uint32_t counter;
 
 	void init();
 };
 
-
-template<class Profile, class Policy>
-void Scheduler<Profile, Policy>::Mutex::lock() {
-	Profile::CallGate::sync(&Scheduler::doLock, detypePtr(static_cast<MutexBase*>(this)));
-}
-
-template<class Profile, class Policy>
-void Scheduler<Profile, Policy>::Mutex::unlock() {
-	Profile::CallGate::sync(&Scheduler::doUnlock, detypePtr(static_cast<MutexBase*>(this)));
-}
-
-
-template<class Profile, class Policy>
-void Scheduler<Profile, Policy>::Mutex::init() {
-	MutexBase::init();
-}
-
-
-template<class Profile, class Policy>
-void Scheduler<Profile, Policy>::MutexBase::init()
+template<class Profile, template<class> class Policy>
+void Scheduler<Profile, Policy>::
+MutexBase::init()
 {
 	owner = nullptr;
 }
 
-template<class Profile, class Policy>
-uintptr_t Scheduler<Profile, Policy>::doLock(uintptr_t mutexPtr)
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doLock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
 
@@ -65,14 +76,15 @@ uintptr_t Scheduler<Profile, Policy>::doLock(uintptr_t mutexPtr)
 	} else if(mutex->owner == currentTask) {
 		mutex->counter++;
 	} else {
-		mutex->waiters.add(currentTask);
+		mutex->waiters.fastAddBack(currentTask);
 		bool ok = switchToNext();
 		// assert(ok);
 	}
 }
 
-template<class Profile, class Policy>
-uintptr_t Scheduler<Profile, Policy>::doUnlock(uintptr_t mutexPtr)
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doUnlock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
 
@@ -81,15 +93,10 @@ uintptr_t Scheduler<Profile, Policy>::doUnlock(uintptr_t mutexPtr)
 	if(mutex->counter)
 		mutex->counter--;
 	else {
-		auto it = mutex->waiters.iterator();
-		while(it.current() && it.current()->next)
-			it.step();
-
-		if(TaskBase* waken = it.current()) {
-			it.remove();
+		if(TaskBase* waken = mutex->waiters.popFront()) {
 			mutex->owner = waken;
 			policy.addRunnable(waken);
-			if(!policy.canRunMore(currentTask)) {
+			if(!policy.isHighest(currentTask)) {
 				policy.addRunnable(currentTask);
 				switchToNext();
 			}

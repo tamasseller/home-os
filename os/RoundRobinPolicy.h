@@ -8,44 +8,30 @@
 #ifndef ROUNDROBINPOLICY_H_
 #define ROUNDROBINPOLICY_H_
 
+#include "data/DoubleList.h"
+
+template<class FullTask>
 class RoundRobinPolicy {
-	template<class, class> friend class Scheduler;
+	template<class, template<class> class> friend class Scheduler;
 
-	class Task {
-		friend RoundRobinPolicy;
-		Task* next;
-	};
+	class Task {};
 
-	Task* first;
+	pet::DoubleList<FullTask> tasks;
 
-	void addRunnable(Task* task) {
-		Task** next = &first;
-		while(*next)
-			next = &((*next)->next);
-
-		*next = task;
-		task->next = nullptr;
+	void addRunnable(FullTask* task) {
+		tasks.fastAddBack(task);
 	}
 
-	void removeRunnable(Task* task) {
-		Task** next = &first;
-		while(*next) {
-			if(*next == task) {
-				*next = task->next;
-				return;
-			}
-			next = &((*next)->next);
-		}
+	void removeRunnable(FullTask* task) {
+		tasks.fastRemove(task);
 	}
 
-	bool canRunMore(Task* task) {
+	bool isHighest(FullTask* task) {
 		return true;
 	}
 
-	Task* getNext() {
-		Task* ret = first;
-		first = first->next;
-		return ret;
+	FullTask* getNext() {
+		return tasks.popFront();
 	}
 
 };

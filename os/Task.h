@@ -13,26 +13,30 @@
 /**
  * Task front-end object.
  */
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 template<class Child>
-class Scheduler<Profile, Policy>::Task: public TaskBase {
+class Scheduler<Profile, Policy>::
+Task: public TaskBase {
 public:
 	inline void start(void* stack, uint32_t stackSize);
 };
 
-template<class Profile, class Policy>
-inline void Scheduler<Profile, Policy>::yield() {
+template<class Profile, template<class> class Policy>
+inline void Scheduler<Profile, Policy>::
+yield() {
 	Profile::CallGate::sync(&Scheduler::doYield);
 }
 
-template<class Profile, class Policy>
-inline void Scheduler<Profile, Policy>::exit() {
+template<class Profile, template<class> class Policy>
+inline void Scheduler<Profile, Policy>::
+exit() {
 	Profile::CallGate::sync(&Scheduler::doExit);
 }
 
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 template<class Child>
-inline void Scheduler<Profile, Policy>::Task<Child>::start(void* stack, uint32_t stackSize) {
+inline void Scheduler<Profile, Policy>::Task<Child>::
+start(void* stack, uint32_t stackSize) {
 	Profile::Task::template initialize<
 		Child,
 		&Child::run,
@@ -41,38 +45,46 @@ inline void Scheduler<Profile, Policy>::Task<Child>::start(void* stack, uint32_t
 				stackSize,
 				static_cast<Child*>(this));
 
-	Profile::CallGate::sync(
-			&Scheduler<Profile, Policy>::doStartTask,
-			detypePtr(static_cast<TaskBase*>(this)));
+	auto arg = detypePtr(static_cast<TaskBase*>(this));
+
+	if(isRunning)
+		Profile::CallGate::sync(&Scheduler<Profile, Policy>::doStartTask, arg);
+	else
+		doStartTask(arg);
 }
 
-
 /**
- * Task internal object.
+ * Internal task object.
  */
-template<class Profile, class Policy>
-class Scheduler<Profile, Policy>::TaskBase: Profile::Task, Policy::Task {
+template<class Profile, template<class> class Policy>
+class Scheduler<Profile, Policy>::
+TaskBase: Profile::Task, Policy<TaskBase>::Task {
 	friend Scheduler;
-	friend pet::LinkedList<TaskBase>;
 
-	TaskBase* next;
+	friend pet::DoubleList<TaskBase>;
+	TaskBase *next, *prev;
 };
 
-template<class Profile, class Policy>
-uintptr_t Scheduler<Profile, Policy>::doStartTask(uintptr_t task) {
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doStartTask(uintptr_t task) {
 	policy.addRunnable(entypePtr<TaskBase>(task));
 }
 
-template<class Profile, class Policy>
-uintptr_t Scheduler<Profile, Policy>::doYield() {
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doYield() {
 	policy.addRunnable(currentTask);
 	switchToNext();
 }
 
-template<class Profile, class Policy>
-uintptr_t Scheduler<Profile, Policy>::doExit() {
-	if(!switchToNext())
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doExit() {
+	if(!switchToNext()) {
+		isRunning = false;
 		currentTask->finishLast();
+	}
 }
 
 #endif /* TASK_H_ */

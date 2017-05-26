@@ -13,7 +13,7 @@
 /*
  * Scheduler root class.
  */
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 class Scheduler {
 public:
 	template<class Child>
@@ -31,7 +31,8 @@ private:
 	class MutexBase;
 
 	static TaskBase* currentTask;
-	static Policy policy;
+	static Policy<TaskBase> policy;
+	static bool isRunning;
 
 	template<class T>
 	static uintptr_t detypePtr(T* x);
@@ -53,30 +54,25 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
+Policy<typename Scheduler<Profile, Policy>::TaskBase> Scheduler<Profile, Policy>::policy;
+
+template<class Profile, template<class> class Policy>
+typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::currentTask;
+
+template<class Profile, template<class> class Policy>
+bool Scheduler<Profile, Policy>::isRunning = false;
+
+template<class Profile, template<class> class Policy>
 inline void Scheduler<Profile, Policy>::start() {
 	currentTask = static_cast<TaskBase*>(policy.getNext());
+	isRunning = true;
 	currentTask->startFirst();
 }
 
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 inline typename Profile::Timer::TickType Scheduler<Profile, Policy>::getTick() {
 	return Profile::Timer::getTick();
 }
-
-/*
- * Internal nested classes.
- */
-
-/*
- * Internal workers.
- */
-
-template<class Profile, class Policy>
-Policy Scheduler<Profile, Policy>::policy;
-
-template<class Profile, class Policy>
-typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::currentTask;
-
 
 #endif /* SCHEDULER_H_ */

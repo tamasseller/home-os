@@ -8,8 +8,9 @@
 #ifndef HELPERS_H_
 #define HELPERS_H_
 
-template<class Profile, class Policy>
-inline bool Scheduler<Profile, Policy>::switchToNext()
+template<class Profile, template<class> class Policy>
+inline bool Scheduler<Profile, Policy>::
+switchToNext()
 {
 	if(TaskBase* newTask = static_cast<TaskBase*>(policy.getNext())) {
 		if(newTask != currentTask) {
@@ -26,15 +27,17 @@ inline bool Scheduler<Profile, Policy>::switchToNext()
  * Helpers.
  */
 
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 template<class T>
-uintptr_t Scheduler<Profile, Policy>::detypePtr(T* x) {
+uintptr_t Scheduler<Profile, Policy>::
+detypePtr(T* x) {
 	return reinterpret_cast<uintptr_t>(x);
 }
 
-template<class Profile, class Policy>
+template<class Profile, template<class> class Policy>
 template<class T>
-T* Scheduler<Profile, Policy>::entypePtr(uintptr_t  x) {
+T* Scheduler<Profile, Policy>::
+entypePtr(uintptr_t  x) {
 	return reinterpret_cast<T*>(x);
 }
 
