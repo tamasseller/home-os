@@ -30,7 +30,6 @@ private:
 	class TaskBase;
 	class MutexBase;
 
-	static TaskBase* currentTask;
 	static Policy<TaskBase> policy;
 	static bool isRunning;
 
@@ -40,7 +39,9 @@ private:
 	template<class T>
 	static T* entypePtr(uintptr_t  x);
 
-	inline static bool switchToNext();
+	template<bool pendOld>
+	inline static void switchToNext();
+
 	static uintptr_t doStartTask(uintptr_t task);
 	static uintptr_t doExit();
 	static uintptr_t doYield();
@@ -58,16 +59,13 @@ template<class Profile, template<class> class Policy>
 Policy<typename Scheduler<Profile, Policy>::TaskBase> Scheduler<Profile, Policy>::policy;
 
 template<class Profile, template<class> class Policy>
-typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::currentTask;
-
-template<class Profile, template<class> class Policy>
 bool Scheduler<Profile, Policy>::isRunning = false;
 
 template<class Profile, template<class> class Policy>
 inline void Scheduler<Profile, Policy>::start() {
-	currentTask = static_cast<TaskBase*>(policy.getNext());
+	TaskBase* firstTask = policy.getNext();
 	isRunning = true;
-	currentTask->startFirst();
+	firstTask->startFirst();
 }
 
 template<class Profile, template<class> class Policy>

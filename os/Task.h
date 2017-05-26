@@ -74,16 +74,17 @@ doStartTask(uintptr_t task) {
 template<class Profile, template<class> class Policy>
 uintptr_t Scheduler<Profile, Policy>::
 doYield() {
-	policy.addRunnable(currentTask);
-	switchToNext();
+	switchToNext<true>();
 }
 
 template<class Profile, template<class> class Policy>
 uintptr_t Scheduler<Profile, Policy>::
 doExit() {
-	if(!switchToNext()) {
+	if(TaskBase* newTask = static_cast<TaskBase*>(policy.getNext())) {
+		newTask->switchTo();
+	} else {
 		isRunning = false;
-		currentTask->finishLast();
+		Profile::Task::getCurrent()->finishLast();
 	}
 }
 

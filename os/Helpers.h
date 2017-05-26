@@ -9,18 +9,18 @@
 #define HELPERS_H_
 
 template<class Profile, template<class> class Policy>
-inline bool Scheduler<Profile, Policy>::
+template<bool pendOld>
+inline void Scheduler<Profile, Policy>::
 switchToNext()
 {
-	if(TaskBase* newTask = static_cast<TaskBase*>(policy.getNext())) {
-		if(newTask != currentTask) {
-			currentTask->switchTo(newTask);
-			currentTask = newTask;
-			return true;
-		}
-	}
+	if(TaskBase* newTask = policy.getNext()) {
+		if(pendOld)
+			policy.addRunnable(static_cast<TaskBase*>(Profile::Task::getCurrent()));
 
-	return false;
+		newTask->switchTo();
+	} else {
+		// TODO idle task
+	}
 }
 
 /*

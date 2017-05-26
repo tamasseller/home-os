@@ -51,7 +51,7 @@ MutexBase {
 	friend Scheduler;
 	TaskBase *owner;
 	pet::DoubleList<TaskBase> waiters;
-	uint32_t counter;
+	uint32_t relockCounter;
 
 	void init();
 };
@@ -68,17 +68,17 @@ uintptr_t Scheduler<Profile, Policy>::
 doLock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
+	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
 
 	if(!mutex->owner) {
 		mutex->owner = currentTask;
-		mutex->counter = 0;
+		mutex->relockCounter = 0;
 		// assert(mutex->waiters.empty();
 	} else if(mutex->owner == currentTask) {
-		mutex->counter++;
+		mutex->relockCounter++;
 	} else {
 		mutex->waiters.fastAddBack(currentTask);
-		bool ok = switchToNext();
-		// assert(ok);
+		switchToNext<false>();
 	}
 }
 
@@ -87,19 +87,19 @@ uintptr_t Scheduler<Profile, Policy>::
 doUnlock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
+	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
 
 	// assert(mutex->owner == currentTask);
 
-	if(mutex->counter)
-		mutex->counter--;
+	if(mutex->relockCounter)
+		mutex->relockCounter--;
 	else {
 		if(TaskBase* waken = mutex->waiters.popFront()) {
 			mutex->owner = waken;
 			policy.addRunnable(waken);
-			if(!policy.isHighest(currentTask)) {
-				policy.addRunnable(currentTask);
-				switchToNext();
-			}
+
+			if(!policy.comparePriority(currentTask, waken) > 0)
+				switchToNext<true>();
 		} else {
 			mutex->owner = nullptr;
 		}
