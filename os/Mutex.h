@@ -96,9 +96,9 @@ doUnlock(uintptr_t mutexPtr)
 	else {
 		if(TaskBase* waken = mutex->waiters.popFront()) {
 			mutex->owner = waken;
-			policy.addRunnable(waken);
+			policy.addRunnable(waken); // ???
 
-			if(!policy.comparePriority(currentTask, waken) > 0)
+			if(!policy.isHigherPriority(waken, currentTask))
 				switchToNext<true>();
 		} else {
 			mutex->owner = nullptr;

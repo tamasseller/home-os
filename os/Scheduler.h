@@ -22,7 +22,8 @@ public:
 	class Mutex;
 
 	inline static typename Profile::Timer::TickType getTick();
-	inline static void start();
+
+	template<class... T> inline static void start(T... t);
 	inline static void yield();
 	inline static void exit();
 
@@ -42,6 +43,8 @@ private:
 	template<bool pendOld>
 	inline static void switchToNext();
 
+	static void doAsync();
+	static void doPreempt();
 	static uintptr_t doStartTask(uintptr_t task);
 	static uintptr_t doExit();
 	static uintptr_t doYield();
@@ -62,15 +65,38 @@ template<class Profile, template<class> class Policy>
 bool Scheduler<Profile, Policy>::isRunning = false;
 
 template<class Profile, template<class> class Policy>
-inline void Scheduler<Profile, Policy>::start() {
+template<class... T>
+inline void Scheduler<Profile, Policy>::start(T... t) {
 	TaskBase* firstTask = policy.getNext();
 	isRunning = true;
+	Profile::CallGate::async(&Scheduler::doAsync);
+	Profile::Timer::setTickHandler(&Scheduler::doPreempt);
+	Profile::init(t...);
 	firstTask->startFirst();
 }
 
 template<class Profile, template<class> class Policy>
 inline typename Profile::Timer::TickType Scheduler<Profile, Policy>::getTick() {
 	return Profile::Timer::getTick();
+}
+
+template<class Profile, template<class> class Policy>
+void Scheduler<Profile, Policy>::doPreempt()
+{
+	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+
+	if(TaskBase* newTask = policy.getNext()) {
+		if(!policy.isHigherPriority(currentTask, newTask)) {
+			policy.addRunnable(static_cast<TaskBase*>(currentTask));
+			newTask->switchTo();
+		}
+	}
+}
+
+template<class Profile, template<class> class Policy>
+inline void Scheduler<Profile, Policy>:: doAsync()
+{
+	asm ("nop");
 }
 
 #endif /* SCHEDULER_H_ */

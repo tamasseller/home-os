@@ -26,8 +26,8 @@ class RoundRobinPolicy {
 		tasks.fastRemove(task);
 	}
 
-	int comparePriority(FullTask* a, FullTask* b) {
-		return (int)(a - b);
+	bool isHigherPriority(FullTask* high, FullTask* low) {
+		return false;
 	}
 
 	FullTask* getNext() {

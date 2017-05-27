@@ -11,8 +11,9 @@ volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
-volatile bool ProfileCortexM0::CallGate::isAsyncActive = false;
+
 void (*ProfileCortexM0::CallGate::asyncCallHandler)();
+void (*ProfileCortexM0::Timer::tickHandler)();
 
 __attribute__((naked))
 void ProfileCortexM0::Task::startFirst()
@@ -135,44 +136,73 @@ void PendSV_Handler() {
 	using Task = ProfileCortexM0::Internals::Task;
 	using CallGate = ProfileCortexM0::Internals::CallGate;
 
-	if(CallGate::isAsyncActive) {
+/*	if(CallGate::isAsyncActive) {
 		CallGate::isAsyncActive = false;
 		CallGate::asyncCallHandler();
-	}
+	}*/
 
 	asm volatile (
-		"cmp %[out], #0			\n"
-		"beq PendSV_done		\n"
-		"mrs r0, psp			\n"
-		"sub r0, r0, #32		\n"
-		"stmia r0!, {r4-r7}		\n" /* Store remaining low regs */
+		".thumb					\n"
+		".syntax unified		\n"
 
-		"str r0, [%[out]]		\n"
-		"mov r4, #0				\n"
-		"str r4, [%[clr]]		\n"
+		"ldr r0, PendSV_async 	\n" // r0 = (void(*)()*) &CallGate::asyncCallHandler
+		"ldr r0, [r0]			\n" // r0 = (void(*)()) CallGate::asyncCallHandler
+		"cmp r0, #0				\n"	// if(CallGate::asyncCallHandler) {
+		"beq PendSV_noAsync		\n"	//
+		"push {lr}				\n"
+		"blx r0					\n"	// CallGate::asyncCallHandler();
+		"pop {r0}				\n"
+		"mov lr, r0				\n"
+		"PendSV_noAsync:		\n"	// }
+
+
+		"ldr r0, PendSV_old		\n" // r0 = (Task**) &Task::oldTask
+		"ldr r1, [r0]			\n" // r1 = (Task*) Task::oldTask
+
+		"cmp r1, #0				\n"	// if(!Task::oldTask)
+		"beq PendSV_done		\n"	// 		goto done;
+
+		"mrs r2, psp			\n" // r2 = psp
+		"subs r2, r2, #32		\n" // r2 -= 8 * 4					// make room for additional registers
+		"stmia r2!, {r4-r7}		\n" // *r2++ = {r4, r5, r6, r7} 	// save low regs
+
+		"str r2, [r1]			\n"	// Task::oldTask->sp = r2		// save mid-frame stack pointer
+		"movs r3, #0			\n"
+		"str r3, [r0]			\n" // *r0 = nullptr				// zero out Task::oldTask
 
 		"mov r4, r8				\n"
 		"mov r5, r9				\n"
 		"mov r6, r10			\n"
 		"mov r7, r11			\n"
-		"stmia r0!, {r4-r7}		\n" /* Store remaining high regs */
+		"stmia r2!, {r4-r7}		\n" // *r2++ = {r8, r9, r10, r11} 	// store remaining high regs
 
-		"ldmia %[in]!, {r4-r7}	\n" /* Load high regs*/
+		"ldr r0, PendSV_new		\n"	// r0 = (Task**) &Task::oldTask
+		"ldr r0, [r0]			\n" // r0 = Task::oldTask
+		"ldr r0, [r0]			\n" // r0 = Task::oldTask->sp
+
+		"ldmia r0!, {r4-r7}		\n" /* Load high regs*/
 		"mov r8, r4				\n"
 		"mov r9, r5				\n"
 		"mov r10, r6			\n"
 		"mov r11, r7			\n"
 
-		"msr psp, %[in]			\n" /* Save original top of stack */
-		"sub %[in], %[in], #32	\n" /* Go back down for the low regs */
-		"ldmia %[in]!, {r4-r7}	\n" /* Load low regs*/
+		"msr psp, r0			\n" /* Save original top of stack */
+		"subs r0, r0, #32		\n" /* Go back down for the low regs */
+		"ldmia r0!, {r4-r7}		\n" /* Load low regs*/
 		"PendSV_done:			\n"
 		"bx lr					\n" /* Return */
+		".align 4				\n"
+		"PendSV_old:			\n"
+		"	.word %c0			\n"
+		"PendSV_new:			\n"
+		"	.word %c1			\n"
+		"PendSV_async:			\n"
+		"	.word %c2			\n"
 			:
-			: [in] "r" (Task::currentTask->sp),
-			  [out] "r" (&Task::oldTask->sp),
-			  [clr] "r" (&Task::oldTask)
-			: "r0", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12"
+			: "i" (&Task::oldTask),
+			  "i" (&Task::currentTask),
+			  "i" (&CallGate::asyncCallHandler)
+			: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12"
 	);
 }
 
@@ -180,4 +210,5 @@ void SysTick_Handler()
 {
 	using Timer = ProfileCortexM0::Internals::Timer;
 	Timer::tick++;
+	Timer::tickHandler();
 }

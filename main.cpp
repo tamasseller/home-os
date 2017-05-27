@@ -58,13 +58,12 @@ struct T1: public TaskHelper<T1> {
 		while(1) {
 			mutex.lock();
 			GPIO_SetBits(GPIOC, LEDR_PIN);
-
-			for(volatile int i = 0xffff; --i;)
-				Os::yield();
-
+			for(volatile int i = 0xfffff; --i;);
 			GPIO_ResetBits(GPIOC, LEDR_PIN);
 			mutex.unlock();
-			Os::yield();
+
+			for(volatile int i = 0xfffff; --i;);
+
 		}
 
 	}
@@ -75,13 +74,11 @@ struct T2: public TaskHelper<T2> {
 		while(1) {
 			mutex.lock();
 			GPIO_SetBits(GPIOC, LEDB_PIN);
-
-			for(volatile int i = 0xffff; --i;)
-				Os::yield();
-
+			for(volatile int i = 0xfffff; --i;);
 			GPIO_ResetBits(GPIOC, LEDB_PIN);
 			mutex.unlock();
-			Os::yield();
+
+			for(volatile int i = 0xfffff; --i;);
 		}
 	}
 } t2;
@@ -92,13 +89,12 @@ struct T3: public TaskHelper<T3> {
 		while(1) {
 			mutex.lock();
 			GPIO_SetBits(GPIOC, LEDG_PIN);
-
-			for(volatile int i = 0xffff; --i;)
-				Os::yield();
-
+			for(volatile int i = 0xfffff; --i;);
 			GPIO_ResetBits(GPIOC, LEDG_PIN);
 			mutex.unlock();
-			Os::yield();
+
+			for(volatile int i = 0xfffff; --i;);
+
 		}
 	}
 } t3;
@@ -120,7 +116,7 @@ int main()
 	t1.start();
 	t2.start();
 	t3.start();
-	Os::start();
+	Os::start(48000);
 
 	GPIO_ResetBits(GPIOC, LEDR_PIN | LEDG_PIN | LEDB_PIN | LEDO_PIN);
 

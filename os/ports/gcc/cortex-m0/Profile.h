@@ -18,8 +18,7 @@ class ProfileCortexM0 {
 		static Task* volatile currentTask;
 		static Task* volatile oldTask;
 
-		template<class Type, void (Type::*entry)()> static void entryStub(
-				Type* self);
+		template<class Type, void (Type::*entry)()> static void entryStub(Type* self);
 
 		void* sp;
 
@@ -36,6 +35,9 @@ class ProfileCortexM0 {
 
 	class Timer {
 		friend void SysTick_Handler();
+
+		static void (*tickHandler)();
+
 		static volatile uint32_t tick;
 	public:
 		typedef uint32_t TickType;
@@ -43,11 +45,12 @@ class ProfileCortexM0 {
 
 		typedef uint32_t ClockType;
 		static inline ClockType getClockCycle();
+
+		static inline void setTickHandler(void (*tickHandler)());
 	};
 
 	class CallGate {
 		friend void PendSV_Handler();
-		static volatile bool isAsyncActive;
 		static void (*asyncCallHandler)();
 
 		static uintptr_t issueSvc(uintptr_t (*f)());
@@ -55,27 +58,17 @@ class ProfileCortexM0 {
 		static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t));
 		static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t));
 		static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t));
+		template<class ... Args> static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args);
 
-		template<class ... Args>
-		static inline uintptr_t callViaSvc(uintptr_t (f)(Args...),
-				Args ... args) {
-			return issueSvc((uintptr_t)args..., f);
-		}
 	public:
-		template<class ... T>
-		static inline uintptr_t sync(T ... ops) {
-			return callViaSvc(ops...);
-		}
-
-		static inline void async();
-
-		inline void init(void (*asyncCallHandler)()) {
-			CallGate::asyncCallHandler = asyncCallHandler;
-		}
+		template<class ... T> static inline uintptr_t sync(T ... ops);
+		static inline void async(void (*asyncCallHandler)());
 	};
 
 public:
 	class Internals;
+
+	static inline void init(uint32_t ticks);
 };
 
 class ProfileCortexM0::Internals: ProfileCortexM0 {
@@ -87,26 +80,26 @@ class ProfileCortexM0::Internals: ProfileCortexM0 {
 		friend void SysTick_Handler();
 		friend ProfileCortexM0;
 		class Icsr {
-			static constexpr auto reg = ((volatile uint32_t *) 0xE000ED04);
+			static constexpr auto reg = ((volatile uint32_t *) 0xe000ed04);
 			static constexpr uint32_t PendSvSet = 1u << 28;
-			static constexpr uint32_t PendStSet = 1u << 26;
-
 		public:
 			static inline void triggerPendSV() {
 				*reg = PendSvSet;
 			}
-
-			static inline void triggerSysTick() {
-				*reg = PendStSet;
-			}
 		};
 
 		class Syst {
-			static constexpr auto reg = ((volatile uint32_t *) 0xE000E010);
-			static constexpr uint32_t Countflag = 1u << 16;
+			static constexpr auto ctrl = ((volatile uint32_t *) 0xe000e010);
+			static constexpr auto load = ((volatile uint32_t *) 0xe000e014);
+			static constexpr uint32_t SourceHclk  = 1u << 2;
+			static constexpr uint32_t EnableIrq   = 1u << 1;
+			static constexpr uint32_t EnableTimer = 1u << 0;
+
 		public:
-			static inline bool triggeredByCounter() {
-				return *reg & Countflag;
+
+			static void init(uint32_t ticks) {
+				*load = ticks-1;
+				*ctrl |=  SourceHclk | EnableIrq | EnableTimer;
 			}
 		};
 	};
@@ -116,18 +109,35 @@ class ProfileCortexM0::Internals: ProfileCortexM0 {
 	using ProfileCortexM0::CallGate;
 };
 
+inline void ProfileCortexM0::init(uint32_t ticks) {
+	Internals::Scb::Syst::init(ticks);
+
+/*    SCB->SHP[_SHP_IDX(IRQn)] = (SCB->SHP[_SHP_IDX(IRQn)] & ~(0xFF << _BIT_SHIFT(IRQn))) |
+        (((priority << (8 - __NVIC_PRIO_BITS)) & 0xFF) << _BIT_SHIFT(IRQn)); }*/
+
+}
+
+template<class ... Args>
+inline uintptr_t ProfileCortexM0::CallGate::callViaSvc(uintptr_t (f)(Args...), Args ... args) {
+	return issueSvc((uintptr_t)args..., f);
+}
+template<class ... T>
+inline uintptr_t ProfileCortexM0::CallGate::sync(T ... ops) {
+	return callViaSvc(ops...);
+}
+
+inline void ProfileCortexM0::CallGate::async(void (*asyncCallHandler)()) {
+	CallGate::asyncCallHandler = asyncCallHandler;
+	Internals::Scb::Icsr::triggerPendSV();
+}
+
 template<class Type, void (Type::*entry)()>
 void ProfileCortexM0::Task::entryStub(Type* self) {
 	(self->*entry)();
 }
 
-inline void ProfileCortexM0::CallGate::async() {
-	return Internals::Scb::Icsr::triggerSysTick();
-}
-
 template<class Type, void (Type::*entry)(), void exit()>
-inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize,
-		Type* arg) {
+inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize, Type* arg) {
 	uintptr_t* data = (uintptr_t*) stack + (stackSize / 4 - 1);
 
 	void (*stub)(Type*) = &entryStub<Type, entry>;
@@ -167,6 +177,10 @@ inline ProfileCortexM0::Timer::TickType ProfileCortexM0::Timer::getTick() {
 
 inline ProfileCortexM0::Timer::ClockType ProfileCortexM0::Timer::getClockCycle() {
 	return 0;
+}
+
+inline void ProfileCortexM0::Timer::setTickHandler(void (*tickHandler)()) {
+	ProfileCortexM0::Timer::tickHandler = tickHandler;
 }
 
 #endif /* CORTEXM0_H_ */
