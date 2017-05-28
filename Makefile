@@ -64,7 +64,7 @@ LDFLAGS += -gc-sections
 LDFLAGS += -nostartfiles
 LDFLAGS += -Tstm32.ld
 
-LIBS += gcc c
+LIBS += gcc 
 
 LIB_DIRS += $(GCCPATH)/arm-none-eabi/lib/armv6-m/ 
 LIB_DIRS += $(GCCPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m/  

@@ -8,8 +8,6 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
-#include "data/LinkedList.h"
-
 /*
  * Scheduler root class.
  */
@@ -29,34 +27,79 @@ public:
 
 private:
 	class TaskBase;
+	class EventBase;
+	class EventList;
 	class MutexBase;
+	class AtomicList;
+	class PreemptionEvent;
+	template<class> class Event;
 
-	static Policy<TaskBase> policy;
 	static bool isRunning;
+	static EventList eventList;
+	static Policy<TaskBase> policy;
+	static PreemptionEvent preemptionEvent;
 
-	template<class T>
-	static uintptr_t detypePtr(T* x);
-
-	template<class T>
-	static T* entypePtr(uintptr_t  x);
-
-	template<bool pendOld>
-	inline static void switchToNext();
-
+	static void onTick();
 	static void doAsync();
-	static void doPreempt();
 	static uintptr_t doStartTask(uintptr_t task);
 	static uintptr_t doExit();
 	static uintptr_t doYield();
 	static uintptr_t doLock(uintptr_t mutex);
 	static uintptr_t doUnlock(uintptr_t mutex);
+
+	template<class T>
+	static inline uintptr_t detypePtr(T* x);
+
+	template<class T>
+	static inline T* entypePtr(uintptr_t  x);
+
+	template<bool pendOld>
+	static inline void switchToNext();
+
+	template<class RealEvent, class... Args>
+	static inline void postEvent(RealEvent*, Args... args);
 };
 
+#include "AtomicList.h"
 #include "Helpers.h"
 #include "Mutex.h"
 #include "Task.h"
+#include "Event.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+
+template<class Profile, template<class> class Policy>
+class Scheduler<Profile, Policy>::PreemptionEvent:
+public Scheduler<Profile, Policy>::template Event<Scheduler<Profile, Policy>::PreemptionEvent> {
+public:
+	class Combiner {
+	public:
+		inline bool operator()(uintptr_t old, uintptr_t& result) const {
+			result = old+1;
+			return true;
+		}
+	};
+
+	static inline void execute(uintptr_t arg) {
+		// assert(arg == 1);
+
+		TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+
+		if(TaskBase* newTask = policy.getNext()) {
+			if(!policy.isHigherPriority(currentTask, newTask)) {
+				policy.addRunnable(static_cast<TaskBase*>(currentTask));
+				newTask->switchTo();
+			}
+		}
+	}
+};
+
+template<class Profile, template<class> class Policy>
+class Scheduler<Profile, Policy>::PreemptionEvent Scheduler<Profile, Policy>::preemptionEvent;
+
+
+template<class Profile, template<class> class Policy>
+typename Scheduler<Profile, Policy>::EventList Scheduler<Profile, Policy>::eventList;
 
 template<class Profile, template<class> class Policy>
 Policy<typename Scheduler<Profile, Policy>::TaskBase> Scheduler<Profile, Policy>::policy;
@@ -69,8 +112,7 @@ template<class... T>
 inline void Scheduler<Profile, Policy>::start(T... t) {
 	TaskBase* firstTask = policy.getNext();
 	isRunning = true;
-	Profile::CallGate::async(&Scheduler::doAsync);
-	Profile::Timer::setTickHandler(&Scheduler::doPreempt);
+	Profile::Timer::setTickHandler(&Scheduler::onTick);
 	Profile::init(t...);
 	firstTask->startFirst();
 }
@@ -81,22 +123,15 @@ inline typename Profile::Timer::TickType Scheduler<Profile, Policy>::getTick() {
 }
 
 template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::doPreempt()
+void Scheduler<Profile, Policy>::onTick()
 {
-	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
-
-	if(TaskBase* newTask = policy.getNext()) {
-		if(!policy.isHigherPriority(currentTask, newTask)) {
-			policy.addRunnable(static_cast<TaskBase*>(currentTask));
-			newTask->switchTo();
-		}
-	}
+	postEvent(&preemptionEvent);
 }
 
 template<class Profile, template<class> class Policy>
 inline void Scheduler<Profile, Policy>:: doAsync()
 {
-	asm ("nop");
+	eventList.dispatch();
 }
 
 #endif /* SCHEDULER_H_ */

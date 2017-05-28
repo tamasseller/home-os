@@ -87,14 +87,13 @@ struct T2: public TaskHelper<T2> {
 struct T3: public TaskHelper<T3> {
 	void run() {
 		while(1) {
-			mutex.lock();
+			//mutex.lock();
 			GPIO_SetBits(GPIOC, LEDG_PIN);
 			for(volatile int i = 0xfffff; --i;);
 			GPIO_ResetBits(GPIOC, LEDG_PIN);
-			mutex.unlock();
+			//mutex.unlock();
 
 			for(volatile int i = 0xfffff; --i;);
-
 		}
 	}
 } t3;
