@@ -97,16 +97,15 @@ inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent()
 	return currentTask;
 }
 
-extern int asd;
+extern volatile int asd, qwe;
 
 inline void ProfileCortexM0::Task::suspendExecution() {
 	struct Idler {
 		__attribute__((naked))
 		static void sleep() {
-			while(true) {
-				asd++;
-				asm("wfi\n");
-			}
+			asm("sleep_until_interrupted:		\n"
+				"	wfi							\n"
+				"	b sleep_until_interrupted	\n");
 		}
 	};
 

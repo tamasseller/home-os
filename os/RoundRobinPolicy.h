@@ -30,10 +30,13 @@ class RoundRobinPolicy {
 		return false;
 	}
 
-	FullTask* getNext() {
+	FullTask* popNext() {
 		return tasks.popFront();
 	}
 
+	FullTask* peekNext() {
+		return tasks.front();
+	}
 };
 
 #endif /* ROUNDROBINPOLICY_H_ */

@@ -77,6 +77,7 @@ TaskBase: Profile::Task, Policy<TaskBase>::Task, Scheduler<Profile, Policy>::Sle
 template<class Profile, template<class> class Policy>
 uintptr_t Scheduler<Profile, Policy>::
 doStartTask(uintptr_t task) {
+	nTasks++;
 	policy.addRunnable(entypePtr<TaskBase>(task));
 }
 
@@ -98,8 +99,8 @@ doSleep(uintptr_t time) {
 template<class Profile, template<class> class Policy>
 uintptr_t Scheduler<Profile, Policy>::
 doExit() {
-	if(TaskBase* newTask = static_cast<TaskBase*>(policy.getNext())) {
-		newTask->switchTo();
+	if(--nTasks) {
+		switchToNext<false>();
 	} else {
 		isRunning = false;
 		Profile::Task::getCurrent()->finishLast();

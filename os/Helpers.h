@@ -13,7 +13,7 @@ template<bool pendOld>
 inline void Scheduler<Profile, Policy>::
 switchToNext()
 {
-	if(TaskBase* newTask = policy.getNext()) {
+	if(TaskBase* newTask = policy.popNext()) {
 		if(pendOld)
 			policy.addRunnable(static_cast<TaskBase*>(Profile::Task::getCurrent()));
 

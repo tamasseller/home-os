@@ -38,6 +38,7 @@ private:
 	template<class> class Event;
 
 	static bool isRunning;
+	static uintptr_t nTasks;
 	static EventList eventList;
 	static SleepList sleepList;
 	static Policy<TaskBase> policy;
@@ -97,19 +98,17 @@ public:
 			policy.addRunnable(static_cast<TaskBase*>(sleeper));
 		}
 
-
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
-			if(TaskBase* newTask = policy.getNext()) {
+			if(TaskBase* newTask = policy.peekNext()) {
+				TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
 				if(!policy.isHigherPriority(currentTask, newTask)) {
+					policy.popNext();
 					policy.addRunnable(static_cast<TaskBase*>(currentTask));
 					newTask->switchTo();
-				} else
-					policy.addRunnable(static_cast<TaskBase*>(newTask));
-					// TODO don't remove-then-readd if not suitable.
+				}
 			}
 		} else {
-			if(TaskBase* newTask = policy.getNext())
+			if(TaskBase* newTask = policy.popNext())
 				newTask->switchTo();
 		}
 	}
@@ -131,9 +130,13 @@ template<class Profile, template<class> class Policy>
 bool Scheduler<Profile, Policy>::isRunning = false;
 
 template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::nTasks;
+
+
+template<class Profile, template<class> class Policy>
 template<class... T>
 inline void Scheduler<Profile, Policy>::start(T... t) {
-	TaskBase* firstTask = policy.getNext();
+	TaskBase* firstTask = policy.popNext();
 	isRunning = true;
 	Profile::Timer::setTickHandler(&Scheduler::onTick);
 	Profile::init(t...);
