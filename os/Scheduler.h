@@ -23,10 +23,13 @@ public:
 
 	template<class... T> inline static void start(T... t);
 	inline static void yield();
+	inline static void sleep(uintptr_t time);
 	inline static void exit();
 
 private:
+	class Sleeper;
 	class TaskBase;
+	class SleepList;
 	class EventBase;
 	class EventList;
 	class MutexBase;
@@ -36,6 +39,7 @@ private:
 
 	static bool isRunning;
 	static EventList eventList;
+	static SleepList sleepList;
 	static Policy<TaskBase> policy;
 	static PreemptionEvent preemptionEvent;
 
@@ -44,6 +48,7 @@ private:
 	static uintptr_t doStartTask(uintptr_t task);
 	static uintptr_t doExit();
 	static uintptr_t doYield();
+	static uintptr_t doSleep(uintptr_t time);
 	static uintptr_t doLock(uintptr_t mutex);
 	static uintptr_t doUnlock(uintptr_t mutex);
 
@@ -65,6 +70,7 @@ private:
 #include "Mutex.h"
 #include "Task.h"
 #include "Event.h"
+#include "SleepList.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -83,6 +89,14 @@ public:
 	static inline void execute(uintptr_t arg) {
 		// assert(arg == 1);
 
+		while(TaskBase* sleeper = sleepList.peek()) {
+			if(!(*sleeper < Profile::Timer::getTick()))
+				break;
+
+			sleepList.pop();
+			policy.addRunnable(static_cast<TaskBase*>(sleeper));
+		}
+
 		TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
 
 		if(TaskBase* newTask = policy.getNext()) {
@@ -97,6 +111,8 @@ public:
 template<class Profile, template<class> class Policy>
 class Scheduler<Profile, Policy>::PreemptionEvent Scheduler<Profile, Policy>::preemptionEvent;
 
+template<class Profile, template<class> class Policy>
+typename Scheduler<Profile, Policy>::SleepList Scheduler<Profile, Policy>::sleepList;
 
 template<class Profile, template<class> class Policy>
 typename Scheduler<Profile, Policy>::EventList Scheduler<Profile, Policy>::eventList;

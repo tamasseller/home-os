@@ -61,9 +61,7 @@ struct T1: public TaskHelper<T1> {
 			for(volatile int i = 0xfffff; --i;);
 			GPIO_ResetBits(GPIOC, LEDR_PIN);
 			mutex.unlock();
-
 			for(volatile int i = 0xfffff; --i;);
-
 		}
 
 	}
@@ -74,11 +72,10 @@ struct T2: public TaskHelper<T2> {
 		while(1) {
 			mutex.lock();
 			GPIO_SetBits(GPIOC, LEDB_PIN);
-			for(volatile int i = 0xfffff; --i;);
+			Os::sleep(1000);
 			GPIO_ResetBits(GPIOC, LEDB_PIN);
 			mutex.unlock();
-
-			for(volatile int i = 0xfffff; --i;);
+			Os::sleep(1000);
 		}
 	}
 } t2;
@@ -87,16 +84,19 @@ struct T2: public TaskHelper<T2> {
 struct T3: public TaskHelper<T3> {
 	void run() {
 		while(1) {
-			//mutex.lock();
+			Os::sleep(200);
 			GPIO_SetBits(GPIOC, LEDG_PIN);
-			for(volatile int i = 0xfffff; --i;);
+			Os::sleep(200);
 			GPIO_ResetBits(GPIOC, LEDG_PIN);
-			//mutex.unlock();
-
-			for(volatile int i = 0xfffff; --i;);
 		}
 	}
 } t3;
+
+struct Idle: public TaskHelper<Idle> {
+	void run() {
+		for(;;);
+	}
+} idle;
 
 int main()
 {
@@ -112,6 +112,7 @@ int main()
 	NVIC_SetPriority(SysTick_IRQn, 0);
 
 	mutex.init();
+	idle.start();
 	t1.start();
 	t2.start();
 	t3.start();

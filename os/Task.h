@@ -9,6 +9,7 @@
 #define TASK_H_
 
 #include "Helpers.h"
+#include "Sleeper.h"
 
 /**
  * Task front-end object.
@@ -26,6 +27,14 @@ inline void Scheduler<Profile, Policy>::
 yield() {
 	Profile::CallGate::sync(&Scheduler::doYield);
 }
+
+template<class Profile, template<class> class Policy>
+inline void Scheduler<Profile, Policy>::
+sleep(uintptr_t time) {
+	// assert(time <= INTPTR_MAX);
+	Profile::CallGate::sync(&Scheduler::doSleep, time);
+}
+
 
 template<class Profile, template<class> class Policy>
 inline void Scheduler<Profile, Policy>::
@@ -58,7 +67,7 @@ start(void* stack, uint32_t stackSize) {
  */
 template<class Profile, template<class> class Policy>
 class Scheduler<Profile, Policy>::
-TaskBase: Profile::Task, Policy<TaskBase>::Task {
+TaskBase: Profile::Task, Policy<TaskBase>::Task, Scheduler<Profile, Policy>::Sleeper {
 	friend Scheduler;
 
 	friend pet::DoubleList<TaskBase>;
@@ -75,6 +84,15 @@ template<class Profile, template<class> class Policy>
 uintptr_t Scheduler<Profile, Policy>::
 doYield() {
 	switchToNext<true>();
+}
+
+template<class Profile, template<class> class Policy>
+uintptr_t Scheduler<Profile, Policy>::
+doSleep(uintptr_t time) {
+	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+	currentTask->deadline = Profile::Timer::getTick() + time;
+	sleepList.add(currentTask);
+	switchToNext<false>();
 }
 
 template<class Profile, template<class> class Policy>
