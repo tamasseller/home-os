@@ -7,10 +7,15 @@
 
 #include "Profile.h"
 
+int volatile asd = 0;
+
 volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
+ProfileCortexM0::Task ProfileCortexM0::Task::idleTask;
+uint32_t ProfileCortexM0::Task::idleStack[ProfileCortexM0::Task::frameSize];
+
 
 void (*ProfileCortexM0::CallGate::asyncCallHandler)();
 void (*ProfileCortexM0::Timer::tickHandler)();
@@ -135,11 +140,6 @@ __attribute__((naked))
 void PendSV_Handler() {
 	using Task = ProfileCortexM0::Internals::Task;
 	using CallGate = ProfileCortexM0::Internals::CallGate;
-
-/*	if(CallGate::isAsyncActive) {
-		CallGate::isAsyncActive = false;
-		CallGate::asyncCallHandler();
-	}*/
 
 	asm volatile (
 		".thumb					\n"

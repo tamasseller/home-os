@@ -21,7 +21,7 @@ class ProfileCortexM0 {
 public:
 	class Internals;
 
-	static inline void init(uint32_t ticks);
+	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
 };
 
 #include "Internals.h"
@@ -32,9 +32,11 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-inline void ProfileCortexM0::init(uint32_t ticks) {
+inline void ProfileCortexM0::init(uint32_t ticks, uint8_t systickPrio) {
+	Task::init();
 	Internals::Scb::Syst::init(ticks);
-	Internals::Scb::Shpr::init(0, 0 /* 0x40 */, 0);
+	Internals::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
+	//Internals::Scb::Scr::configureSleepMode(true, false, false);
 }
 
 #endif /* CORTEXM0_H_ */

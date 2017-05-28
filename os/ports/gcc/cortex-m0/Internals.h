@@ -43,13 +43,29 @@ class ProfileCortexM0::Internals: ProfileCortexM0 {
 		};
 
 		class Shpr {
-			static constexpr auto shpr2 = ((volatile uint32_t *) 0xe000e01c);
-			static constexpr auto shpr3 = ((volatile uint32_t *) 0xe000e010);
+			static constexpr auto shpr2 = ((volatile uint32_t *) 0xe000ed1c);
+			static constexpr auto shpr3 = ((volatile uint32_t *) 0xe000ed20);
 
 		public:
 			static void init(uint8_t svcPrio, uint8_t sysTickPrio, uint8_t pendSvPrio) {
 				*shpr2 = (*shpr2 & 0x00ffffff) | (svcPrio << 24);
 				*shpr3 = (*shpr3 & 0x0000ffff) | (sysTickPrio << 24 | pendSvPrio << 16);
+			}
+		};
+
+		class Scr {
+			static constexpr auto reg = ((volatile uint32_t *) 0xe000ed10);
+			static constexpr uint32_t sevOnPend = 1u << 4;
+			static constexpr uint32_t sleepDeep = 1u << 2;
+			static constexpr uint32_t sleepOnExit = 1u << 1;
+
+		public:
+			static void configureSleepMode(bool doSevOnPend, bool doSleepDeep, bool doSleepOnExit) {
+				*reg = (*reg & (~(sevOnPend | sleepDeep | sleepOnExit)))
+						| ((doSevOnPend ? sevOnPend : 0)
+						| (doSleepDeep ? sleepDeep : 0)
+						| (doSleepOnExit ? sleepOnExit : 0));
+
 			}
 		};
 	};

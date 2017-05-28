@@ -71,9 +71,9 @@ struct T2: public TaskHelper<T2> {
 	void run() {
 		while(1) {
 			mutex.lock();
-			GPIO_SetBits(GPIOC, LEDB_PIN);
+			GPIO_SetBits(GPIOC, LEDO_PIN);
 			Os::sleep(1000);
-			GPIO_ResetBits(GPIOC, LEDB_PIN);
+			GPIO_ResetBits(GPIOC, LEDO_PIN);
 			mutex.unlock();
 			Os::sleep(1000);
 		}
@@ -107,12 +107,7 @@ int main()
 	gpioInit.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_Init(GPIOC, &gpioInit);
 
-	SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
-	SysTick_Config(48000);
-	NVIC_SetPriority(SysTick_IRQn, 0);
-
 	mutex.init();
-	idle.start();
 	t1.start();
 	t2.start();
 	t3.start();

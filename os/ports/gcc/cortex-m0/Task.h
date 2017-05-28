@@ -19,15 +19,23 @@ class ProfileCortexM0::Task {
 
 	void* sp;
 
+	static constexpr auto frameSize = 16u * 4u;
+
+	static Task idleTask;
+	static uint32_t idleStack[frameSize];
 public:
+	inline static void init();
+
 	template<class Type, void (Type::*entry)(), void exit()>
 	inline void initialize(void* stack, uint32_t stackSize, Type* arg);
 
 	void startFirst();
 	void finishLast();
 
-	void switchTo();
-	static Task* getCurrent();
+	inline void switchTo();
+	inline static Task* getCurrent();
+
+	static inline void suspendExecution();
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -40,6 +48,8 @@ void ProfileCortexM0::Task::entryStub(Type* self) {
 template<class Type, void (Type::*entry)(), void exit()>
 inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize, Type* arg) {
 	uintptr_t* data = (uintptr_t*) stack + (stackSize / 4 - 1);
+
+	// assert(stackSize >= frameSize);
 
 	void (*stub)(Type*) = &entryStub<Type, entry>;
 
@@ -72,5 +82,20 @@ inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent() {
 	return currentTask;
 }
 
+inline void ProfileCortexM0::Task::init() {
+	struct Idler {
+		__attribute__((noreturn))
+		void sleep() {
+			while(true)
+				asm("wfe\n");
+		}
+	};
+
+	idleTask.initialize<Idler, &Idler::sleep, (void (*)())nullptr>(idleStack, sizeof(idleStack), nullptr);
+}
+
+inline void ProfileCortexM0::Task::suspendExecution() {
+	idleTask.switchTo();
+}
 
 #endif /* PROFILE_TASK_H_ */

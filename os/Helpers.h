@@ -18,9 +18,9 @@ switchToNext()
 			policy.addRunnable(static_cast<TaskBase*>(Profile::Task::getCurrent()));
 
 		newTask->switchTo();
-	} else {
-		// TODO idle task
-	}
+	} else
+		Profile::Task::suspendExecution();
+
 }
 
 /*
