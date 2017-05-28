@@ -14,6 +14,7 @@ class ProfileCortexM0::Task {
 	friend void PendSV_Handler();
 	static Task* volatile currentTask;
 	static Task* volatile oldTask;
+	static void* suspendedPc;
 
 	template<class Type, void (Type::*entry)()> static void entryStub(Type* self);
 
@@ -21,11 +22,8 @@ class ProfileCortexM0::Task {
 
 	static constexpr auto frameSize = 16u * 4u;
 
-	static Task idleTask;
-	static uint32_t idleStack[frameSize];
+	static inline void* &stackedPc();
 public:
-	inline static void init();
-
 	template<class Type, void (Type::*entry)(), void exit()>
 	inline void initialize(void* stack, uint32_t stackSize, Type* arg);
 
@@ -72,30 +70,48 @@ inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize, T
 	*data-- = 0xbaadf00d;		// r4
 }
 
-inline void ProfileCortexM0::Task::switchTo() {
+inline void* &ProfileCortexM0::Task::stackedPc()
+{
+	void **psp;
+	asm volatile ("mrs %0, psp\n"  : "=r" (psp));
+	return psp[6];
+}
+
+inline void ProfileCortexM0::Task::switchTo()
+{
+	if(suspendedPc) {
+		stackedPc() = suspendedPc;
+		suspendedPc = nullptr;
+	}
+
 	oldTask = currentTask;
 	currentTask = this;
 	Internals::Scb::Icsr::triggerPendSV();
 }
 
-inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent() {
+inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent()
+{
+	if(suspendedPc)
+		return nullptr;
+
 	return currentTask;
 }
 
-inline void ProfileCortexM0::Task::init() {
+extern int asd;
+
+inline void ProfileCortexM0::Task::suspendExecution() {
 	struct Idler {
-		__attribute__((noreturn))
-		void sleep() {
-			while(true)
-				asm("wfe\n");
+		__attribute__((naked))
+		static void sleep() {
+			while(true) {
+				asd++;
+				asm("wfi\n");
+			}
 		}
 	};
 
-	idleTask.initialize<Idler, &Idler::sleep, (void (*)())nullptr>(idleStack, sizeof(idleStack), nullptr);
-}
-
-inline void ProfileCortexM0::Task::suspendExecution() {
-	idleTask.switchTo();
+	suspendedPc = stackedPc();
+	stackedPc() = (void*)&Idler::sleep;
 }
 
 #endif /* PROFILE_TASK_H_ */

@@ -97,13 +97,20 @@ public:
 			policy.addRunnable(static_cast<TaskBase*>(sleeper));
 		}
 
-		TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
 
-		if(TaskBase* newTask = policy.getNext()) {
-			if(!policy.isHigherPriority(currentTask, newTask)) {
-				policy.addRunnable(static_cast<TaskBase*>(currentTask));
-				newTask->switchTo();
+		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
+			TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
+			if(TaskBase* newTask = policy.getNext()) {
+				if(!policy.isHigherPriority(currentTask, newTask)) {
+					policy.addRunnable(static_cast<TaskBase*>(currentTask));
+					newTask->switchTo();
+				} else
+					policy.addRunnable(static_cast<TaskBase*>(newTask));
+					// TODO don't remove-then-readd if not suitable.
 			}
+		} else {
+			if(TaskBase* newTask = policy.getNext())
+				newTask->switchTo();
 		}
 	}
 };

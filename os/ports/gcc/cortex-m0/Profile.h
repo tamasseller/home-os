@@ -33,7 +33,6 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 inline void ProfileCortexM0::init(uint32_t ticks, uint8_t systickPrio) {
-	Task::init();
 	Internals::Scb::Syst::init(ticks);
 	Internals::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
 	//Internals::Scb::Scr::configureSleepMode(true, false, false);

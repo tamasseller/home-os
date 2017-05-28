@@ -7,15 +7,11 @@
 
 #include "Profile.h"
 
-int volatile asd = 0;
-
 volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
-ProfileCortexM0::Task ProfileCortexM0::Task::idleTask;
-uint32_t ProfileCortexM0::Task::idleStack[ProfileCortexM0::Task::frameSize];
-
+void* ProfileCortexM0::Task::suspendedPc;
 
 void (*ProfileCortexM0::CallGate::asyncCallHandler)();
 void (*ProfileCortexM0::Timer::tickHandler)();
@@ -64,9 +60,7 @@ void ProfileCortexM0::Task::finishLast()
 		}
 	};
 
-	void **psp;
-	asm volatile ("mrs %0, psp\n"  : "=r" (psp));
-	psp[6] = (void*)&ReturnTaskStub::restoreMasterState;
+	stackedPc() = (void*)&ReturnTaskStub::restoreMasterState;
 	currentTask = nullptr;
 }
 

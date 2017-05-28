@@ -72,10 +72,10 @@ struct T2: public TaskHelper<T2> {
 		while(1) {
 			mutex.lock();
 			GPIO_SetBits(GPIOC, LEDO_PIN);
-			Os::sleep(1000);
+			Os::sleep(500);
 			GPIO_ResetBits(GPIOC, LEDO_PIN);
 			mutex.unlock();
-			Os::sleep(1000);
+			Os::sleep(500);
 		}
 	}
 } t2;
