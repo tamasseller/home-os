@@ -13,7 +13,7 @@
 /*
  * Scheduler root class.
  */
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 class Scheduler {
 public:
 	template<class Child>
@@ -30,20 +30,27 @@ public:
 
 private:
 	class Sleeper;
-	class TaskBase;
 	class SleepList;
+
+	class Waiter;
+	class WaitList;
+
 	class EventBase;
 	class EventList;
-	class MutexBase;
 	class AtomicList;
 	class PreemptionEvent;
 	template<class> class Event;
 
+	class TaskBase;
+	class MutexBase;
+
+	typedef PolicyParam<Waiter> Policy;
+
+	static Policy policy;
 	static bool isRunning;
 	static uintptr_t nTasks;
 	static EventList eventList;
 	static SleepList sleepList;
-	static Policy<TaskBase> policy;
 	static PreemptionEvent preemptionEvent;
 
 	static void onTick();
@@ -68,18 +75,20 @@ private:
 	static inline void postEvent(RealEvent*, Args... args);
 };
 
+#include "WaitList.h"
+#include "SleepList.h"
 #include "AtomicList.h"
 #include "Helpers.h"
 #include "Mutex.h"
 #include "Task.h"
 #include "Event.h"
-#include "SleepList.h"
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::PreemptionEvent:
-public Scheduler<Profile, Policy>::template Event<Scheduler<Profile, Policy>::PreemptionEvent> {
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::PreemptionEvent:
+public Scheduler<Profile, PolicyParam>::template Event<Scheduler<Profile, PolicyParam>::PreemptionEvent> {
 public:
 	class Combiner {
 	public:
@@ -92,72 +101,77 @@ public:
 	static inline void execute(uintptr_t arg) {
 		// assert(arg == 1);
 
-		while(TaskBase* sleeper = sleepList.peek()) {
+		while(Sleeper* sleeper = sleepList.peek()) {
 			if(!(*sleeper < Profile::Timer::getTick()))
 				break;
 
 			sleepList.pop();
-			policy.addRunnable(static_cast<TaskBase*>(sleeper));
+			TaskBase* task = static_cast<TaskBase*>(sleeper);
+			if(task->isWaiting()) {
+				// assert(task->waitList);
+				task->waitList->remove(task);
+			}
+			policy.addRunnable(task);
 		}
 
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			if(TaskBase* newTask = policy.peekNext()) {
+			if(Waiter* newTask = policy.peekNext()) {
 				TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
-				if(!policy.isHigherPriority(currentTask, newTask)) {
+				if(*static_cast<Waiter*>(currentTask) < *newTask) {
 					policy.popNext();
 					policy.addRunnable(static_cast<TaskBase*>(currentTask));
-					newTask->switchTo();
+					static_cast<TaskBase*>(newTask)->switchTo();
 				}
 			}
 		} else {
-			if(TaskBase* newTask = policy.popNext())
+			if(TaskBase* newTask = static_cast<TaskBase*>(policy.popNext()))
 				newTask->switchTo();
 		}
 	}
 };
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::PreemptionEvent Scheduler<Profile, Policy>::preemptionEvent;
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::PreemptionEvent Scheduler<Profile, PolicyParam>::preemptionEvent;
 
-template<class Profile, template<class> class Policy>
-typename Scheduler<Profile, Policy>::SleepList Scheduler<Profile, Policy>::sleepList;
+template<class Profile, template<class> class PolicyParam>
+typename Scheduler<Profile, PolicyParam>::SleepList Scheduler<Profile, PolicyParam>::sleepList;
 
-template<class Profile, template<class> class Policy>
-typename Scheduler<Profile, Policy>::EventList Scheduler<Profile, Policy>::eventList;
+template<class Profile, template<class> class PolicyParam>
+typename Scheduler<Profile, PolicyParam>::EventList Scheduler<Profile, PolicyParam>::eventList;
 
-template<class Profile, template<class> class Policy>
-Policy<typename Scheduler<Profile, Policy>::TaskBase> Scheduler<Profile, Policy>::policy;
+template<class Profile, template<class> class PolicyParam>
+typename Scheduler<Profile, PolicyParam>::Policy Scheduler<Profile, PolicyParam>::policy;
 
-template<class Profile, template<class> class Policy>
-bool Scheduler<Profile, Policy>::isRunning = false;
+template<class Profile, template<class> class PolicyParam>
+bool Scheduler<Profile, PolicyParam>::isRunning = false;
 
-template<class Profile, template<class> class Policy>
-uintptr_t Scheduler<Profile, Policy>::nTasks;
+template<class Profile, template<class> class PolicyParam>
+uintptr_t Scheduler<Profile, PolicyParam>::nTasks;
 
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<class... T>
-inline void Scheduler<Profile, Policy>::start(T... t) {
-	TaskBase* firstTask = policy.popNext();
+inline void Scheduler<Profile, PolicyParam>::start(T... t) {
+	TaskBase* firstTask = static_cast<TaskBase*>(static_cast<TaskBase*>(policy.popNext()));
 	isRunning = true;
 	Profile::Timer::setTickHandler(&Scheduler::onTick);
 	Profile::init(t...);
 	firstTask->startFirst();
 }
 
-template<class Profile, template<class> class Policy>
-inline typename Profile::Timer::TickType Scheduler<Profile, Policy>::getTick() {
+template<class Profile, template<class> class PolicyParam>
+inline typename Profile::Timer::TickType Scheduler<Profile, PolicyParam>::getTick() {
 	return Profile::Timer::getTick();
 }
 
-template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::onTick()
+template<class Profile, template<class> class PolicyParam>
+void Scheduler<Profile, PolicyParam>::onTick()
 {
 	postEvent(&preemptionEvent);
 }
 
-template<class Profile, template<class> class Policy>
-inline void Scheduler<Profile, Policy>:: doAsync()
+template<class Profile, template<class> class PolicyParam>
+inline void Scheduler<Profile, PolicyParam>:: doAsync()
 {
 	eventList.dispatch();
 }

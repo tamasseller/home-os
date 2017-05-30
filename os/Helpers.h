@@ -10,12 +10,12 @@
 
 #include <stdint.h>
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<bool pendOld>
-inline void Scheduler<Profile, Policy>::
+inline void Scheduler<Profile, PolicyParam>::
 switchToNext()
 {
-	if(TaskBase* newTask = policy.popNext()) {
+	if(TaskBase* newTask = static_cast<TaskBase*>(static_cast<TaskBase*>(policy.popNext()))) {
 		if(pendOld)
 			policy.addRunnable(static_cast<TaskBase*>(Profile::Task::getCurrent()));
 
@@ -29,23 +29,23 @@ switchToNext()
  * Helpers.
  */
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<class T>
-inline uintptr_t Scheduler<Profile, Policy>::
+inline uintptr_t Scheduler<Profile, PolicyParam>::
 detypePtr(T* x) {
 	return reinterpret_cast<uintptr_t>(x);
 }
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<class T>
-inline T* Scheduler<Profile, Policy>::
+inline T* Scheduler<Profile, PolicyParam>::
 entypePtr(uintptr_t  x) {
 	return reinterpret_cast<T*>(x);
 }
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<class RealEvent, class... Args>
-inline void Scheduler<Profile, Policy>::postEvent(RealEvent* event, Args... args) {
+inline void Scheduler<Profile, PolicyParam>::postEvent(RealEvent* event, Args... args) {
 	eventList.issue(event, args...);
 	Profile::CallGate::async(&Scheduler::doAsync);
 }

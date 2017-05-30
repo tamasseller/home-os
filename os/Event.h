@@ -13,23 +13,23 @@
 
 #include <stdint.h>
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::EventBase: public Scheduler<Profile, Policy>::AtomicList::Element {
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::EventBase: public Scheduler<Profile, PolicyParam>::AtomicList::Element {
 	friend EventList;
 	void (* const callback)(uintptr_t);
 protected:
 	inline EventBase(void (* const callback)(uintptr_t)): callback(callback) {}
 };
 
-template<class Profile, template<class> class Policy>
+template<class Profile, template<class> class PolicyParam>
 template<class Child>
-class Scheduler<Profile, Policy>::Event: public Scheduler<Profile, Policy>::EventBase {
+class Scheduler<Profile, PolicyParam>::Event: public Scheduler<Profile, PolicyParam>::EventBase {
 public:
 	inline Event(): EventBase(Child::execute) {}
 };
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::EventList: public Scheduler<Profile, Policy>::AtomicList {
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::EventList: public Scheduler<Profile, PolicyParam>::AtomicList {
 public:
 	template<class Event, class... Args>
 	inline void issue(Event* event, Args... args) {

@@ -10,8 +10,8 @@
 
 #include "Scheduler.h"
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::AtomicList
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::AtomicList
 {
 	template<class Value>
 	using Atomic = typename Profile::template Atomic<Value>;

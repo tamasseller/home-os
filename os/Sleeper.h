@@ -10,10 +10,12 @@
 
 #include "Scheduler.h"
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::Sleeper {
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::Sleeper {
+	static constexpr Sleeper *invalid = (Sleeper *)0xffffffff;
+
 	friend pet::DoubleList<Sleeper>;
-	Sleeper *prev, *next;
+	Sleeper *prev = invalid, *next;
 public:
 	uintptr_t deadline;
 
@@ -23,6 +25,14 @@ public:
 
 	inline bool operator < (const Sleeper& other) const {
 		return *this < other.deadline;
+	}
+
+	inline bool isSleeping() {
+		return prev == invalid;
+	}
+
+	inline void invalidate() {
+		prev = invalid;
 	}
 };
 

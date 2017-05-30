@@ -10,31 +10,31 @@
 
 #include "data/DoubleList.h"
 
-template<class FullTask>
+template<class Waiter>
 class RoundRobinPolicy {
 	template<class, template<class> class> friend class Scheduler;
 
-	class Task {};
+	struct Priority{
+		inline bool operator <(const Priority &other) const {
+			return false;
+		}
+	};
 
-	pet::DoubleList<FullTask> tasks;
+	pet::DoubleList<Waiter> tasks;
 
-	void addRunnable(FullTask* task) {
+	void addRunnable(Waiter* task) {
 		tasks.fastAddBack(task);
 	}
 
-	void removeRunnable(FullTask* task) {
+	void removeRunnable(Waiter* task) {
 		tasks.fastRemove(task);
 	}
 
-	bool isHigherPriority(FullTask* high, FullTask* low) {
-		return false;
-	}
-
-	FullTask* popNext() {
+	Waiter* popNext() {
 		return tasks.popFront();
 	}
 
-	FullTask* peekNext() {
+	Waiter* peekNext() {
 		return tasks.front();
 	}
 };

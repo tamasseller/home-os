@@ -17,8 +17,8 @@
 /**
  * Mutex front-end object.
  */
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::
 Mutex: public MutexBase {
 public:
 	void init();
@@ -26,20 +26,20 @@ public:
 	void unlock();
 };
 
-template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+void Scheduler<Profile, PolicyParam>::
 Mutex::init() {
 	MutexBase::init();
 }
 
-template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+void Scheduler<Profile, PolicyParam>::
 Mutex::lock() {
 	Profile::CallGate::sync(&Scheduler::doLock, detypePtr(static_cast<MutexBase*>(this)));
 }
 
-template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+void Scheduler<Profile, PolicyParam>::
 Mutex::unlock() {
 	Profile::CallGate::sync(&Scheduler::doUnlock, detypePtr(static_cast<MutexBase*>(this)));
 }
@@ -47,26 +47,26 @@ Mutex::unlock() {
 /**
  * Internal mutex object.
  */
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::
 MutexBase {
 	friend Scheduler;
 	TaskBase *owner;
-	pet::DoubleList<TaskBase> waiters;
+	WaitList waiters;
 	uintptr_t relockCounter;
 
 	void init();
 };
 
-template<class Profile, template<class> class Policy>
-void Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+void Scheduler<Profile, PolicyParam>::
 MutexBase::init()
 {
 	owner = nullptr;
 }
 
-template<class Profile, template<class> class Policy>
-uintptr_t Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+uintptr_t Scheduler<Profile, PolicyParam>::
 doLock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
@@ -79,13 +79,13 @@ doLock(uintptr_t mutexPtr)
 	} else if(mutex->owner == currentTask) {
 		mutex->relockCounter++;
 	} else {
-		mutex->waiters.fastAddBack(currentTask);
+		mutex->waiters.add(currentTask);
 		switchToNext<false>();
 	}
 }
 
-template<class Profile, template<class> class Policy>
-uintptr_t Scheduler<Profile, Policy>::
+template<class Profile, template<class> class PolicyParam>
+uintptr_t Scheduler<Profile, PolicyParam>::
 doUnlock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
@@ -96,10 +96,10 @@ doUnlock(uintptr_t mutexPtr)
 	if(mutex->relockCounter)
 		mutex->relockCounter--;
 	else {
-		if(TaskBase* waken = mutex->waiters.popFront()) {
-			mutex->owner = waken;
+		if(Waiter* waken = mutex->waiters.pop()) {
+			mutex->owner = static_cast<TaskBase*>(waken);
 
-			if(policy.isHigherPriority(waken, currentTask))
+			if(*static_cast<Waiter*>(currentTask) < *waken)
 				switchToNext<true>();
 			else
 				policy.addRunnable(waken);

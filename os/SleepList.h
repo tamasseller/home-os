@@ -8,12 +8,15 @@
 #ifndef SLEEPLIST_H_
 #define SLEEPLIST_H_
 
+#include "Scheduler.h"
+#include "Sleeper.h"
 #include "Task.h"
+
 #include "data/OrderedDoubleList.h"
 
-template<class Profile, template<class> class Policy>
-class Scheduler<Profile, Policy>::SleepList:
-	private pet::OrderedDoubleList<typename Scheduler<Profile, Policy>::Sleeper> {
+template<class Profile, template<class> class PolicyParam>
+class Scheduler<Profile, PolicyParam>::SleepList:
+	private pet::OrderedDoubleList<typename Scheduler<Profile, PolicyParam>::Sleeper> {
 public:
 	inline void add(TaskBase* elem);
 	inline void remove(TaskBase* elem);
@@ -21,20 +24,22 @@ public:
 	inline TaskBase* pop();
 };
 
-template<class Profile, template<class> class Policy>
-inline void Scheduler<Profile, Policy>::SleepList:: add(TaskBase* elem)
+template<class Profile, template<class> class PolicyParam>
+inline void Scheduler<Profile, PolicyParam>::SleepList:: add(TaskBase* elem)
 {
 	this->pet::OrderedDoubleList<Sleeper>::add(static_cast<Sleeper*>(elem));
 }
 
-template<class Profile, template<class> class Policy>
-inline void Scheduler<Profile, Policy>::SleepList:: remove(TaskBase* elem)
+template<class Profile, template<class> class PolicyParam>
+inline void Scheduler<Profile, PolicyParam>::SleepList:: remove(TaskBase* elem)
 {
-	this->pet::OrderedDoubleList<Sleeper>::remove(static_cast<Sleeper*>(elem));
+	Sleeper* sleeper = static_cast<Sleeper*>(elem);
+	this->pet::OrderedDoubleList<Sleeper>::remove();
+	sleeper->invalidate();
 }
 
-template<class Profile, template<class> class Policy>
-inline typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::SleepList::peek()
+template<class Profile, template<class> class PolicyParam>
+inline typename Scheduler<Profile, PolicyParam>::TaskBase* Scheduler<Profile, PolicyParam>::SleepList::peek()
 {
 	if(Sleeper* ret = this->pet::OrderedDoubleList<Sleeper>::lowest())
 		return static_cast<TaskBase*>(ret);
@@ -42,11 +47,13 @@ inline typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>
 	return nullptr;
 }
 
-template<class Profile, template<class> class Policy>
-inline typename Scheduler<Profile, Policy>::TaskBase* Scheduler<Profile, Policy>::SleepList::pop()
+template<class Profile, template<class> class PolicyParam>
+inline typename Scheduler<Profile, PolicyParam>::TaskBase* Scheduler<Profile, PolicyParam>::SleepList::pop()
 {
-	if(Sleeper* ret = this->pet::OrderedDoubleList<Sleeper>::popLowest())
+	if(Sleeper* ret = this->pet::OrderedDoubleList<Sleeper>::popLowest()) {
+		ret->invalidate();
 		return static_cast<TaskBase*>(ret);
+	}
 
 	return nullptr;
 }
