@@ -48,8 +48,9 @@ SECTIONS
         *(.gcc_except_table)
         *(.gnu.linkonce.r.*)
         
-		etext = .;
+        . = ALIGN(4);
 		sidata = etext;
+		etext = .;
         PROVIDE(etext = .);
     } > flash
     

@@ -1,6 +1,6 @@
-[submodule "ultimate-makefile"]
-	path = ultimate-makefile
-	url = http://github.com/tamasseller/ultimate-makefile
 [submodule "pet"]
 	path = pet
 	url = http://github.com/tamasseller/pet
+[submodule "os/test/ultimate-makefile"]
+	path = os/test/ultimate-makefile
+	url = http://github.com/tamasseller/ultimate-makefile

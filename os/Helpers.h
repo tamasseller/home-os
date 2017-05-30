@@ -8,6 +8,8 @@
 #ifndef HELPERS_H_
 #define HELPERS_H_
 
+#include <stdint.h>
+
 template<class Profile, template<class> class Policy>
 template<bool pendOld>
 inline void Scheduler<Profile, Policy>::

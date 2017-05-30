@@ -8,6 +8,8 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
+#include <stdint.h>
+
 /*
  * Scheduler root class.
  */

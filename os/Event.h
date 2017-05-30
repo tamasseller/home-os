@@ -11,6 +11,8 @@
 #include "Scheduler.h"
 #include "AtomicList.h"
 
+#include <stdint.h>
+
 template<class Profile, template<class> class Policy>
 class Scheduler<Profile, Policy>::EventBase: public Scheduler<Profile, Policy>::AtomicList::Element {
 	friend EventList;

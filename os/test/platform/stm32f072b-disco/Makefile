@@ -1,49 +1,44 @@
 OUTPUT = fw.elf
 
-SOURCES += cxx.cpp
+ROOT = ../../..
+PET = $(ROOT)/../pet
+
+INCLUDE_DIRS += $(ROOT)
+INCLUDE_DIRS += $(ROOT)/test
+INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex-m0
+
+SOURCES += $(wildcard $(ROOT)/test/*.cpp)
+
+SOURCES += $(ROOT)/ports/gcc/cortex-m0/Profile.cpp
+
+SOURCES += $(PET)/1test/TestRunner.cpp
+SOURCES += $(PET)/1test/TraceOutput.cpp
+SOURCES += $(PET)/1test/FailureInjector.cpp
+
 SOURCES += main.cpp
+SOURCES += cxx.cpp
 SOURCES += startup.cpp
 SOURCES += vectors.cpp
+SOURCES += setjmp.cpp
+SOURCES += semihosting.cpp
 
-SOURCES += os/ports/gcc/cortex-m0/Profile.cpp
-
-SOURCES += st/stdperiph/src/stm32f0xx_pwr.c
-SOURCES += st/stdperiph/src/stm32f0xx_i2c.c
-SOURCES += st/stdperiph/src/stm32f0xx_spi.c
-SOURCES += st/stdperiph/src/stm32f0xx_iwdg.c
-SOURCES += st/stdperiph/src/stm32f0xx_syscfg.c
-SOURCES += st/stdperiph/src/stm32f0xx_exti.c
-SOURCES += st/stdperiph/src/stm32f0xx_crs.c
-SOURCES += st/stdperiph/src/stm32f0xx_tim.c
-SOURCES += st/stdperiph/src/stm32f0xx_comp.c
 SOURCES += st/stdperiph/src/stm32f0xx_gpio.c
 SOURCES += st/stdperiph/src/stm32f0xx_rcc.c
-SOURCES += st/stdperiph/src/stm32f0xx_can.c
-SOURCES += st/stdperiph/src/stm32f0xx_rtc.c
-SOURCES += st/stdperiph/src/stm32f0xx_wwdg.c
-SOURCES += st/stdperiph/src/stm32f0xx_crc.c
-SOURCES += st/stdperiph/src/stm32f0xx_dma.c
-SOURCES += st/stdperiph/src/stm32f0xx_usart.c
-SOURCES += st/stdperiph/src/stm32f0xx_dac.c
-SOURCES += st/stdperiph/src/stm32f0xx_adc.c
 SOURCES += st/stdperiph/src/stm32f0xx_misc.c
-SOURCES += st/stdperiph/src/stm32f0xx_flash.c
 SOURCES += st/stdperiph/src/stm32f0xx_dbgmcu.c
-SOURCES += st/stdperiph/src/stm32f0xx_cec.c
 
 INCLUDE_DIRS += .
 INCLUDE_DIRS += st/cmsis/Include
 INCLUDE_DIRS += st/stdperiph/inc
 INCLUDE_DIRS += st/cmsis/Device/ST/STM32F0xx/Include
-INCLUDE_DIRS += pet
-INCLUDE_DIRS += os
-INCLUDE_DIRS += os/ports/gcc/cortex-m0
+
+INCLUDE_DIRS += $(PET)
 
 COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -O1 -g3 
+COMMONFLAGS += -O1 -ggdb 
 COMMONFLAGS += -static
 
 CXXFLAGS += $(COMMONFLAGS)
@@ -69,4 +64,4 @@ LIBS += gcc
 LIB_DIRS += $(GCCPATH)/arm-none-eabi/lib/armv6-m/ 
 LIB_DIRS += $(GCCPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m/  
 
-include ultimate-makefile/Makefile.ultimate
+include ../../ultimate-makefile/Makefile.ultimate

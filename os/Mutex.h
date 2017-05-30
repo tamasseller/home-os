@@ -12,6 +12,8 @@
 
 #include "data/DoubleList.h"
 
+#include <stdint.h>
+
 /**
  * Mutex front-end object.
  */
@@ -51,7 +53,7 @@ MutexBase {
 	friend Scheduler;
 	TaskBase *owner;
 	pet::DoubleList<TaskBase> waiters;
-	uint32_t relockCounter;
+	uintptr_t relockCounter;
 
 	void init();
 };

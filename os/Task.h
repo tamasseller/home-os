@@ -11,6 +11,8 @@
 #include "Helpers.h"
 #include "Sleeper.h"
 
+#include <stdint.h>
+
 /**
  * Task front-end object.
  */
@@ -19,7 +21,7 @@ template<class Child>
 class Scheduler<Profile, Policy>::
 Task: public TaskBase {
 public:
-	inline void start(void* stack, uint32_t stackSize);
+	inline void start(void* stack, uintptr_t stackSize);
 };
 
 template<class Profile, template<class> class Policy>
@@ -45,7 +47,7 @@ exit() {
 template<class Profile, template<class> class Policy>
 template<class Child>
 inline void Scheduler<Profile, Policy>::Task<Child>::
-start(void* stack, uint32_t stackSize) {
+start(void* stack, uintptr_t stackSize) {
 	Profile::Task::template initialize<
 		Child,
 		&Child::run,
