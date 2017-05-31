@@ -19,12 +19,13 @@ template<class... Args>
 class Scheduler<Args...>::Task:
 	Profile::Task,
 	Scheduler<Args...>::Sleeper,
-	Scheduler<Args...>::Waiter
+	Scheduler<Args...>::Blockable
 {
 		template<class Child, void (Child::*entry)()> static void entryStub(void* self);
 
 		friend Scheduler<Args...>;
-		WaitList* waitList;
+
+		Waitable* waitsFor = nullptr;
 	protected:
 		template<class Child, void (Child::*entry)()>
 		inline void start(void* stack, uintptr_t stackSize);

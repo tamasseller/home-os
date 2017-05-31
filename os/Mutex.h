@@ -50,7 +50,7 @@ class Scheduler<Args...>::
 MutexBase {
 	friend Scheduler<Args...>;
 	Task *owner;
-	WaitList waiters;
+	BlockableList waiters;
 	uintptr_t relockCounter;
 
 	void init();
@@ -107,7 +107,7 @@ doUnlock(uintptr_t mutexPtr)
 
 			state.policy.addRunnable(waken);
 
-			if(*static_cast<Waiter*>(currentTask) < *waken)
+			if(*static_cast<Blockable*>(currentTask) < *waken)
 				switchToNext<true>();
 		} else {
 			mutex->owner = nullptr;

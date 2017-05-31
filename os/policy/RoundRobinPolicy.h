@@ -10,7 +10,7 @@
 
 #include "data/DoubleList.h"
 
-template<class Waiter>
+template<class Blockable>
 struct RoundRobinPolicy {
 	struct Priority{
 		inline bool operator <(const Priority &other) const {
@@ -18,21 +18,21 @@ struct RoundRobinPolicy {
 		}
 	};
 
-	pet::DoubleList<Waiter> tasks;
+	pet::DoubleList<Blockable> tasks;
 
-	void addRunnable(Waiter* task) {
+	void addRunnable(Blockable* task) {
 		tasks.fastAddBack(task);
 	}
 
-	void removeRunnable(Waiter* task) {
+	void removeRunnable(Blockable* task) {
 		tasks.fastRemove(task);
 	}
 
-	Waiter* popNext() {
+	Blockable* popNext() {
 		return tasks.popFront();
 	}
 
-	Waiter* peekNext() {
+	Blockable* peekNext() {
 		return tasks.front();
 	}
 };

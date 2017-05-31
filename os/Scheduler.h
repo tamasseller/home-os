@@ -52,8 +52,8 @@ struct SchedulerOptions {
 		class Sleeper;
 		class SleepList;
 
-		class Waiter;
-		class WaitList;
+		class Blockable;
+		class BlockableList;
 
 		class Event;
 		class EventList;
@@ -62,7 +62,7 @@ struct SchedulerOptions {
 
 		class MutexBase;
 
-		typedef PolicyTemplate<Waiter> Policy;
+		typedef PolicyTemplate<Blockable> Policy;
 
 		static struct State {
 			Policy policy;
@@ -81,7 +81,7 @@ struct SchedulerOptions {
 		static uintptr_t doSleep(uintptr_t time);
 		static uintptr_t doLock(uintptr_t mutex);
 		static uintptr_t doUnlock(uintptr_t mutex);
-		static uintptr_t doWait(uintptr_t waitable, uintptr_t timeout);
+		static uintptr_t doBlock(uintptr_t waitable, uintptr_t timeout);
 		static uintptr_t doNotify(uintptr_t timeout);
 
 		template<class T>
@@ -106,12 +106,13 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Events.h"
 #include "internal/Helpers.h"
 #include "internal/Sleepers.h"
-#include "internal/Waiters.h"
+#include "internal/Blocking.h"
 
 #include "Mutex.h"
 #include "Scheduler.h"
 #include "Task.h"
-//#include "Waitable.h"
+#include "Waitable.h"
+//#include "Blockable.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -126,17 +127,16 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 
 			state.sleepList.pop();
 			Task* task = static_cast<Task*>(sleeper);
-			if(task->isWaiting()) {
-				// assert(task->waitList);
-				task->waitList->remove(task);
+			if(task->waitsFor) {
+				task->waitsFor->interrupted();
 			}
 			state.policy.addRunnable(task);
 		}
 
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			if(Waiter* newTask = state.policy.peekNext()) {
+			if(Blockable* newTask = state.policy.peekNext()) {
 				Task* currentTask = static_cast<Task*>(platformTask);
-				if(*static_cast<Waiter*>(currentTask) < *newTask) {
+				if(*static_cast<Blockable*>(currentTask) < *newTask) {
 					state.policy.popNext();
 					state.policy.addRunnable(static_cast<Task*>(currentTask));
 					static_cast<Task*>(newTask)->switchTo();

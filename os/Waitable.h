@@ -11,16 +11,14 @@
 #include "Scheduler.h"
 
 template<class... Args>
-template<class Child>
-class Scheduler<Args...>::
-Waitable: public Event<Child> {
+class Scheduler<Args...>::Waitable: public Event {
 	friend Scheduler<Args...>;
+
+	inline void interrupted() {}
 public:
 	void init();
 	void wait(uintptr_t timeout);
 	void notify();
-
-	using Combiner = typename Child::Combiner;
 };
 
 

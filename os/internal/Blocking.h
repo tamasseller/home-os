@@ -1,32 +1,32 @@
 /*
- * Waiters.h
+ * Blocking.h
  *
  *  Created on: 2017.05.30.
  *      Author: tooma
  */
 
-#ifndef WAITERS_H_
-#define WAITERS_H_
+#ifndef BLOCKING_H_
+#define BLOCKING_H_
 
 #include "Scheduler.h"
 
 #include "data/OrderedDoubleList.h"
 
 template<class... Args>
-class Scheduler<Args...>::Waiter: public Policy::Priority {
-	static constexpr Waiter *invalid = (Waiter *)0xffffffff;
+class Scheduler<Args...>::Blockable: public Policy::Priority {
+	static constexpr Blockable *invalid = (Blockable *)0xffffffff;
 
-	friend pet::DoubleList<Waiter>;
+	friend pet::DoubleList<Blockable>;
 
-	Waiter *prev = invalid, *next;
+	Blockable *prev = invalid, *next;
 
-	friend WaitList;
+	friend BlockableList;
 	inline void invalidate() {
 		prev = invalid;
 	}
 
 public:
-	inline bool isWaiting() {
+	inline bool isBlockable() {
 		return prev == invalid;
 	}
 
@@ -36,26 +36,26 @@ public:
 };
 
 template<class... Args>
-class Scheduler<Args...>::WaitList:
-	private pet::OrderedDoubleList<typename Scheduler<Args...>::Waiter>
+class Scheduler<Args...>::BlockableList:
+	private pet::OrderedDoubleList<typename Scheduler<Args...>::Blockable>
 {
-	typedef pet::OrderedDoubleList<Waiter> List;
+	typedef pet::OrderedDoubleList<Blockable> List;
 public:
 	inline void add(Task* elem)
 	{
-		List::add(static_cast<Waiter*>(elem));
+		List::add(static_cast<Blockable*>(elem));
 	}
 
 	inline void remove(Task* elem)
 	{
-		Waiter* waiter = elem;
+		Blockable* waiter = elem;
 		List::remove(waiter);
 		waiter->invalidate();
 	}
 
 	inline Task* peek()
 	{
-		if(Waiter* ret = List::lowest())
+		if(Blockable* ret = List::lowest())
 			return static_cast<Task*>(ret);
 
 		return nullptr;
@@ -63,7 +63,7 @@ public:
 
 	inline Task* pop()
 	{
-		if(Waiter* ret = List::popLowest()) {
+		if(Blockable* ret = List::popLowest()) {
 			ret->invalidate();
 			return static_cast<Task*>(ret);
 		}
@@ -72,4 +72,4 @@ public:
 	}
 };
 
-#endif /* WAITERS_H_ */
+#endif /* BLOCKING_H_ */
