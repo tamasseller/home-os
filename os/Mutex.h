@@ -49,7 +49,7 @@ template<class... Args>
 class Scheduler<Args...>::
 MutexBase {
 	friend Scheduler<Args...>;
-	TaskBase *owner;
+	Task *owner;
 	WaitList waiters;
 	uintptr_t relockCounter;
 
@@ -68,7 +68,7 @@ uintptr_t Scheduler<Args...>::
 doLock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
-	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
 	if(!mutex->owner) {
 		mutex->owner = currentTask;
@@ -87,21 +87,28 @@ uintptr_t Scheduler<Args...>::
 doUnlock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
-	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
 	// assert(mutex->owner == currentTask);
 
 	if(mutex->relockCounter)
 		mutex->relockCounter--;
 	else {
-		if(Waiter* waken = mutex->waiters.pop()) {
-			mutex->owner = static_cast<TaskBase*>(waken);
+		/*
+		 * We know that the sleeper obtained here is actually a task,
+		 * because only the block method can add elements to the
+		 * waiter list, and that only accepts tasks.
+		 *
+		 * We also know that the task is not queued for a timeout,
+		 * because locking with timeout is not supported (on purpose).
+		 */
+		if(Task* waken = static_cast<Task*>(mutex->waiters.pop())) {
+			mutex->owner = waken;
+
+			state.policy.addRunnable(waken);
 
 			if(*static_cast<Waiter*>(currentTask) < *waken)
 				switchToNext<true>();
-			else
-				state.policy.addRunnable(waken);
-
 		} else {
 			mutex->owner = nullptr;
 		}

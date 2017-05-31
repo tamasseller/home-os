@@ -33,17 +33,17 @@ struct SchedulerOptions {
 		using PolicyTemplate = typename SchedulingPolicy<RoundRobinPolicy>::extract<Options...>::template typeTemplate<X...>;
 
 	public:
-		template<class Child>
+		using TickType = typename Profile::Timer::TickType;
+
 		class Task;
-
 		class Mutex;
-
-		template<class Child>
 		class Waitable;
+		class AtomicList;
 
-		inline static typename Profile::Timer::TickType getTick();
+		inline static TickType getTick();
 
 		template<class... T> inline static void start(T... t);
+
 		inline static void yield();
 		inline static void sleep(uintptr_t time);
 		inline static void exit();
@@ -55,13 +55,11 @@ struct SchedulerOptions {
 		class Waiter;
 		class WaitList;
 
-		class EventBase;
+		class Event;
 		class EventList;
-		class AtomicList;
-		class PreemptionEvent;
-		template<class> class Event;
 
-		class TaskBase;
+		class PreemptionEvent;
+
 		class MutexBase;
 
 		typedef PolicyTemplate<Waiter> Policy;
@@ -105,12 +103,10 @@ template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
 #include "internal/AtomicList.h"
-#include "internal/Event.h"
+#include "internal/Events.h"
 #include "internal/Helpers.h"
-#include "internal/Sleeper.h"
-#include "internal/SleepList.h"
-#include "internal/Waiter.h"
-#include "internal/WaitList.h"
+#include "internal/Sleepers.h"
+#include "internal/Waiters.h"
 
 #include "Mutex.h"
 #include "Scheduler.h"
@@ -120,17 +116,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 ///////////////////////////////////////////////////////////////////////////////
 
 template<class... Args>
-class Scheduler<Args...>::PreemptionEvent:
-public Scheduler<Args...>::template Event<Scheduler<Args...>::PreemptionEvent> {
-public:
-	class Combiner {
-	public:
-		inline bool operator()(uintptr_t old, uintptr_t& result) const {
-			result = old+1;
-			return true;
-		}
-	};
-
+class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 	static inline void execute(uintptr_t arg) {
 		// assert(arg == 1);
 
@@ -139,7 +125,7 @@ public:
 				break;
 
 			state.sleepList.pop();
-			TaskBase* task = static_cast<TaskBase*>(sleeper);
+			Task* task = static_cast<Task*>(sleeper);
 			if(task->isWaiting()) {
 				// assert(task->waitList);
 				task->waitList->remove(task);
@@ -149,18 +135,21 @@ public:
 
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
 			if(Waiter* newTask = state.policy.peekNext()) {
-				TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
+				Task* currentTask = static_cast<Task*>(platformTask);
 				if(*static_cast<Waiter*>(currentTask) < *newTask) {
 					state.policy.popNext();
-					state.policy.addRunnable(static_cast<TaskBase*>(currentTask));
-					static_cast<TaskBase*>(newTask)->switchTo();
+					state.policy.addRunnable(static_cast<Task*>(currentTask));
+					static_cast<Task*>(newTask)->switchTo();
 				}
 			}
 		} else {
-			if(TaskBase* newTask = static_cast<TaskBase*>(state.policy.popNext()))
+			if(Task* newTask = static_cast<Task*>(state.policy.popNext()))
 				newTask->switchTo();
 		}
 	}
+
+public:
+	inline PreemptionEvent(): Event(execute) {}
 };
 
 template<class... Args>
@@ -169,7 +158,7 @@ typename Scheduler<Args...>::State Scheduler<Args...>::state;
 template<class... Args>
 template<class... T>
 inline void Scheduler<Args...>::start(T... t) {
-	TaskBase* firstTask = static_cast<TaskBase*>(static_cast<TaskBase*>(state.policy.popNext()));
+	Task* firstTask = static_cast<Task*>(static_cast<Task*>(state.policy.popNext()));
 	state.isRunning = true;
 	Profile::Timer::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);

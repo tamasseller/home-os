@@ -39,11 +39,11 @@ uintptr_t *TestStackPool<size, count>::current = TestStackPool<size, count>::sta
 typedef TestStackPool<testStackSize, testStackCount> StackPool;
 
 template<class Child>
-struct TestTask: Os::Task<Child>
+struct TestTask: Os::Task
 {
 	template<class... Args>
 	void start(Args... args) {
-		Os::Task<Child>::start(StackPool::get(), testStackSize, args...);
+		Os::Task::start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
 	}
 };
 

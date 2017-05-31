@@ -16,16 +16,13 @@ class ProfileCortexM0::Task {
 	static Task* volatile oldTask;
 	static void* suspendedPc;
 
-	template<class Type, void (Type::*entry)()> static void entryStub(Type* self);
-
 	void* sp;
 
 	static constexpr auto frameSize = 16u * 4u;
 
 	static inline void* &stackedPc();
 public:
-	template<class Type, void (Type::*entry)(), void exit()>
-	inline void initialize(void* stack, uint32_t stackSize, Type* arg);
+	inline void initialize(void (*entry)(void*), void (*exit)(), void* stack, uint32_t stackSize, void* arg);
 
 	void startFirst();
 	void finishLast();
@@ -38,21 +35,20 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template<class Type, void (Type::*entry)()>
-void ProfileCortexM0::Task::entryStub(Type* self) {
-	(self->*entry)();
-}
 
-template<class Type, void (Type::*entry)(), void exit()>
-inline void ProfileCortexM0::Task::initialize(void* stack, uint32_t stackSize, Type* arg) {
+inline void ProfileCortexM0::Task::initialize(
+		void (*entry)(void*),
+		void (*exit)(),
+		void* stack,
+		uint32_t stackSize,
+		void* arg)
+{
 	uintptr_t* data = (uintptr_t*) stack + (stackSize / 4 - 1);
 
 	// assert(stackSize >= frameSize);
 
-	void (*stub)(Type*) = &entryStub<Type, entry>;
-
 	*data-- = 0x01000000;		// xpsr
-	*data-- = (uintptr_t) stub;	// pc
+	*data-- = (uintptr_t) entry;// pc
 	*data-- = (uintptr_t) exit;	// lr
 	*data-- = 0xbaadf00d;		// r12
 	*data-- = 0xbaadf00d;		// r3

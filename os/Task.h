@@ -16,11 +16,21 @@
  * Task front-end object.
  */
 template<class... Args>
-template<class Child>
-class Scheduler<Args...>::
-Task: public TaskBase {
-public:
-	inline void start(void* stack, uintptr_t stackSize);
+class Scheduler<Args...>::Task:
+	Profile::Task,
+	Scheduler<Args...>::Sleeper,
+	Scheduler<Args...>::Waiter
+{
+		template<class Child, void (Child::*entry)()> static void entryStub(void* self);
+
+		friend Scheduler<Args...>;
+		WaitList* waitList;
+	protected:
+		template<class Child, void (Child::*entry)()>
+		inline void start(void* stack, uintptr_t stackSize);
+
+	public:
+		inline void start(void (*entry)(void*), void* stack, uintptr_t stackSize, void* arg);
 };
 
 template<class... Args>
@@ -43,42 +53,41 @@ exit() {
 }
 
 template<class... Args>
-template<class Child>
-inline void Scheduler<Args...>::Task<Child>::
-start(void* stack, uintptr_t stackSize) {
-	Profile::Task::template initialize<
-		Child,
-		&Child::run,
-		&Scheduler<Args...>::exit> (
-				stack,
-				stackSize,
-				static_cast<Child*>(this));
+inline void Scheduler<Args...>::Task::start(
+		void (*entry)(void*),
+		void* stack,
+		uintptr_t stackSize,
+		void* arg)
+{
+	Profile::Task::initialize(entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
 
-	auto arg = detypePtr(static_cast<TaskBase*>(this));
+	auto task = detypePtr(static_cast<Task*>(this));
 
 	if(state.isRunning)
-		Profile::CallGate::sync(&Scheduler<Args...>::doStartTask, arg);
+		Profile::CallGate::sync(&Scheduler<Args...>::doStartTask, task);
 	else
-		doStartTask(arg);
+		doStartTask(task);
 }
 
-/**
- * Internal task object.
- */
 template<class... Args>
-class Scheduler<Args...>::TaskBase:
-	Profile::Task,
-	Scheduler<Args...>::Sleeper,
-	Scheduler<Args...>::Waiter {
-	friend Scheduler<Args...>;
-	WaitList* waitList;
-};
+template<class Child, void (Child::*entry)()>
+void Scheduler<Args...>::Task::entryStub(void* self) {
+	(static_cast<Child*>(self)->*entry)();
+}
+
+template<class... Args>
+template<class Child, void (Child::*entry)()>
+inline void Scheduler<Args...>::Task::start(void* stack, uintptr_t stackSize)
+{
+	start(&Task::entryStub<Child, entry>, stack, stackSize, static_cast<Child*>(this));
+}
+
 
 template<class... Args>
 uintptr_t Scheduler<Args...>::
 doStartTask(uintptr_t task) {
 	state.nTasks++;
-	state.policy.addRunnable(entypePtr<TaskBase>(task));
+	state.policy.addRunnable(entypePtr<Task>(task));
 }
 
 template<class... Args>
@@ -90,7 +99,7 @@ doYield() {
 template<class... Args>
 uintptr_t Scheduler<Args...>::
 doSleep(uintptr_t time) {
-	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 	currentTask->deadline = Profile::Timer::getTick() + time;
 	state.sleepList.add(currentTask);
 	switchToNext<false>();

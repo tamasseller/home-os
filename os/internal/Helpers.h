@@ -15,9 +15,9 @@ template<bool pendOld>
 inline void Scheduler<Args...>::
 switchToNext()
 {
-	if(TaskBase* newTask = static_cast<TaskBase*>(static_cast<TaskBase*>(state.policy.popNext()))) {
+	if(Task* newTask = static_cast<Task*>(state.policy.popNext())) {
 		if(pendOld)
-			state.policy.addRunnable(static_cast<TaskBase*>(Profile::Task::getCurrent()));
+			state.policy.addRunnable(static_cast<Task*>(Profile::Task::getCurrent()));
 
 		newTask->switchTo();
 	} else
