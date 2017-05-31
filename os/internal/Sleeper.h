@@ -10,8 +10,8 @@
 
 #include "Scheduler.h"
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::Sleeper {
+template<class... Args>
+class Scheduler<Args...>::Sleeper {
 	static constexpr Sleeper *invalid = (Sleeper *)0xffffffff;
 
 	friend pet::DoubleList<Sleeper>;

@@ -8,58 +8,56 @@
 #ifndef TASK_H_
 #define TASK_H_
 
-#include "Helpers.h"
-#include "Sleeper.h"
+#include "Scheduler.h"
 
 #include <stdint.h>
 
 /**
  * Task front-end object.
  */
-template<class Profile, template<class> class PolicyParam>
+template<class... Args>
 template<class Child>
-class Scheduler<Profile, PolicyParam>::
+class Scheduler<Args...>::
 Task: public TaskBase {
 public:
 	inline void start(void* stack, uintptr_t stackSize);
 };
 
-template<class Profile, template<class> class PolicyParam>
-inline void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+inline void Scheduler<Args...>::
 yield() {
-	Profile::CallGate::sync(&Scheduler::doYield);
+	Profile::CallGate::sync(&Scheduler<Args...>::doYield);
 }
 
-template<class Profile, template<class> class PolicyParam>
-inline void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+inline void Scheduler<Args...>::
 sleep(uintptr_t time) {
 	// assert(time <= INTPTR_MAX);
-	Profile::CallGate::sync(&Scheduler::doSleep, time);
+	Profile::CallGate::sync(&Scheduler<Args...>::doSleep, time);
 }
 
-
-template<class Profile, template<class> class PolicyParam>
-inline void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+inline void Scheduler<Args...>::
 exit() {
-	Profile::CallGate::sync(&Scheduler::doExit);
+	Profile::CallGate::sync(&Scheduler<Args...>::doExit);
 }
 
-template<class Profile, template<class> class PolicyParam>
+template<class... Args>
 template<class Child>
-inline void Scheduler<Profile, PolicyParam>::Task<Child>::
+inline void Scheduler<Args...>::Task<Child>::
 start(void* stack, uintptr_t stackSize) {
 	Profile::Task::template initialize<
 		Child,
 		&Child::run,
-		&Scheduler::exit> (
+		&Scheduler<Args...>::exit> (
 				stack,
 				stackSize,
 				static_cast<Child*>(this));
 
 	auto arg = detypePtr(static_cast<TaskBase*>(this));
 
-	if(isRunning)
-		Profile::CallGate::sync(&Scheduler<Profile, PolicyParam>::doStartTask, arg);
+	if(state.isRunning)
+		Profile::CallGate::sync(&Scheduler<Args...>::doStartTask, arg);
 	else
 		doStartTask(arg);
 }
@@ -67,44 +65,44 @@ start(void* stack, uintptr_t stackSize) {
 /**
  * Internal task object.
  */
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::TaskBase:
+template<class... Args>
+class Scheduler<Args...>::TaskBase:
 	Profile::Task,
-	Scheduler<Profile, PolicyParam>::Sleeper,
-	Scheduler<Profile, PolicyParam>::Waiter {
-	friend Scheduler;
+	Scheduler<Args...>::Sleeper,
+	Scheduler<Args...>::Waiter {
+	friend Scheduler<Args...>;
 	WaitList* waitList;
 };
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doStartTask(uintptr_t task) {
-	nTasks++;
-	policy.addRunnable(entypePtr<TaskBase>(task));
+	state.nTasks++;
+	state.policy.addRunnable(entypePtr<TaskBase>(task));
 }
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doYield() {
 	switchToNext<true>();
 }
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doSleep(uintptr_t time) {
 	TaskBase* currentTask = static_cast<TaskBase*>(Profile::Task::getCurrent());
 	currentTask->deadline = Profile::Timer::getTick() + time;
-	sleepList.add(currentTask);
+	state.sleepList.add(currentTask);
 	switchToNext<false>();
 }
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doExit() {
-	if(--nTasks) {
+	if(--state.nTasks) {
 		switchToNext<false>();
 	} else {
-		isRunning = false;
+		state.isRunning = false;
 		Profile::Task::getCurrent()->finishLast();
 	}
 }

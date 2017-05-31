@@ -10,85 +10,118 @@
 
 #include <stdint.h>
 
+#include "meta/Configuration.h"
+
+#include "policy/RoundRobinPolicy.h"
+
 /*
  * Scheduler root class.
  */
-template<class Profile, template<class> class PolicyParam>
-class Scheduler {
-public:
-	template<class Child>
-	class Task;
 
-	class Mutex;
+struct SchedulerOptions {
+	template<class Arg>
+	struct HardwareProfile: pet::ConfigType<HardwareProfile, Arg> {};
 
-	inline static typename Profile::Timer::TickType getTick();
+	template<template<class...> class Arg>
+	struct SchedulingPolicy: pet::ConfigTemplate<SchedulingPolicy, Arg> {};
 
-	template<class... T> inline static void start(T... t);
-	inline static void yield();
-	inline static void sleep(uintptr_t time);
-	inline static void exit();
+	template<class... Options>
+	class Configurable {
+		using Profile = typename HardwareProfile<void>::extract<Options...>::type;
 
-private:
-	class Sleeper;
-	class SleepList;
+		template<class... X>
+		using PolicyTemplate = typename SchedulingPolicy<RoundRobinPolicy>::extract<Options...>::template typeTemplate<X...>;
 
-	class Waiter;
-	class WaitList;
+	public:
+		template<class Child>
+		class Task;
 
-	class EventBase;
-	class EventList;
-	class AtomicList;
-	class PreemptionEvent;
-	template<class> class Event;
+		class Mutex;
 
-	class TaskBase;
-	class MutexBase;
+		template<class Child>
+		class Waitable;
 
-	typedef PolicyParam<Waiter> Policy;
+		inline static typename Profile::Timer::TickType getTick();
 
-	static Policy policy;
-	static bool isRunning;
-	static uintptr_t nTasks;
-	static EventList eventList;
-	static SleepList sleepList;
-	static PreemptionEvent preemptionEvent;
+		template<class... T> inline static void start(T... t);
+		inline static void yield();
+		inline static void sleep(uintptr_t time);
+		inline static void exit();
 
-	static void onTick();
-	static void doAsync();
-	static uintptr_t doStartTask(uintptr_t task);
-	static uintptr_t doExit();
-	static uintptr_t doYield();
-	static uintptr_t doSleep(uintptr_t time);
-	static uintptr_t doLock(uintptr_t mutex);
-	static uintptr_t doUnlock(uintptr_t mutex);
+	private:
+		class Sleeper;
+		class SleepList;
 
-	template<class T>
-	static inline uintptr_t detypePtr(T* x);
+		class Waiter;
+		class WaitList;
 
-	template<class T>
-	static inline T* entypePtr(uintptr_t  x);
+		class EventBase;
+		class EventList;
+		class AtomicList;
+		class PreemptionEvent;
+		template<class> class Event;
 
-	template<bool pendOld>
-	static inline void switchToNext();
+		class TaskBase;
+		class MutexBase;
 
-	template<class RealEvent, class... Args>
-	static inline void postEvent(RealEvent*, Args... args);
+		typedef PolicyTemplate<Waiter> Policy;
+
+		static struct State {
+			Policy policy;
+			bool isRunning;
+			uintptr_t nTasks;
+			EventList eventList;
+			SleepList sleepList;
+			PreemptionEvent preemptionEvent;
+		} state;
+
+		static void onTick();
+		static void doAsync();
+		static uintptr_t doStartTask(uintptr_t task);
+		static uintptr_t doExit();
+		static uintptr_t doYield();
+		static uintptr_t doSleep(uintptr_t time);
+		static uintptr_t doLock(uintptr_t mutex);
+		static uintptr_t doUnlock(uintptr_t mutex);
+		static uintptr_t doWait(uintptr_t waitable, uintptr_t timeout);
+		static uintptr_t doNotify(uintptr_t timeout);
+
+		template<class T>
+		static inline uintptr_t detypePtr(T* x);
+
+		template<class T>
+		static inline T* entypePtr(uintptr_t  x);
+
+		template<bool pendOld>
+		static inline void switchToNext();
+
+		template<class RealEvent, class... Args>
+		static inline void postEvent(RealEvent*, Args... args);
+
+	};
 };
 
-#include "WaitList.h"
-#include "SleepList.h"
-#include "AtomicList.h"
-#include "Helpers.h"
-#include "Mutex.h"
-#include "Task.h"
-#include "Event.h"
+template<class... Args>
+using Scheduler = SchedulerOptions::Configurable<Args...>;
 
+#include "internal/AtomicList.h"
+#include "internal/Event.h"
+#include "internal/Helpers.h"
+#include "internal/Sleeper.h"
+#include "internal/SleepList.h"
+#include "internal/Waiter.h"
+#include "internal/WaitList.h"
+
+#include "Mutex.h"
+#include "Scheduler.h"
+#include "Task.h"
+//#include "Waitable.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::PreemptionEvent:
-public Scheduler<Profile, PolicyParam>::template Event<Scheduler<Profile, PolicyParam>::PreemptionEvent> {
+template<class... Args>
+class Scheduler<Args...>::PreemptionEvent:
+public Scheduler<Args...>::template Event<Scheduler<Args...>::PreemptionEvent> {
 public:
 	class Combiner {
 	public:
@@ -101,79 +134,63 @@ public:
 	static inline void execute(uintptr_t arg) {
 		// assert(arg == 1);
 
-		while(Sleeper* sleeper = sleepList.peek()) {
+		while(Sleeper* sleeper = state.sleepList.peek()) {
 			if(!(*sleeper < Profile::Timer::getTick()))
 				break;
 
-			sleepList.pop();
+			state.sleepList.pop();
 			TaskBase* task = static_cast<TaskBase*>(sleeper);
 			if(task->isWaiting()) {
 				// assert(task->waitList);
 				task->waitList->remove(task);
 			}
-			policy.addRunnable(task);
+			state.policy.addRunnable(task);
 		}
 
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			if(Waiter* newTask = policy.peekNext()) {
+			if(Waiter* newTask = state.policy.peekNext()) {
 				TaskBase* currentTask = static_cast<TaskBase*>(platformTask);
 				if(*static_cast<Waiter*>(currentTask) < *newTask) {
-					policy.popNext();
-					policy.addRunnable(static_cast<TaskBase*>(currentTask));
+					state.policy.popNext();
+					state.policy.addRunnable(static_cast<TaskBase*>(currentTask));
 					static_cast<TaskBase*>(newTask)->switchTo();
 				}
 			}
 		} else {
-			if(TaskBase* newTask = static_cast<TaskBase*>(policy.popNext()))
+			if(TaskBase* newTask = static_cast<TaskBase*>(state.policy.popNext()))
 				newTask->switchTo();
 		}
 	}
 };
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::PreemptionEvent Scheduler<Profile, PolicyParam>::preemptionEvent;
+template<class... Args>
+typename Scheduler<Args...>::State Scheduler<Args...>::state;
 
-template<class Profile, template<class> class PolicyParam>
-typename Scheduler<Profile, PolicyParam>::SleepList Scheduler<Profile, PolicyParam>::sleepList;
-
-template<class Profile, template<class> class PolicyParam>
-typename Scheduler<Profile, PolicyParam>::EventList Scheduler<Profile, PolicyParam>::eventList;
-
-template<class Profile, template<class> class PolicyParam>
-typename Scheduler<Profile, PolicyParam>::Policy Scheduler<Profile, PolicyParam>::policy;
-
-template<class Profile, template<class> class PolicyParam>
-bool Scheduler<Profile, PolicyParam>::isRunning = false;
-
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::nTasks;
-
-
-template<class Profile, template<class> class PolicyParam>
+template<class... Args>
 template<class... T>
-inline void Scheduler<Profile, PolicyParam>::start(T... t) {
-	TaskBase* firstTask = static_cast<TaskBase*>(static_cast<TaskBase*>(policy.popNext()));
-	isRunning = true;
-	Profile::Timer::setTickHandler(&Scheduler::onTick);
+inline void Scheduler<Args...>::start(T... t) {
+	TaskBase* firstTask = static_cast<TaskBase*>(static_cast<TaskBase*>(state.policy.popNext()));
+	state.isRunning = true;
+	Profile::Timer::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);
 	firstTask->startFirst();
 }
 
-template<class Profile, template<class> class PolicyParam>
-inline typename Profile::Timer::TickType Scheduler<Profile, PolicyParam>::getTick() {
+template<class... Args>
+inline typename Scheduler<Args...>::Profile::Timer::TickType Scheduler<Args...>::getTick() {
 	return Profile::Timer::getTick();
 }
 
-template<class Profile, template<class> class PolicyParam>
-void Scheduler<Profile, PolicyParam>::onTick()
+template<class... Args>
+void Scheduler<Args...>::onTick()
 {
-	postEvent(&preemptionEvent);
+	postEvent(&state.preemptionEvent);
 }
 
-template<class Profile, template<class> class PolicyParam>
-inline void Scheduler<Profile, PolicyParam>:: doAsync()
+template<class... Args>
+inline void Scheduler<Args...>:: doAsync()
 {
-	eventList.dispatch();
+	state.eventList.dispatch();
 }
 
 #endif /* SCHEDULER_H_ */

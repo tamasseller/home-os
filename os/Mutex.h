@@ -8,17 +8,15 @@
 #ifndef MUTEX_H_
 #define MUTEX_H_
 
-#include "Helpers.h"
-
-#include "data/DoubleList.h"
+#include "Scheduler.h"
 
 #include <stdint.h>
 
 /**
  * Mutex front-end object.
  */
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::
+template<class... Args>
+class Scheduler<Args...>::
 Mutex: public MutexBase {
 public:
 	void init();
@@ -26,31 +24,31 @@ public:
 	void unlock();
 };
 
-template<class Profile, template<class> class PolicyParam>
-void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+void Scheduler<Args...>::
 Mutex::init() {
 	MutexBase::init();
 }
 
-template<class Profile, template<class> class PolicyParam>
-void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+void Scheduler<Args...>::
 Mutex::lock() {
-	Profile::CallGate::sync(&Scheduler::doLock, detypePtr(static_cast<MutexBase*>(this)));
+	Profile::CallGate::sync(&Scheduler<Args...>::doLock, detypePtr(static_cast<MutexBase*>(this)));
 }
 
-template<class Profile, template<class> class PolicyParam>
-void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+void Scheduler<Args...>::
 Mutex::unlock() {
-	Profile::CallGate::sync(&Scheduler::doUnlock, detypePtr(static_cast<MutexBase*>(this)));
+	Profile::CallGate::sync(&Scheduler<Args...>::doUnlock, detypePtr(static_cast<MutexBase*>(this)));
 }
 
 /**
  * Internal mutex object.
  */
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::
+template<class... Args>
+class Scheduler<Args...>::
 MutexBase {
-	friend Scheduler;
+	friend Scheduler<Args...>;
 	TaskBase *owner;
 	WaitList waiters;
 	uintptr_t relockCounter;
@@ -58,15 +56,15 @@ MutexBase {
 	void init();
 };
 
-template<class Profile, template<class> class PolicyParam>
-void Scheduler<Profile, PolicyParam>::
+template<class... Args>
+void Scheduler<Args...>::
 MutexBase::init()
 {
 	owner = nullptr;
 }
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doLock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
@@ -84,8 +82,8 @@ doLock(uintptr_t mutexPtr)
 	}
 }
 
-template<class Profile, template<class> class PolicyParam>
-uintptr_t Scheduler<Profile, PolicyParam>::
+template<class... Args>
+uintptr_t Scheduler<Args...>::
 doUnlock(uintptr_t mutexPtr)
 {
 	MutexBase* mutex = entypePtr<MutexBase>(mutexPtr);
@@ -102,7 +100,7 @@ doUnlock(uintptr_t mutexPtr)
 			if(*static_cast<Waiter*>(currentTask) < *waken)
 				switchToNext<true>();
 			else
-				policy.addRunnable(waken);
+				state.policy.addRunnable(waken);
 
 		} else {
 			mutex->owner = nullptr;

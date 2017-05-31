@@ -11,9 +11,7 @@
 #include "data/DoubleList.h"
 
 template<class Waiter>
-class RoundRobinPolicy {
-	template<class, template<class> class> friend class Scheduler;
-
+struct RoundRobinPolicy {
 	struct Priority{
 		inline bool operator <(const Priority &other) const {
 			return false;

@@ -12,7 +12,10 @@
 #include "Scheduler.h"
 #include "Profile.h"
 
-typedef Scheduler<ProfileCortexM0, RoundRobinPolicy> Os;
+using Os = Scheduler<
+		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>
+>;
 
 static constexpr auto testStackSize = 128u;
 static constexpr auto testStackCount = 8u;

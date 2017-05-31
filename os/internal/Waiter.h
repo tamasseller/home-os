@@ -10,8 +10,8 @@
 
 #include "Scheduler.h"
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::Waiter: public Policy::Priority {
+template<class... Args>
+class Scheduler<Args...>::Waiter: public Policy::Priority {
 	static constexpr Waiter *invalid = (Waiter *)0xffffffff;
 
 	friend pet::DoubleList<Waiter>;

@@ -14,11 +14,11 @@ class ProfileCortexM0::CallGate {
 	friend void PendSV_Handler();
 	static void (*asyncCallHandler)();
 
-	static uintptr_t issueSvc(uintptr_t (*f)());
-	static uintptr_t issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t));
-	static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t));
-	static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t));
-	static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t));
+	static inline uintptr_t issueSvc(uintptr_t (*f)());
+	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t));
+	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t));
+	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t));
+	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t));
 	template<class ... Args> static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args);
 
 public:
@@ -28,18 +28,90 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-template<class ... Args>
-inline uintptr_t ProfileCortexM0::CallGate::callViaSvc(uintptr_t (f)(Args...), Args ... args) {
-	return issueSvc((uintptr_t)args..., f);
+inline void ProfileCortexM0::CallGate::async(void (*asyncCallHandler)()) {
+	CallGate::asyncCallHandler = asyncCallHandler;
+	Internals::Scb::Icsr::triggerPendSV();
 }
+
 template<class ... T>
 inline uintptr_t ProfileCortexM0::CallGate::sync(T ... ops) {
 	return callViaSvc(ops...);
 }
 
-inline void ProfileCortexM0::CallGate::async(void (*asyncCallHandler)()) {
-	CallGate::asyncCallHandler = asyncCallHandler;
-	Internals::Scb::Icsr::triggerPendSV();
+template<class ... Args>
+inline uintptr_t ProfileCortexM0::CallGate::callViaSvc(uintptr_t (f)(Args...), Args ... args) {
+	return issueSvc((uintptr_t)args..., f);
 }
+
+inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t (*f)())
+{
+	register uintptr_t func asm("r12") = (uintptr_t)f;
+	register uintptr_t ret asm("r0");
+
+	asm volatile (
+		"svc 0\n" : "=r"(ret) : "r"(func) :
+	);
+
+	return ret;
+}
+
+inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t))
+{
+	register uintptr_t func asm("r12") = (uintptr_t)f;
+	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
+	register uintptr_t ret asm("r0");
+
+	asm volatile (
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1):
+	);
+
+	return ret;
+}
+
+inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t))
+{
+	register uintptr_t func asm("r12") = (uintptr_t)f;
+	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
+	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
+	register uintptr_t ret asm("r0");
+
+	asm volatile (
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2):
+	);
+
+	return ret;
+}
+
+inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t))
+{
+	register uintptr_t func asm("r12") = (uintptr_t)f;
+	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
+	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
+	register uintptr_t arg_3 asm("r0") = (uintptr_t)arg3;
+	register uintptr_t ret asm("r0");
+
+	asm volatile (
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3):
+	);
+
+	return ret;
+}
+
+inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))
+{
+	register uintptr_t func asm("r12") = (uintptr_t)f;
+	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
+	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
+	register uintptr_t arg_3 asm("r0") = (uintptr_t)arg3;
+	register uintptr_t arg_4 asm("r0") = (uintptr_t)arg4;
+	register uintptr_t ret asm("r0");
+
+	asm volatile (
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3), "r"(arg_4):
+	);
+
+	return ret;
+}
+
 
 #endif /* CALLGATE_H_ */

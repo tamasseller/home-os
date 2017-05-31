@@ -10,8 +10,8 @@
 
 #include "Scheduler.h"
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::AtomicList
+template<class... Args>
+class Scheduler<Args...>::AtomicList
 {
 	template<class Value>
 	using Atomic = typename Profile::template Atomic<Value>;
@@ -26,8 +26,8 @@ private:
 	Atomic<Element*> first;
 
 public:
-	template<class Combiner, class... Args>
-	inline void push(Element* element, Combiner&& combiner, Args... args) {
+	template<class Combiner, class... CombinerArgs>
+	inline void push(Element* element, Combiner&& combiner, CombinerArgs... args) {
 		if(!element->arg(combiner, args...)) {
 			first([&](Element* old, Element* &result) {
 				element->next = old;

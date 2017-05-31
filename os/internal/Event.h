@@ -9,30 +9,29 @@
 #define EVENT_H_
 
 #include "Scheduler.h"
-#include "AtomicList.h"
 
 #include <stdint.h>
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::EventBase: public Scheduler<Profile, PolicyParam>::AtomicList::Element {
+template<class... Args>
+class Scheduler<Args...>::EventBase: public Scheduler<Args...>::AtomicList::Element {
 	friend EventList;
 	void (* const callback)(uintptr_t);
 protected:
 	inline EventBase(void (* const callback)(uintptr_t)): callback(callback) {}
 };
 
-template<class Profile, template<class> class PolicyParam>
+template<class... Args>
 template<class Child>
-class Scheduler<Profile, PolicyParam>::Event: public Scheduler<Profile, PolicyParam>::EventBase {
+class Scheduler<Args...>::Event: public Scheduler<Args...>::EventBase {
 public:
 	inline Event(): EventBase(Child::execute) {}
 };
 
-template<class Profile, template<class> class PolicyParam>
-class Scheduler<Profile, PolicyParam>::EventList: public Scheduler<Profile, PolicyParam>::AtomicList {
+template<class... Args>
+class Scheduler<Args...>::EventList: public Scheduler<Args...>::AtomicList {
 public:
-	template<class Event, class... Args>
-	inline void issue(Event* event, Args... args) {
+	template<class Event, class... CombinerArgs>
+	inline void issue(Event* event, CombinerArgs... args) {
 		auto element = static_cast<typename AtomicList::Element*>(event);
 		AtomicList::push(element, typename Event::Combiner(), args...);
 	}

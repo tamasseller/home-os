@@ -65,59 +65,6 @@ void ProfileCortexM0::Task::finishLast()
 }
 
 __attribute__((naked))
-uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t (*f)())
-{
-	asm volatile (
-		"mov r12, r0	\n"
-		"svc 0			\n"
-		"bx lr			\n" : : :
-	);
-}
-
-__attribute__((naked))
-uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t))
-{
-	asm volatile (
-		"mov r12, r1	\n"
-		"svc 0			\n"
-		"bx lr			\n" : : :
-	);
-}
-
-__attribute__((naked))
-uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t))
-{
-	asm volatile (
-		"mov r12, r2	\n"
-		"svc 0			\n"
-		"bx lr			\n" : : :
-	);
-}
-
-__attribute__((naked))
-uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t))
-{
-	asm volatile (
-		"mov r12, r3	\n"
-		"svc 0			\n"
-		"bx lr			\n" : : :
-	);
-}
-
-__attribute__((naked))
-uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))
-{
-	asm volatile (
-		"push {r4}			\n"
-		"ldr r4, [sp, #4]	\n"
-		"mov r4, r12		\n"
-		"svc 0				\n"
-		"pop {r4}			\n"
-		"bx lr				\n" : : : "r4"
-	);
-}
-
-__attribute__((naked))
 void SVC_Handler() {
 	asm volatile (
 		"push {r4, lr}		\n"

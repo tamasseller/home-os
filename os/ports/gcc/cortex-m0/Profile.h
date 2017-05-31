@@ -10,15 +10,12 @@
 
 #include <stdint.h>
 
-class ProfileCortexM0 {
-	template<class, template<class > class> friend class Scheduler;
-
+struct ProfileCortexM0 {
 	class Task;
 	class Timer;
 	class CallGate;
 	template<class> class Atomic;
 
-public:
 	class Internals;
 
 	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
