@@ -44,6 +44,7 @@ namespace SemaphorePassaround {
 TEST(SemaphorePassaround)
 {
 	using namespace SemaphorePassaround;
+	data.reset();
 	t1.start(false);
 	t2.start(false);
 	t3.start(false);
@@ -53,16 +54,17 @@ TEST(SemaphorePassaround)
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(UINT16_MAX/3*3));
 	CHECK(t1.counter == UINT16_MAX/3);
 	CHECK(t2.counter == UINT16_MAX/3);
 	CHECK(t3.counter == UINT16_MAX/3);
+	CHECK(data.check(UINT16_MAX/3*3));
 }
 
 
 TEST(SemaphorePassaroundWithTimeout)
 {
 	using namespace SemaphorePassaround;
+	data.reset();
 	t1.start(true);
 	t2.start(true);
 	t3.start(true);
@@ -72,9 +74,12 @@ TEST(SemaphorePassaroundWithTimeout)
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(UINT16_MAX/3*3));
+	// TODO return values
+	// CHECK(!error);
+
 	CHECK(t1.counter == UINT16_MAX/3);
 	CHECK(t2.counter == UINT16_MAX/3);
 	CHECK(t3.counter == UINT16_MAX/3);
+	CHECK(data.check(UINT16_MAX/3*3));
 }
 

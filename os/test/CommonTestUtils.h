@@ -86,6 +86,13 @@ public:
 
 		return !error;
 	}
+
+	inline void reset() {
+		for(int i = sizeof(data)/sizeof(data[0]) - 1; i >= 0; i--)
+			data[i] = 0;
+
+		error = false;
+	}
 };
 
 #endif /* COMMONTESTUTILS_H_ */
