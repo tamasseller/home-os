@@ -49,20 +49,16 @@ struct SchedulerOptions {
 		inline static void exit();
 
 	private:
+		class Blockable;
 		class Sleeper;
 		class SleepList;
-
-		class Blockable;
-		class BlockableList;
 
 		class Event;
 		class EventList;
 
 		class PreemptionEvent;
 
-		class MutexBase;
-
-		typedef PolicyTemplate<Blockable> Policy;
+		typedef PolicyTemplate<Task, Blockable> Policy;
 
 		static struct State {
 			Policy policy;
@@ -121,22 +117,19 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 	static inline void execute(uintptr_t arg) {
 		// assert(arg == 1);
 
-		while(Sleeper* sleeper = state.sleepList.peek()) {
-			if(!(*sleeper < Profile::Timer::getTick()))
-				break;
-
-			state.sleepList.pop();
+		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
 			Task* task = static_cast<Task*>(sleeper);
 			if(task->waitsFor) {
-				task->waitsFor->interrupted();
+				// TODO
+				// task->waitsFor->interrupted();
 			}
 			state.policy.addRunnable(task);
 		}
 
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			if(Blockable* newTask = state.policy.peekNext()) {
+			if(Task* newTask = state.policy.peekNext()) {
 				Task* currentTask = static_cast<Task*>(platformTask);
-				if(*static_cast<Blockable*>(currentTask) < *newTask) {
+				if(*currentTask < *newTask) {
 					state.policy.popNext();
 					state.policy.addRunnable(static_cast<Task*>(currentTask));
 					static_cast<Task*>(newTask)->switchTo();
@@ -158,7 +151,7 @@ typename Scheduler<Args...>::State Scheduler<Args...>::state;
 template<class... Args>
 template<class... T>
 inline void Scheduler<Args...>::start(T... t) {
-	Task* firstTask = static_cast<Task*>(static_cast<Task*>(state.policy.popNext()));
+	Task* firstTask = state.policy.popNext();
 	state.isRunning = true;
 	Profile::Timer::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);

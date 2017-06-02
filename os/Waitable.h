@@ -10,11 +10,15 @@
 
 #include "Scheduler.h"
 
+#include "data/LinkedList.h"
+
 template<class... Args>
-class Scheduler<Args...>::Waitable: public Event {
+class Scheduler<Args...>::Waitable: Scheduler<Args...>::Mutex, public Event {
 	friend Scheduler<Args...>;
 
-	inline void interrupted() {}
+	virtual uintptr_t acquire(uintptr_t) = 0;
+	virtual uintptr_t release(uintptr_t) = 0;
+
 public:
 	void init();
 	void wait(uintptr_t timeout);

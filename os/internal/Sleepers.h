@@ -18,16 +18,9 @@ class Scheduler<Args...>::Sleeper {
 
 	friend pet::DoubleList<Sleeper>;
 	Sleeper *prev = invalid, *next;
+
 public:
 	uintptr_t deadline;
-
-	inline bool operator < (uintptr_t time) const {
-		return (intptr_t)(deadline - time) < 0;
-	}
-
-	inline bool operator < (const Sleeper& other) const {
-		return *this < other.deadline;
-	}
 
 	inline bool isSleeping() {
 		return prev == invalid;
@@ -39,49 +32,47 @@ public:
 };
 
 template<class... Args>
-class Scheduler<Args...>::SleepList:
-	private pet::OrderedDoubleList<typename Scheduler<Args...>::Sleeper> {
-	typedef pet::OrderedDoubleList<Sleeper> List;
+class Scheduler<Args...>::SleepList {
+	static inline bool compareDeadline(const Sleeper& a, const Sleeper& b);
+	pet::OrderedDoubleList<Sleeper, &SleepList::compareDeadline> list;
 
 public:
 	inline void add(Task* elem);
 	inline void remove(Task* elem);
-	inline Task* peek();
-	inline Task* pop();
+	inline Task* getWakeable();
 };
 
 template<class... Args>
-inline void Scheduler<Args...>::SleepList:: add(Task* elem)
+inline bool Scheduler<Args...>::SleepList::compareDeadline(const Sleeper& a, const Sleeper& b) {
+	return a.deadline < b.deadline;
+}
+
+
+template<class... Args>
+inline void Scheduler<Args...>::SleepList::add(Task* elem)
 {
-	List::add(static_cast<Sleeper*>(elem));
+	list.add(static_cast<Sleeper*>(elem));
 }
 
 template<class... Args>
-inline void Scheduler<Args...>::SleepList:: remove(Task* elem)
+inline void Scheduler<Args...>::SleepList::remove(Task* elem)
 {
 	Sleeper* sleeper = static_cast<Sleeper*>(elem);
-	List::remove();
+	list.remove(sleeper);
 	sleeper->invalidate();
 }
 
 template<class... Args>
-inline typename Scheduler<Args...>::Task* Scheduler<Args...>::SleepList::peek()
+inline typename Scheduler<Args...>::Task* Scheduler<Args...>::SleepList::getWakeable()
 {
-	if(Sleeper* ret = List::lowest())
-		return static_cast<Task*>(ret);
-
-	return nullptr;
-}
-
-template<class... Args>
-inline typename Scheduler<Args...>::Task* Scheduler<Args...>::SleepList::pop()
-{
-	if(Sleeper* ret = List::popLowest()) {
-		ret->invalidate();
-		return static_cast<Task*>(ret);
+	if(Sleeper* ret = list.lowest()) {
+		if(ret->deadline < Profile::Timer::getTick()) {
+			list.popLowest();
+			return static_cast<Task*>(ret);
+		}
 	}
-
 	return nullptr;
 }
+
 
 #endif /* SLEEPERS_H_ */

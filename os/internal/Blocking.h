@@ -13,62 +13,19 @@
 #include "data/OrderedDoubleList.h"
 
 template<class... Args>
-class Scheduler<Args...>::Blockable: public Policy::Priority {
-	static constexpr Blockable *invalid = (Blockable *)0xffffffff;
-
+class Scheduler<Args...>::Blockable {
 	friend pet::DoubleList<Blockable>;
 
-	Blockable *prev = invalid, *next;
+	Blockable *prev, *next;
 
-	friend BlockableList;
-	inline void invalidate() {
-		prev = invalid;
-	}
+	Task* (* const getTaskVirtual)(Blockable*);
+
+protected:
+	inline Blockable(Task* (*getTaskVirtual)(Blockable*)): getTaskVirtual(getTaskVirtual) {}
 
 public:
-	inline bool isBlockable() {
-		return prev == invalid;
-	}
-
-	inline Task *prepareWakeup() {
-		return prepareWakeupCallback(this);
-	}
-};
-
-template<class... Args>
-class Scheduler<Args...>::BlockableList:
-	private pet::OrderedDoubleList<typename Scheduler<Args...>::Blockable>
-{
-	typedef pet::OrderedDoubleList<Blockable> List;
-public:
-	inline void add(Task* elem)
-	{
-		List::add(static_cast<Blockable*>(elem));
-	}
-
-	inline void remove(Task* elem)
-	{
-		Blockable* waiter = elem;
-		List::remove(waiter);
-		waiter->invalidate();
-	}
-
-	inline Task* peek()
-	{
-		if(Blockable* ret = List::lowest())
-			return static_cast<Task*>(ret);
-
-		return nullptr;
-	}
-
-	inline Task* pop()
-	{
-		if(Blockable* ret = List::popLowest()) {
-			ret->invalidate();
-			return static_cast<Task*>(ret);
-		}
-
-		return nullptr;
+	inline Task *getTask() {
+		return getTaskVirtual(this);
 	}
 };
 

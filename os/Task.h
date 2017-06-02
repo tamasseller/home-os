@@ -17,6 +17,7 @@
  */
 template<class... Args>
 class Scheduler<Args...>::Task:
+	Policy::Priority,
 	Profile::Task,
 	Scheduler<Args...>::Sleeper,
 	Scheduler<Args...>::Blockable
@@ -24,15 +25,29 @@ class Scheduler<Args...>::Task:
 		template<class Child, void (Child::*entry)()> static void entryStub(void* self);
 
 		friend Scheduler<Args...>;
+		friend Policy;
 
 		Waitable* waitsFor = nullptr;
+
+		static Task* getTaskVirtual(Blockable*);
 	protected:
 		template<class Child, void (Child::*entry)()>
 		inline void start(void* stack, uintptr_t stackSize);
 
 	public:
+		inline Task();
 		inline void start(void (*entry)(void*), void* stack, uintptr_t stackSize, void* arg);
 };
+
+template<class... Args>
+typename Scheduler<Args...>::Task* Scheduler<Args...>::Task::getTaskVirtual(Blockable* self) {
+	return static_cast<Task*>(self);
+}
+
+template<class... Args>
+inline Scheduler<Args...>::Task::Task():
+	Blockable(&Task::getTaskVirtual) {}
+
 
 template<class... Args>
 inline void Scheduler<Args...>::
