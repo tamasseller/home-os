@@ -8,12 +8,9 @@
 #ifndef TESTSUITE_H_
 #define TESTSUITE_H_
 
-#include "Os.h"
-
 #include "1test/TestPlugin.h"
 #include "1test/TestRunner.h"
 
-#include "OsTestBase.h"
 #include "CommonTestUtils.h"
 
 class OsTestPlugin: public pet::TestPlugin

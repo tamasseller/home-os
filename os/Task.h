@@ -27,7 +27,10 @@ class Scheduler<Args...>::Task:
 		friend Scheduler<Args...>;
 		friend Policy;
 
-		Waitable* waitsFor = nullptr;
+		/*
+		 * Used by waitables only!
+		 */
+		Waker* waitsFor = nullptr;
 
 		static Task* getTaskVirtual(Blockable*);
 	protected:
@@ -116,8 +119,7 @@ template<class... Args>
 uintptr_t Scheduler<Args...>::
 doSleep(uintptr_t time) {
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
-	currentTask->deadline = Profile::Timer::getTick() + time;
-	state.sleepList.add(currentTask);
+	state.sleepList.delay(currentTask, time);
 	switchToNext<false>();
 }
 

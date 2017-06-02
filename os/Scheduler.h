@@ -39,6 +39,8 @@ struct SchedulerOptions {
 		class Mutex;
 		class Waitable;
 		class AtomicList;
+		class BinarySemaphore;
+		class CountingSemaphore;
 
 		inline static TickType getTick();
 
@@ -52,6 +54,7 @@ struct SchedulerOptions {
 		class Blockable;
 		class Sleeper;
 		class SleepList;
+		class Waker;
 
 		class Event;
 		class EventList;
@@ -77,8 +80,8 @@ struct SchedulerOptions {
 		static uintptr_t doSleep(uintptr_t time);
 		static uintptr_t doLock(uintptr_t mutex);
 		static uintptr_t doUnlock(uintptr_t mutex);
-		static uintptr_t doBlock(uintptr_t waitable, uintptr_t timeout);
-		static uintptr_t doNotify(uintptr_t timeout);
+		static uintptr_t doWait(uintptr_t waitable);
+		static uintptr_t doWaitTimeout(uintptr_t waitable, uintptr_t timeout);
 
 		template<class T>
 		static inline uintptr_t detypePtr(T* x);
@@ -100,28 +103,28 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 
 #include "internal/AtomicList.h"
 #include "internal/Events.h"
+#include "internal/Waker.h"
 #include "internal/Helpers.h"
 #include "internal/Sleepers.h"
-#include "internal/Blocking.h"
+#include "internal/Blockable.h"
+#include "internal/Waitable.h"
 
 #include "Mutex.h"
 #include "Scheduler.h"
 #include "Task.h"
-#include "Waitable.h"
-//#include "Blockable.h"
+#include "Semaphore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
 template<class... Args>
 class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
-	static inline void execute(uintptr_t arg) {
+	static inline void execute(Event* self, uintptr_t arg) {
 		// assert(arg == 1);
 
 		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
 			Task* task = static_cast<Task*>(sleeper);
 			if(task->waitsFor) {
-				// TODO
-				// task->waitsFor->interrupted();
+				task->waitsFor->remove(task);
 			}
 			state.policy.addRunnable(task);
 		}

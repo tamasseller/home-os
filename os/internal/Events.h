@@ -15,9 +15,9 @@
 template<class... Args>
 class Scheduler<Args...>::Event: public Scheduler<Args...>::AtomicList::Element {
 	friend EventList;
-	void (* const callback)(uintptr_t);
+	void (* const callback)(Event*, uintptr_t);
 protected:
-	inline Event(void (* const callback)(uintptr_t)): callback(callback) {}
+	inline Event(void (* const callback)(Event*, uintptr_t)): callback(callback) {}
 };
 
 template<class... Args>
@@ -37,8 +37,10 @@ public:
 	inline void dispatch()
 	{
 		uintptr_t arg;
-		for(auto reader = AtomicList::read(); auto* element = reader.pop(arg);)
-			static_cast<Event*>(element)->callback(arg);
+		for(auto reader = AtomicList::read(); auto* element = reader.pop(arg);) {
+			Event* event = static_cast<Event*>(element);
+			event->callback(event, arg);
+		}
 	}
 };
 

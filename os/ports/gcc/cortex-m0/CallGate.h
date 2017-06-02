@@ -72,7 +72,7 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 {
 	register uintptr_t func asm("r12") = (uintptr_t)f;
 	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
-	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
+	register uintptr_t arg_2 asm("r1") = (uintptr_t)arg2;
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
@@ -86,8 +86,8 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 {
 	register uintptr_t func asm("r12") = (uintptr_t)f;
 	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
-	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
-	register uintptr_t arg_3 asm("r0") = (uintptr_t)arg3;
+	register uintptr_t arg_2 asm("r1") = (uintptr_t)arg2;
+	register uintptr_t arg_3 asm("r2") = (uintptr_t)arg3;
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
@@ -101,9 +101,9 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 {
 	register uintptr_t func asm("r12") = (uintptr_t)f;
 	register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
-	register uintptr_t arg_2 asm("r0") = (uintptr_t)arg2;
-	register uintptr_t arg_3 asm("r0") = (uintptr_t)arg3;
-	register uintptr_t arg_4 asm("r0") = (uintptr_t)arg4;
+	register uintptr_t arg_2 asm("r1") = (uintptr_t)arg2;
+	register uintptr_t arg_3 asm("r2") = (uintptr_t)arg3;
+	register uintptr_t arg_4 asm("r3") = (uintptr_t)arg4;
 	register uintptr_t ret asm("r0");
 
 	asm volatile (

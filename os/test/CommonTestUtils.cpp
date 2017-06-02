@@ -7,8 +7,6 @@
 
 #include "CommonTestUtils.h"
 
-#include "Os.h"
-
 uint64_t CommonTestUtils::iterationsPerMs;
 uintptr_t CommonTestUtils::startParam;
 

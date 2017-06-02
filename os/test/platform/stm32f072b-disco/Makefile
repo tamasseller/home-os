@@ -8,6 +8,9 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex-m0
 
 SOURCES += $(wildcard $(ROOT)/test/*.cpp)
+#SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
+SOURCES += $(ROOT)/test/TestSuite.cpp
+SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 
 SOURCES += $(ROOT)/ports/gcc/cortex-m0/Profile.cpp
 

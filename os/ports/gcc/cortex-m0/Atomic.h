@@ -27,8 +27,8 @@ public:
 		asm volatile (
 			"cpsid i\n"
 			"ldr %[old], [%[data]]\n"
-				: [old]"=r"(old)
-				: [data]"r"(&this->data)
+				: [old]"=l"(old)
+				: [data]"l"(&this->data)
 				: /* No clobbers */
 		);
 

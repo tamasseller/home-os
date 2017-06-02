@@ -23,7 +23,7 @@ public:
 	uintptr_t deadline;
 
 	inline bool isSleeping() {
-		return prev == invalid;
+		return prev != invalid;
 	}
 
 	inline void invalidate() {
@@ -37,7 +37,7 @@ class Scheduler<Args...>::SleepList {
 	pet::OrderedDoubleList<Sleeper, &SleepList::compareDeadline> list;
 
 public:
-	inline void add(Task* elem);
+	inline void delay(Task* elem, uintptr_t delay);
 	inline void remove(Task* elem);
 	inline Task* getWakeable();
 };
@@ -49,8 +49,9 @@ inline bool Scheduler<Args...>::SleepList::compareDeadline(const Sleeper& a, con
 
 
 template<class... Args>
-inline void Scheduler<Args...>::SleepList::add(Task* elem)
+inline void Scheduler<Args...>::SleepList::delay(Task* elem, uintptr_t delay)
 {
+	elem->deadline = Profile::Timer::getTick() + delay;
 	list.add(static_cast<Sleeper*>(elem));
 }
 

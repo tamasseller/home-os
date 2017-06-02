@@ -1,11 +1,10 @@
 /*
- * SingleMutex.cpp
+ * MutexSingle.cpp
  *
  *  Created on: 2017.05.29.
  *      Author: tooma
  */
 
-#include "OsTestBase.h"
 #include "CommonTestUtils.h"
 
 namespace {
