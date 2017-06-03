@@ -11,6 +11,7 @@
 #include "Profile.h"
 
 class ProfileCortexM0::Timer {
+	friend ProfileCortexM0;
 	friend void SysTick_Handler();
 
 	static void (*tickHandler)();

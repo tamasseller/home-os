@@ -104,6 +104,7 @@ inline bool Scheduler<Args...>::Waitable::comparePriority(const Blockable& a, co
 template<class... Args>
 inline void Scheduler<Args...>::Waitable::remove(Task* task) {
 	waiters.remove(task);
+	task->injectReturnValue(false);
 }
 
 
@@ -126,19 +127,22 @@ uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t tim
 	Waitable* waitable = entypePtr<Waitable>(waitablePtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	if(!waitable->acquire()) {
-		if(timeout) {
-			waitable->waiters.add(currentTask);
-			currentTask->waitsFor = waitable;
-			state.sleepList.delay(currentTask, timeout);
-			switchToNext<false>();
-			/*
-			 * Return value will be injected.
-			 */
-		}else
-			return false;
-	}else
+	if(waitable->acquire())
 		return true;
+
+	if(!timeout)
+		return false;
+
+	waitable->waiters.add(currentTask);
+	currentTask->waitsFor = waitable;
+	state.sleepList.delay(currentTask, timeout);
+	switchToNext<false>();
+	return true;
+
+			/*
+			 * False return value will be injected by
+			 * the tick handler, if timed out.
+			 */
 }
 
 

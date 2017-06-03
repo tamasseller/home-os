@@ -8,7 +8,7 @@
 #include "CommonTestUtils.h"
 
 namespace SemaphorePassaround {
-	typedef typename Os::BinarySemaphore Semaphore;
+	typedef typename OsRr::BinarySemaphore Semaphore;
 	static Semaphore s1, s2, s3;
 	static SharedData<16> data;
 	bool error = false;
@@ -74,8 +74,7 @@ TEST(SemaphorePassaroundWithTimeout)
 
 	CommonTestUtils::start();
 
-	// TODO return values
-	// CHECK(!error);
+	CHECK(!error);
 
 	CHECK(t1.counter == UINT16_MAX/3);
 	CHECK(t2.counter == UINT16_MAX/3);

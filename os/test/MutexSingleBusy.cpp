@@ -8,7 +8,7 @@
 #include "CommonTestUtils.h"
 
 namespace {
-	static Os::Mutex mutex;
+	static OsRr::Mutex mutex;
 	static SharedData<16> data;
 
 	struct T1: public TestTask<T1> {
@@ -26,10 +26,10 @@ namespace {
 			for(int i=0; i<10; i++) {
 				mutex.lock();
 				data.update();
-				Os::sleep(5);
+				OsRr::sleep(5);
 				data.update();
 				mutex.unlock();
-				Os::sleep(5);
+				OsRr::sleep(5);
 			}
 		}
 	} t2;

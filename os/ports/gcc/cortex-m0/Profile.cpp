@@ -60,7 +60,7 @@ void ProfileCortexM0::Task::finishLast()
 		}
 	};
 
-	stackedPc() = (void*)&ReturnTaskStub::restoreMasterState;
+	irqEntryStackedPc() = (void*)&ReturnTaskStub::restoreMasterState;
 	currentTask = nullptr;
 }
 

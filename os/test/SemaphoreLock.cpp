@@ -8,7 +8,7 @@
 #include "CommonTestUtils.h"
 
 namespace {
-	static typename Os::BinarySemaphore sem;
+	static typename OsRr::BinarySemaphore sem;
 	static SharedData<16> data;
 
 	struct Task: public TestTask<Task> {

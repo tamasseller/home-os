@@ -20,7 +20,7 @@ class ProfileCortexM0::Task {
 
 	static constexpr auto frameSize = 16u * 4u;
 
-	static inline void* &stackedPc();
+	static inline void* &irqEntryStackedPc();
 public:
 	inline void initialize(void (*entry)(void*), void (*exit)(), void* stack, uint32_t stackSize, void* arg);
 
@@ -28,6 +28,8 @@ public:
 	void finishLast();
 
 	inline void switchTo();
+	inline void injectReturnValue(uintptr_t);
+
 	inline static Task* getCurrent();
 
 	static inline void suspendExecution();
@@ -66,7 +68,7 @@ inline void ProfileCortexM0::Task::initialize(
 	*data-- = 0xbaadf00d;		// r4
 }
 
-inline void* &ProfileCortexM0::Task::stackedPc()
+inline void* &ProfileCortexM0::Task::irqEntryStackedPc()
 {
 	void **psp;
 	asm volatile ("mrs %0, psp\n"  : "=r" (psp));
@@ -76,13 +78,19 @@ inline void* &ProfileCortexM0::Task::stackedPc()
 inline void ProfileCortexM0::Task::switchTo()
 {
 	if(suspendedPc) {
-		stackedPc() = suspendedPc;
+		irqEntryStackedPc() = suspendedPc;
 		suspendedPc = nullptr;
 	}
 
 	oldTask = currentTask;
 	currentTask = this;
 	Internals::Scb::Icsr::triggerPendSV();
+}
+
+inline void ProfileCortexM0::Task::injectReturnValue(uintptr_t ret)
+{
+	uintptr_t* frame = reinterpret_cast<uintptr_t*>(sp);
+	frame[4] = ret;
 }
 
 inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent()
@@ -105,8 +113,8 @@ inline void ProfileCortexM0::Task::suspendExecution() {
 		}
 	};
 
-	suspendedPc = stackedPc();
-	stackedPc() = (void*)&Idler::sleep;
+	suspendedPc = irqEntryStackedPc();
+	irqEntryStackedPc() = (void*)&Idler::sleep;
 }
 
 #endif /* PROFILE_TASK_H_ */

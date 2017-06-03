@@ -15,7 +15,7 @@
 #include "Platform.h"
 #include "Scheduler.h"
 
-using Os = Scheduler<
+using OsRr = Scheduler<
 		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
 		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>
 >;
@@ -45,11 +45,11 @@ uintptr_t *TestStackPool<size, count>::current = TestStackPool<size, count>::sta
 typedef TestStackPool<testStackSize, testStackCount> StackPool;
 
 template<class Child>
-struct TestTask: Os::Task
+struct TestTask: OsRr::Task
 {
 	template<class... Args>
 	void start(Args... args) {
-		Os::Task::start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
+		OsRr::Task::start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
 	}
 };
 

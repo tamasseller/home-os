@@ -8,7 +8,7 @@
 #include "CommonTestUtils.h"
 
 namespace {
-	static Os::Mutex mutex;
+	static OsRr::Mutex mutex;
 	static SharedData<16> data;
 
 	struct Task: public TestTask<Task> {

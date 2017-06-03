@@ -22,9 +22,9 @@ void CommonTestUtils::calibrate()
 	uint64_t trial = 10000;
 
 	while(1) {
-		auto startTicks = Os::getTick();
+		auto startTicks = OsRr::getTick();
 		busyWork(trial);
-		auto endTicks = Os::getTick();
+		auto endTicks = OsRr::getTick();
 		auto time = endTicks - startTicks;
 
 		if(time > 16) {
@@ -43,5 +43,5 @@ uint64_t CommonTestUtils ::getIterations(uintptr_t ms)
 
 void CommonTestUtils::start()
 {
-	Os::start(startParam);
+	OsRr::start(startParam);
 }
