@@ -36,6 +36,9 @@ void initHw() {
 
 void setFirstLed() {
 	GPIO_WriteBit(LEDR_PORT, LEDR_PIN, Bit_SET);
+	GPIO_WriteBit(LEDG_PORT, LEDG_PIN, Bit_RESET);
+	GPIO_WriteBit(LEDB_PORT, LEDB_PIN, Bit_RESET);
+	GPIO_WriteBit(LEDO_PORT, LEDO_PIN, Bit_RESET);
 }
 
 void blinkLeds(int n)

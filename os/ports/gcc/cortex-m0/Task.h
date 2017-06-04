@@ -82,15 +82,23 @@ inline void ProfileCortexM0::Task::switchTo()
 		suspendedPc = nullptr;
 	}
 
-	oldTask = currentTask;
+	if(!oldTask)
+		oldTask = currentTask;
+
 	currentTask = this;
 	Internals::Scb::Icsr::triggerPendSV();
 }
 
 inline void ProfileCortexM0::Task::injectReturnValue(uintptr_t ret)
 {
-	uintptr_t* frame = reinterpret_cast<uintptr_t*>(sp);
-	frame[4] = ret;
+	if(suspendedPc && this == currentTask) {
+		uintptr_t* frame;
+		asm volatile ("mrs %0, psp\n"  : "=r" (frame));
+		frame[0] = ret;
+	} else {
+		uintptr_t* frame = reinterpret_cast<uintptr_t*>(sp);
+		frame[4] = ret;
+	}
 }
 
 inline ProfileCortexM0::Task* ProfileCortexM0::Task::getCurrent()

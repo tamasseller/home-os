@@ -58,6 +58,7 @@ private:
 	virtual void release(WakeSession& session, uintptr_t arg) = 0;
 
 	virtual void remove(Task* task) final;
+	virtual void waken(Task* task) final;
 
 	static bool comparePriority(const Blockable&, const Blockable&);
 	pet::OrderedDoubleList<Blockable, &Waitable::comparePriority> waiters;
@@ -107,6 +108,10 @@ inline void Scheduler<Args...>::Waitable::remove(Task* task) {
 	task->injectReturnValue(false);
 }
 
+template<class... Args>
+inline void Scheduler<Args...>::Waitable::waken(Task* task) {
+	waiters.remove(task);
+}
 
 template<class... Args>
 uintptr_t Scheduler<Args...>::doWait(uintptr_t waitablePtr)
@@ -137,26 +142,29 @@ uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t tim
 	currentTask->waitsFor = waitable;
 	state.sleepList.delay(currentTask, timeout);
 	switchToNext<false>();
-	return true;
 
-			/*
-			 * False return value will be injected by
-			 * the tick handler, if timed out.
-			 */
+	/*
+	 * False return value will be injected by
+	 * the tick handler, if timed out.
+	 */
+	return true;
 }
 
 
 template<class... Args>
 bool Scheduler<Args...>::Waitable::wakeOne(WakeSession& session) {
-	if(Blockable* blockable = waiters.popLowest()) {
-		Task* waken = static_cast<Task*>(blockable);
+	if(Blockable* blockable = waiters.lowest()) {
+		Task* waken = blockable->getTask();
+
 		if(!session.highestPrio || *session.highestPrio < *waken)
 			session.highestPrio = waken;
 
-		state.policy.addRunnable(waken);
-
 		if(waken->isSleeping())
 			state.sleepList.remove(waken);
+
+		waken->waitsFor->waken(waken);
+
+		state.policy.addRunnable(waken);
 
 		return true;
 	}

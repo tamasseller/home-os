@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 template<class... Args>
-class Scheduler<Args...>::Event: public Scheduler<Args...>::AtomicList::Element {
+class Scheduler<Args...>::Event: Scheduler<Args...>::AtomicList::Element {
 	friend EventList;
 	void (* const callback)(Event*, uintptr_t);
 protected:
@@ -21,7 +21,7 @@ protected:
 };
 
 template<class... Args>
-class Scheduler<Args...>::EventList: public Scheduler<Args...>::AtomicList {
+class Scheduler<Args...>::EventList: Scheduler<Args...>::AtomicList {
 	struct Combiner {
 		inline bool operator()(uintptr_t old, uintptr_t& result) const {
 			result = old+1;

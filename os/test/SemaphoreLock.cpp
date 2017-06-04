@@ -34,5 +34,3 @@ TEST(SemaphoreLock) {
 
 	CHECK(data.check(UINT16_MAX/5*5));
 }
-
-

@@ -58,17 +58,17 @@ inline void Scheduler<Args...>::SleepList::delay(Task* elem, uintptr_t delay)
 template<class... Args>
 inline void Scheduler<Args...>::SleepList::remove(Task* elem)
 {
-	Sleeper* sleeper = static_cast<Sleeper*>(elem);
-	list.remove(sleeper);
-	sleeper->invalidate();
+	list.remove(elem);
+	elem->invalidate();
 }
 
 template<class... Args>
 inline typename Scheduler<Args...>::Task* Scheduler<Args...>::SleepList::getWakeable()
 {
 	if(Sleeper* ret = list.lowest()) {
-		if(ret->deadline < Profile::Timer::getTick()) {
+		if(ret->deadline <= Profile::Timer::getTick()) {
 			list.popLowest();
+			ret->invalidate();
 			return static_cast<Task*>(ret);
 		}
 	}

@@ -44,6 +44,8 @@ public:
 		OsTestPlugin plugin;
 		pet::TestRunner::installPlugin(&plugin);
 
+		platformTestStartedReport();
+
 		return pet::TestRunner::runAllTests(&output) == 0;
 	}
 };

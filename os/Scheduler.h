@@ -125,6 +125,7 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 			Task* task = static_cast<Task*>(sleeper);
 			if(task->waitsFor) {
 				task->waitsFor->remove(task);
+				task->waitsFor = nullptr;
 			}
 			state.policy.addRunnable(task);
 		}
@@ -132,7 +133,7 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
 			if(Task* newTask = state.policy.peekNext()) {
 				Task* currentTask = static_cast<Task*>(platformTask);
-				if(*currentTask < *newTask) {
+				if(!(*newTask < *currentTask)) {
 					state.policy.popNext();
 					state.policy.addRunnable(static_cast<Task*>(currentTask));
 					static_cast<Task*>(newTask)->switchTo();
