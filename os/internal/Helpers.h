@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 template<class... Args>
-template<bool pendOld>
+template<bool pendOld, bool suspend>
 inline void Scheduler<Args...>::
 switchToNext()
 {
@@ -20,9 +20,8 @@ switchToNext()
 			state.policy.addRunnable(static_cast<Task*>(Profile::Task::getCurrent()));
 
 		newTask->switchTo();
-	} else
+	} else if(suspend)
 		Profile::Task::suspendExecution();
-
 }
 
 /*

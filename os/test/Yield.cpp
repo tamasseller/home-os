@@ -8,7 +8,7 @@
 #include "CommonTestUtils.h"
 
 namespace {
-	constexpr auto nTasks = 3;
+	constexpr auto nTasks = 2;
 	int data[nTasks] = {0,};
 	static bool error = false;
 
@@ -37,8 +37,8 @@ TEST(Yield) {
 
 	CommonTestUtils::start();
 
+	for(int i = 0; i < nTasks; i++)
+		CHECK(data[i] == 1000);
+
 	CHECK(!error);
 }
-
-
-

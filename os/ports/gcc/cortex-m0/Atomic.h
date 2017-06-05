@@ -11,12 +11,16 @@
 template<class Value>
 class ProfileCortexM0::Atomic
 {
-	Value data;
+	volatile Value data;
 public:
 	inline Atomic(): data(0) {}
 
 	inline Atomic(const Value& value) {
 		data = value;
+	}
+
+	inline operator Value() {
+		return data;
 	}
 
 	template<class Op, class... Args>

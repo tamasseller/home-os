@@ -112,7 +112,7 @@ doStartTask(uintptr_t task) {
 template<class... Args>
 uintptr_t Scheduler<Args...>::
 doYield() {
-	switchToNext<true>();
+	switchToNext<true, false>();
 }
 
 template<class... Args>

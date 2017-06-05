@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 class Semihosting {
-	static constexpr auto bufferSize = 128u;
+	static constexpr auto bufferSize = 64u;
 	static char buffer[bufferSize];
 	static uint32_t idx;
 	static void flush();

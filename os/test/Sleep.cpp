@@ -38,9 +38,9 @@ namespace {
 		}
 	};
 
-	Task<42> t1, t2, t3;
-	Task<57> t4, t5;
-	Task<103> t6;
+	Task<42> t1, t2;
+	Task<57> t3, t4;
+	Task<103> t5;
 }
 
 TEST(Sleep) {
@@ -49,7 +49,6 @@ TEST(Sleep) {
 	t3.start();
 	t4.start();
 	t5.start();
-	t6.start();
 
 	CommonTestUtils::start();
 

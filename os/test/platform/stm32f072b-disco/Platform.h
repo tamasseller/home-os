@@ -12,7 +12,7 @@
 
 typedef ProfileCortexM0 PlatformHardwareProfile;
 
-static constexpr auto testStackSize = 128u;
-static constexpr auto testStackCount = 8u;
+static constexpr auto testStackSize = 1000u;
+static constexpr auto testStackCount = 5u;
 
 #endif /* PLATFORM_H_ */

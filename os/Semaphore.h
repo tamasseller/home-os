@@ -16,14 +16,13 @@ class Scheduler<Args...>::BinarySemaphore: public Scheduler<Args...>::Waitable
 	friend Scheduler<Args...>;
 	bool open = true;
 
-	virtual bool acquire()
-	{
-		if(open) {
-			open = false;
-			return true;
-		}
+	virtual bool wouldBlock() {
+		return !open;
+	}
 
-		return false;
+	virtual void acquire()
+	{
+		open = false;
 	}
 
 	virtual void release(typename Waitable::WakeSession& session, uintptr_t arg)

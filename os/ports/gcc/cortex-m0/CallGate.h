@@ -12,7 +12,7 @@
 
 class ProfileCortexM0::CallGate {
 	friend void PendSV_Handler();
-	static void (*asyncCallHandler)();
+	static void (* volatile asyncCallHandler)();
 
 	static inline uintptr_t issueSvc(uintptr_t (*f)());
 	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t));
@@ -62,7 +62,7 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t (
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
-		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1):
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1): "memory"
 	);
 
 	return ret;
@@ -76,7 +76,7 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
-		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2):
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2): "memory"
 	);
 
 	return ret;
@@ -91,7 +91,7 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
-		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3):
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3): "memory"
 	);
 
 	return ret;
@@ -107,7 +107,7 @@ inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t arg1, uintptr_t a
 	register uintptr_t ret asm("r0");
 
 	asm volatile (
-		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3), "r"(arg_4):
+		"svc 0\n" : "=r"(ret) : "r"(func), "r"(arg_1), "r"(arg_2), "r"(arg_3), "r"(arg_4): "memory"
 	);
 
 	return ret;

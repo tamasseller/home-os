@@ -14,8 +14,8 @@ void Calibrator::run() {
 }
 
 void OsTestPlugin::beforeTest() {
+	StackPool::clear();
 }
 
 void OsTestPlugin::afterTest() {
-	StackPool::clear();
 }

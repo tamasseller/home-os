@@ -13,7 +13,7 @@ ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
 void* ProfileCortexM0::Task::suspendedPc;
 
-void (*ProfileCortexM0::CallGate::asyncCallHandler)();
+void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
 void (*ProfileCortexM0::Timer::tickHandler)();
 
 __attribute__((naked))
@@ -21,23 +21,22 @@ void ProfileCortexM0::Task::startFirst()
 {
 	currentTask = this;
 	asm volatile (
-		"push {r4-r7, lr}	\n"
-		"mov r4, r8			\n"
-		"mov r5, r9			\n"
-		"mov r6, r10		\n"
-		"mov r7, r11		\n"
-		"push {r4-r7}		\n" : : : "r4", "r5", "r6", "r7"
-	);
-
-	asm volatile (
-		"msr psp, %0		\n"
-		"movs r0, #2		\n"
+		"cpsid i			\n" // On the Cortex-M0 system interrupts can not be masked selectively.
+		"push {r4-r7, lr}	\n" // ABI: r0-r3 and r12 can be destroyed during a procedure call.
+		"mov r4, r8			\n" // r4-r11 and lr are stored here in a platform-convenient order.
+		"mov r5, r9			\n" // pc will be restored by loading lr (i.e. returning)
+		"mov r6, r10		\n" // sp is saved implicitly by keeping it in MSP, and using
+		"mov r7, r11		\n" // PSP for the threads (interrupts will restore MSP on exit).
+		"push {r4-r7}		\n"
+		"msr psp, %0		\n" // %0 points to the start of the exception frame.
+		"movs r0, #2		\n" // Switch tasks.
 		"msr control, r0	\n"
 		"isb				\n"
-		"pop {r0-r5}		\n"
-		"mov lr, r5			\n"
+		"pop {r0-r5}		\n" // In the frame there are r0-r3, r12, lr, pc
+		"mov lr, r5			\n" // Here r0-r3 and lr is loaded, r12 is ignored.
 		"cpsie i			\n"
-		"pop {pc}			\n" : : "r" ((uint32_t*)sp + 4) :
+		"pop {pc}			\n"
+			: : "r" ((uint32_t*)sp + 4) /* Adjust sp to point to the exception frame*/:
 	);
 }
 
@@ -47,6 +46,7 @@ void ProfileCortexM0::Task::finishLast()
 		__attribute__((naked))
 		static void restoreMasterState() {
 			asm volatile (
+				"cpsid i			\n" // On the Cortex-M0 system interrupts can not be masked selectively.
 				"movs r0, #0		\n"
 				"msr control, r0	\n"
 				"isb				\n"
@@ -86,16 +86,19 @@ void PendSV_Handler() {
 		".thumb					\n"
 		".syntax unified		\n"
 
-		"ldr r0, PendSV_async 	\n" // r0 = (void(*)()*) &CallGate::asyncCallHandler
-		"ldr r0, [r0]			\n" // r0 = (void(*)()) CallGate::asyncCallHandler
+		"ldr r1, PendSV_async 	\n" // r0 = (void(*)()*) &CallGate::asyncCallHandler
+		"ldr r0, [r1]			\n" // r0 = (void(*)()) CallGate::asyncCallHandler
 		"cmp r0, #0				\n"	// if(CallGate::asyncCallHandler) {
 		"beq PendSV_noAsync		\n"	//
-		"push {lr}				\n"
-		"blx r0					\n"	// CallGate::asyncCallHandler();
-		"pop {r0}				\n"
-		"mov lr, r0				\n"
-		"PendSV_noAsync:		\n"	// }
 
+		"push {r1, lr}			\n"
+		"blx r0					\n"	// CallGate::asyncCallHandler();
+		"pop {r1, r2}			\n"
+		"mov lr, r2				\n"
+		"movs r0, #0			\n"
+		"str r0, [r1]			\n" // CallGate::asyncCallHandler = nullptr;
+
+		"PendSV_noAsync:		\n"	// }
 
 		"ldr r0, PendSV_old		\n" // r0 = (Task**) &Task::oldTask
 		"ldr r1, [r0]			\n" // r1 = (Task*) Task::oldTask

@@ -8,7 +8,7 @@ extern "C" void DefaultHardFaultHandler(){
     for(;;){}
 }
 
-extern "C" void mstack();
+extern "C" void estack();
 void Reset_Handler() __attribute__((weak, alias("DefaultHandler")));
 void NMI_Handler() __attribute__((weak, alias("DefaultHandler")));
 void HardFault_Handler() __attribute__((weak, alias("DefaultHardFaultHandler")));
@@ -54,7 +54,7 @@ typedef void (*funcp)();
 
 __attribute__((section(".isr_vector")))
 funcp vector_table[] = {
-	(funcp)mstack, /* &_estack*/
+	(funcp)estack, /* &_estack*/
 	Reset_Handler,
 	NMI_Handler,
 	HardFault_Handler,

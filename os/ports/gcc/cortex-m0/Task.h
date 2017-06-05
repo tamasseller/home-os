@@ -11,6 +11,7 @@
 #include "Profile.h"
 
 class ProfileCortexM0::Task {
+	friend ProfileCortexM0;
 	friend void PendSV_Handler();
 	static Task* volatile currentTask;
 	static Task* volatile oldTask;
@@ -49,7 +50,7 @@ inline void ProfileCortexM0::Task::initialize(
 
 	// assert(stackSize >= frameSize);
 
-	*data-- = 0x01000000;		// xpsr
+	*data-- = 0x01000000;		// xpsr (with thumb bit set)
 	*data-- = (uintptr_t) entry;// pc
 	*data-- = (uintptr_t) exit;	// lr
 	*data-- = 0xbaadf00d;		// r12

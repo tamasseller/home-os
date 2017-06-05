@@ -35,26 +35,22 @@ struct SchedulerOptions {
 	public:
 		using TickType = typename Profile::Timer::TickType;
 
+		template<class Data>
+		using Atomic = typename Profile::template Atomic<Data>;
+
 		class Task;
 		class Mutex;
-		class Waitable;
 		class AtomicList;
 		class BinarySemaphore;
 		class CountingSemaphore;
-
-		inline static TickType getTick();
-
-		template<class... T> inline static void start(T... t);
-
-		inline static void yield();
-		inline static void sleep(uintptr_t time);
-		inline static void exit();
-
 	private:
+
 		class Blockable;
 		class Sleeper;
 		class SleepList;
 		class Waker;
+		class Waitable;
+		class WaitableSet;
 
 		class Event;
 		class EventList;
@@ -82,6 +78,7 @@ struct SchedulerOptions {
 		static uintptr_t doUnlock(uintptr_t mutex);
 		static uintptr_t doWait(uintptr_t waitable);
 		static uintptr_t doWaitTimeout(uintptr_t waitable, uintptr_t timeout);
+		static uintptr_t doSelect(uintptr_t waitableSet);
 
 		template<class T>
 		static inline uintptr_t detypePtr(T* x);
@@ -89,12 +86,22 @@ struct SchedulerOptions {
 		template<class T>
 		static inline T* entypePtr(uintptr_t  x);
 
-		template<bool pendOld>
+		template<bool pendOld, bool suspend = true>
 		static inline void switchToNext();
 
 		template<class RealEvent, class... Args>
 		static inline void postEvent(RealEvent*, Args... args);
 
+	public:
+		inline static TickType getTick();
+
+		template<class... T> inline static void start(T... t);
+
+
+		inline static void yield();
+		inline static void sleep(uintptr_t time);
+		inline static void exit();
+		template<class... T> inline static Waitable* select(T... t);
 	};
 };
 
@@ -108,6 +115,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Sleepers.h"
 #include "internal/Blockable.h"
 #include "internal/Waitable.h"
+#include "internal/WaitableSet.h"
 
 #include "Mutex.h"
 #include "Scheduler.h"

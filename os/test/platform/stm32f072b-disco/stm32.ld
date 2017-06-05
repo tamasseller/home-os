@@ -57,7 +57,6 @@ SECTIONS
     .stack (NOLOAD) : {
     	PROVIDE( sstack = . );
         . += 512;
-        PROVIDE( mstack = . );
 		PROVIDE( estack = . );
 
         . = ALIGN(4);

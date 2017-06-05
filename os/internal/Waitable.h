@@ -35,30 +35,44 @@ protected:
 	bool wakeOne(WakeSession&);
 
 private:
+    /*
+     * Implementation defined method to determine if
+     * the synchronization object is blocking during
+     * the acquire/lock/wait/pend call.
+     *
+	 * @return	Must return true if there the caller
+	 * 			needs to be blocked, i.e. if the acquiring
+	 * 			can not be successful at the moment, if
+	 * 			returns true, the caller is blocked and
+	 * 			put to the waiting list.
+	 */
+	virtual bool wouldBlock() = 0;
+
 	/**
 	 * Implementation defined acquire/lock/wait/pend method.
 	 *
-	 * @return	Must return true if there the caller needs
-	 * 			**NOT** to be blocked, i.e. if the acquiring
-	 * 			was successful, if returns false, the caller
-	 * 			is blocked and put to the waiting list.
+	 * @note	It is only called after estavlishing
+	 * 			that it is going to be successfull by
+	 * 			querying via the _wouldBlock_ method.
 	 */
-	virtual bool acquire() = 0;
+	virtual void acquire() = 0;
 
 	/**
-	 * Implementation defined release/unlock/notify/send method.
+	 * Implementation defined release/unlock/notify/send
+	 * method.
 	 *
-	 * @param	session The WakeSession that can be used to wake
-	 * 					up waiters.
+	 * @param	session The WakeSession that can be used
+	 * 					to wake up waiters.
 	 *
-	 * @param	arg		The argument retrieved from EventList.
-	 * 					See the description of EventList and
-	 * 					AtomicList for details.
+	 * @param	arg		The number of deferred release calls,
+	 * 					the argument retrieved from the event
+	 * 					list. See the description of EventList
+	 * 					and AtomicList for details.
 	 */
 	virtual void release(WakeSession& session, uintptr_t arg) = 0;
 
 	virtual void remove(Task* task) final;
-	virtual void waken(Task* task) final;
+	virtual void waken(Task* task, Waitable*) final;
 
 	static bool comparePriority(const Blockable&, const Blockable&);
 	pet::OrderedDoubleList<Blockable, &Waitable::comparePriority> waiters;
@@ -83,12 +97,14 @@ inline void Scheduler<Args...>::Waitable::init() {
 
 template<class... Args>
 inline void Scheduler<Args...>::Waitable::wait() {
-	Profile::CallGate::sync(&Scheduler<Args...>::doWait, detypePtr(this));
+	using CallGate = typename Profile::CallGate;
+	CallGate::sync(&Scheduler<Args...>::doWait, detypePtr(this));
 }
 
 template<class... Args>
 inline bool Scheduler<Args...>::Waitable::wait(uintptr_t timeout) {
-	return Profile::CallGate::sync(&Scheduler<Args...>::doWaitTimeout, detypePtr(this), timeout);
+	using CallGate = typename Profile::CallGate;
+	return CallGate::sync(&Scheduler<Args...>::doWaitTimeout, detypePtr(this), timeout);
 }
 
 
@@ -109,7 +125,7 @@ inline void Scheduler<Args...>::Waitable::remove(Task* task) {
 }
 
 template<class... Args>
-inline void Scheduler<Args...>::Waitable::waken(Task* task) {
+inline void Scheduler<Args...>::Waitable::waken(Task* task, Waitable*) {
 	waiters.remove(task);
 }
 
@@ -119,11 +135,14 @@ uintptr_t Scheduler<Args...>::doWait(uintptr_t waitablePtr)
 	Waitable* waitable = entypePtr<Waitable>(waitablePtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	if(!waitable->acquire()) {
+	if(waitable->wouldBlock()) {
 		waitable->waiters.add(currentTask);
 		currentTask->waitsFor = waitable;
 		switchToNext<false>();
-	}
+	} else
+		waitable->acquire();
+
+	return true;
 }
 
 template<class... Args>
@@ -132,8 +151,10 @@ uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t tim
 	Waitable* waitable = entypePtr<Waitable>(waitablePtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	if(waitable->acquire())
+	if(!waitable->wouldBlock()) {
+		waitable->acquire();
 		return true;
+	}
 
 	if(!timeout)
 		return false;
@@ -150,7 +171,6 @@ uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t tim
 	return true;
 }
 
-
 template<class... Args>
 bool Scheduler<Args...>::Waitable::wakeOne(WakeSession& session) {
 	if(Blockable* blockable = waiters.lowest()) {
@@ -162,7 +182,7 @@ bool Scheduler<Args...>::Waitable::wakeOne(WakeSession& session) {
 		if(waken->isSleeping())
 			state.sleepList.remove(waken);
 
-		waken->waitsFor->waken(waken);
+		waken->waitsFor->waken(waken, this);
 
 		state.policy.addRunnable(waken);
 

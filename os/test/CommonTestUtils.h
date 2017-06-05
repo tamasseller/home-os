@@ -22,7 +22,7 @@ using OsRr = Scheduler<
 
 template<uintptr_t size, uintptr_t count>
 struct TestStackPool {
-	static uintptr_t stacks[size * count];
+	static uintptr_t stacks[size * count / sizeof(uintptr_t)];
 	static uintptr_t *current;
 
 	static void* get() {
@@ -32,6 +32,8 @@ struct TestStackPool {
 	}
 
 	static void clear() {
+		for(int i=0; i<sizeof(stacks)/sizeof(stacks[0]); i++)
+			stacks[i] = 0x1badc0de;
 		current = stacks;
 	}
 };

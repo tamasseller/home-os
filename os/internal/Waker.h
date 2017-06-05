@@ -14,7 +14,7 @@ template<class... Args>
 class Scheduler<Args...>::Waker {
 	friend Scheduler<Args...>;
 	virtual void remove(Task*) = 0;
-	virtual void waken(Task*) = 0;
+	virtual void waken(Task*, Waitable*) = 0;
 };
 
 

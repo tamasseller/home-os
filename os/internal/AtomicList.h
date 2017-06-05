@@ -15,8 +15,6 @@
 template<class... Args>
 class Scheduler<Args...>::AtomicList
 {
-	template<class Value>
-	using Atomic = typename Profile::template Atomic<Value>;
 public:
 	class Element {
 		friend AtomicList;

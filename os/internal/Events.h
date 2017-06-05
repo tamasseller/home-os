@@ -17,7 +17,7 @@ class Scheduler<Args...>::Event: Scheduler<Args...>::AtomicList::Element {
 	friend EventList;
 	void (* const callback)(Event*, uintptr_t);
 protected:
-	inline Event(void (* const callback)(Event*, uintptr_t)): callback(callback) {}
+	inline Event(void (* callback)(Event*, uintptr_t)): callback(callback) {}
 };
 
 template<class... Args>

@@ -7,8 +7,18 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex-m0
 
-SOURCES += $(wildcard $(ROOT)/test/*.cpp)
-#SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
+SOURCES += $(ROOT)/test/MutexMany.cpp
+SOURCES += $(ROOT)/test/MutexSingle.cpp
+SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
+SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
+SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/AtomicListSimple.cpp
+SOURCES += $(ROOT)/test/AtomicListReissue.cpp
+SOURCES += $(ROOT)/test/SemaphoreLock.cpp
+SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
+SOURCES += $(ROOT)/test/Yield.cpp
+SOURCES += $(ROOT)/test/Select.cpp
+
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 
@@ -41,7 +51,8 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -O1 -ggdb 
+COMMONFLAGS += -g3 -O3
+COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 
 CXXFLAGS += $(COMMONFLAGS)
@@ -62,7 +73,7 @@ LDFLAGS += -gc-sections
 LDFLAGS += -nostartfiles
 LDFLAGS += -Tstm32.ld
 
-LIBS += gcc 
+LIBS += gcc c
 
 LIB_DIRS += $(GCCPATH)/arm-none-eabi/lib/armv6-m/ 
 LIB_DIRS += $(GCCPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m/  

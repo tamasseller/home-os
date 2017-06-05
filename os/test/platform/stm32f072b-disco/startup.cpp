@@ -10,6 +10,8 @@ extern unsigned int sdata;
 extern unsigned int edata;
 extern unsigned int sbss;
 extern unsigned int ebss;
+extern unsigned int sstack;
+extern unsigned int estack;
 
 extern unsigned int preinit_array_start;
 extern unsigned int preinit_array_end;
@@ -72,13 +74,17 @@ void Reset_Handler() {
 		for(;;){}
 	}
 
-	unsigned int *in, *out;
+	register unsigned int *in, *out;
 
 	in = &sidata;
 	out = &sdata;
 
 	while(out < &edata)
 		*out++ = *in++;
+
+	out = &sstack;
+	while(out < &estack)
+		*out++ = 0x1baddeed;
 
 	out = &sbss;
 	while(out < &ebss)
