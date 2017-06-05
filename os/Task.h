@@ -34,12 +34,14 @@ class Scheduler<Args...>::Task:
 
 		static Task* getTaskVirtual(Blockable*);
 	protected:
-		template<class Child, void (Child::*entry)()>
-		inline void start(void* stack, uintptr_t stackSize);
+		template<class Child, void (Child::*entry)(), class... StartArgs>
+		inline void start(void* stack, uintptr_t stackSize, StartArgs...);
 
 	public:
 		inline Task();
-		inline void start(void (*entry)(void*), void* stack, uintptr_t stackSize, void* arg);
+
+		template<class... StartArgs>
+		inline void start(void (*entry)(void*), void* stack, uintptr_t stackSize, void* arg, StartArgs...);
 };
 
 template<class... Args>
@@ -72,13 +74,16 @@ exit() {
 }
 
 template<class... Args>
+template<class... StartArgs>
 inline void Scheduler<Args...>::Task::start(
 		void (*entry)(void*),
 		void* stack,
 		uintptr_t stackSize,
-		void* arg)
+		void* arg,
+		StartArgs... startArgs)
 {
 	Profile::Task::initialize(entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
+	Policy::initialize(this, startArgs...);
 
 	auto task = detypePtr(static_cast<Task*>(this));
 
@@ -95,10 +100,10 @@ void Scheduler<Args...>::Task::entryStub(void* self) {
 }
 
 template<class... Args>
-template<class Child, void (Child::*entry)()>
-inline void Scheduler<Args...>::Task::start(void* stack, uintptr_t stackSize)
+template<class Child, void (Child::*entry)(), class... StartArgs>
+inline void Scheduler<Args...>::Task::start(void* stack, uintptr_t stackSize, StartArgs... startArgs)
 {
-	start(&Task::entryStub<Child, entry>, stack, stackSize, static_cast<Child*>(this));
+	start(&Task::entryStub<Child, entry>, stack, stackSize, static_cast<Child*>(this), startArgs...);
 }
 
 

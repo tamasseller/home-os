@@ -15,10 +15,24 @@
 #include "Platform.h"
 #include "Scheduler.h"
 
+#include "policy/RoundRobinPrioPolicy.h"
+#include "policy/RealtimePolicy.h"
+
 using OsRr = Scheduler<
 		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
 		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>
 >;
+
+using OsRrPrio = Scheduler<
+		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>
+>;
+
+using OsRt4 = Scheduler<
+		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::SchedulingPolicy<RealtimePolicy<4>::Policy>
+>;
+
 
 template<uintptr_t size, uintptr_t count>
 struct TestStackPool {
@@ -46,12 +60,12 @@ uintptr_t *TestStackPool<size, count>::current = TestStackPool<size, count>::sta
 
 typedef TestStackPool<testStackSize, testStackCount> StackPool;
 
-template<class Child>
-struct TestTask: OsRr::Task
+template<class Child, class Os=OsRr>
+struct TestTask: Os::Task
 {
 	template<class... Args>
 	void start(Args... args) {
-		OsRr::Task::start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
+		Os::Task::template start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
 	}
 };
 
@@ -64,7 +78,11 @@ public:
 	static void busyWork(uint64_t iterations);
 	static void calibrate();
 	static uint64_t getIterations(uintptr_t ms);
-	static void start();
+
+	template<class Os=OsRr>
+	static void start() {
+		Os::start(startParam);
+	}
 };
 
 template<uintptr_t size>

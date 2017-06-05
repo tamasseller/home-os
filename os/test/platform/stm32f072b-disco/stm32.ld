@@ -5,8 +5,8 @@ PROVIDE(FlashDataLoc = 0x80000000);
 
 MEMORY
 {
-    sram (rwx) : ORIGIN = 0x20000000, LENGTH = 8k
-    flash (rx) : ORIGIN = 0x08000000, LENGTH = 64k
+    sram (rwx) : ORIGIN = 0x20000000, LENGTH = 16k
+    flash (rx) : ORIGIN = 0x08000000, LENGTH = 128k
 }
 
 SECTIONS

@@ -41,6 +41,8 @@ struct RoundRobinPolicy {
 
 		return nullptr;
 	}
+
+	inline static void initialize(Task* task) {}
 };
 
 #endif /* ROUNDROBINPOLICY_H_ */

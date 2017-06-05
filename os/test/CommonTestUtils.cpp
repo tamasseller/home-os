@@ -39,9 +39,3 @@ uint64_t CommonTestUtils ::getIterations(uintptr_t ms)
 {
 	return iterationsPerMs * ms;
 }
-
-
-void CommonTestUtils::start()
-{
-	OsRr::start(startParam);
-}

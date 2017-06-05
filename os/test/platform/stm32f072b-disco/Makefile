@@ -19,6 +19,8 @@ SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
+SOURCES += $(ROOT)/test/PolicyPrio.cpp
+
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 

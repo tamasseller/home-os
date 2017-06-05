@@ -141,13 +141,14 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
 			if(Task* newTask = state.policy.peekNext()) {
 				Task* currentTask = static_cast<Task*>(platformTask);
-				if(!(*newTask < *currentTask)) {
+				if(!(*currentTask < *newTask)) {
 					state.policy.popNext();
 					state.policy.addRunnable(static_cast<Task*>(currentTask));
 					static_cast<Task*>(newTask)->switchTo();
 				}
 			}
 		} else {
+			//
 			if(Task* newTask = static_cast<Task*>(state.policy.popNext()))
 				newTask->switchTo();
 		}
