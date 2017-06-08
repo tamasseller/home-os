@@ -21,10 +21,10 @@ struct ProfileCortexM0 {
 	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
 };
 
+#include "Atomic.h"
 #include "Internals.h"
 #include "Task.h"
 #include "Timer.h"
-#include "Atomic.h"
 #include "CallGate.h"
 
 ///////////////////////////////////////////////////////////////////////////////

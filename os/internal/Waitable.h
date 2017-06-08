@@ -16,14 +16,10 @@ template<class... Args>
 class Scheduler<Args...>::Waitable: Waker, Event {
 	friend Scheduler<Args...>;
 protected:
-	/**
-	 * Represents a series of tasks waken during a single
-	 * run of the release method of the implementation.
-	 */
+
+	// TODO this is unnecessary, remove and use the policy instead.
 	class WakeSession {
 		friend Waitable;
-
-		/// The highest priority task waken during the session.
 		Task* highestPrio = nullptr;
 	};
 
@@ -51,7 +47,7 @@ private:
 	/**
 	 * Implementation defined acquire/lock/wait/pend method.
 	 *
-	 * @note	It is only called after estavlishing
+	 * @note	It is only called after establishing
 	 * 			that it is going to be successfull by
 	 * 			querying via the _wouldBlock_ method.
 	 */
@@ -201,7 +197,7 @@ void Scheduler<Args...>::Waitable::doNotify(Event* event, uintptr_t arg)
 	WakeSession session;
 	waitable->release(session, arg);
 
-	if(session.highestPrio && *currentTask < *session.highestPrio)
+	if(session.highestPrio && firstPreemptsSecond(session.highestPrio, currentTask))
 		switchToNext<true>();
 }
 

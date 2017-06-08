@@ -21,9 +21,44 @@ class ProfileCortexM0::Internals: ProfileCortexM0 {
 		class Icsr {
 			static constexpr auto reg = ((volatile uint32_t *) 0xe000ed04);
 			static constexpr uint32_t PendSvSet = 1u << 28;
+			static constexpr uint32_t VectactiveMask = 0x1f;
+			static constexpr uint32_t VectactivePendSv = 14;
+
+			static volatile bool isAsyncDeferred;
+			static volatile uint32_t asyncBlockCount;
 		public:
+			static inline bool isInPendSV() {
+				return (*reg & VectactiveMask) == VectactivePendSv;
+			}
+
 			static inline void triggerPendSV() {
-				*reg = PendSvSet;
+				asm volatile ("cpsid i" ::: "memory");
+
+				if(asyncBlockCount)
+					isAsyncDeferred = true;
+				else
+					*reg = PendSvSet;
+
+				asm volatile ("cpsie i" ::: "memory");
+			}
+
+			static inline void blockPendSV() {
+				asm volatile ("cpsie i" ::: "memory");
+
+				asyncBlockCount++;
+
+				asm volatile ("cpsid i" ::: "memory");
+			}
+
+			static inline void unblockPendSV() {
+				asm volatile ("cpsid i" ::: "memory");
+
+				if(!--asyncBlockCount && isAsyncDeferred) {
+					*reg = PendSvSet;
+					isAsyncDeferred = false;
+				}
+
+				asm volatile ("cpsie i" ::: "memory");
 			}
 		};
 

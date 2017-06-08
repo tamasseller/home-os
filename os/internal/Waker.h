@@ -11,10 +11,11 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::Waker {
+class Scheduler<Args...>::Waker {	// TODO rename to somthing prioqueue like.
 	friend Scheduler<Args...>;
 	virtual void remove(Task*) = 0;
 	virtual void waken(Task*, Waitable*) = 0;
+	// TODO add handlePriorityChange method.
 };
 
 

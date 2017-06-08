@@ -16,7 +16,7 @@
  * Mutex front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Mutex
+class Scheduler<Args...>::Mutex: Scheduler<Args...>::Policy::Priority
 {
 	friend Scheduler<Args...>;
 	static bool comparePriority(const Blockable&, const Blockable&);
@@ -62,13 +62,34 @@ doLock(uintptr_t mutexPtr)
 	Mutex* mutex = entypePtr<Mutex>(mutexPtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
+	// TODO set waitsFor
+
 	if(!mutex->owner) {
 		mutex->owner = currentTask;
 		mutex->relockCounter = 0;
-		// assert(mutex->waiters.empty();
+		// assert(mutex->waiters.empty());
+
+		/*
+		 * Save original priority now, so that it can be restored if
+		 * a later lock operation issued by a higher priority task
+		 * raises the priority of the _currentTask_ through the
+		 * ownership relation.
+		 */
+		*static_cast<typename Policy::Priority*>(mutex) = *currentTask;
+
 	} else if(mutex->owner == currentTask) {
 		mutex->relockCounter++;
 	} else {
+		/*
+		 * Raise the priority of the owner to avoid priority inversion.
+		 * The original priority will be restored once the mutex is unlocked.
+		 *
+		 * TODO use waitsFor instead of the policy (it can be blocked by another mutex or waitable too).
+		 */
+		if(firstPreemptsSecond(currentTask, mutex->owner)) {
+			state.policy.inheritPriority(mutex->owner, currentTask);
+		}
+
 		mutex->waiters.add(currentTask);
 		switchToNext<false>();
 	}
@@ -87,6 +108,15 @@ doUnlock(uintptr_t mutexPtr)
 		mutex->relockCounter--;
 	else {
 		/*
+		 * Restore priority. Here the _currentTask_ is executing, so it
+		 * is sure to not be handled by the policy currently, so the
+		 * priority can be set directly.
+		 */
+		*static_cast<typename Policy::Priority*>(currentTask) = *mutex;
+
+		// TODO reset waitsFor
+
+		/*
 		 * We know that the sleeper obtained here is actually a task,
 		 * because only the block method can add elements to the
 		 * waiter list, and that only accepts tasks.
@@ -99,11 +129,12 @@ doUnlock(uintptr_t mutexPtr)
 
 			state.policy.addRunnable(waken);
 
-			if(*currentTask < *waken)
+			if(firstPreemptsSecond(waken, currentTask))
 				switchToNext<true>();
 		} else {
 			mutex->owner = nullptr;
 		}
+
 	}
 }
 

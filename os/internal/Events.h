@@ -31,7 +31,26 @@ class Scheduler<Args...>::EventList: Scheduler<Args...>::AtomicList {
 public:
 	inline void issue(Event* event) {
 		auto element = static_cast<typename AtomicList::Element*>(event);
+
+		/*
+		 * The scheduling needs to be blocked while the event is added,
+		 * because if the task gets preempted between the argument setting
+		 * and list insertion step, then the _event_ instance could get
+		 * stuck, meaning that it is only delivered once the task that
+		 * started the insertion (and got preempted during it) gets to
+		 * finish the operation.
+		 *
+		 * If this was left without protection then it could cause a
+		 * nasty situations when the task that got the event stuck is
+		 * a low priority one, and higher priority tasks can delay it
+		 * indefinitely.
+		 */
+
+		Profile::CallGate::blockAsync();
+
 		AtomicList::push(element, Combiner());
+
+		Profile::CallGate::unblockAsync();
 	}
 
 	inline void dispatch()

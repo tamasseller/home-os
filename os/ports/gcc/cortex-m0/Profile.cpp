@@ -8,13 +8,17 @@
 #include "Profile.h"
 
 volatile uint32_t ProfileCortexM0::Timer::tick = 0;
+void (*ProfileCortexM0::Timer::tickHandler)();
+
+volatile bool ProfileCortexM0::Internals::Scb::Icsr::isAsyncDeferred;
+volatile bool isAsyncBlocked;
+volatile uint32_t ProfileCortexM0::Internals::Scb::Icsr::asyncBlockCount;
+void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
 
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
 void* ProfileCortexM0::Task::suspendedPc;
 
-void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
-void (*ProfileCortexM0::Timer::tickHandler)();
 
 __attribute__((naked))
 void ProfileCortexM0::Task::startFirst()

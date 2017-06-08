@@ -92,6 +92,8 @@ struct SchedulerOptions {
 		template<class RealEvent, class... Args>
 		static inline void postEvent(RealEvent*, Args... args);
 
+		static inline bool firstPreemptsSecond(Task* first, Task *second);
+
 	public:
 		inline static TickType getTick();
 
@@ -141,14 +143,17 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
 			if(Task* newTask = state.policy.peekNext()) {
 				Task* currentTask = static_cast<Task*>(platformTask);
-				if(!(*currentTask < *newTask)) {
+
+				bool newInferior = firstPreemptsSecond(currentTask, newTask);
+
+				if(!newInferior) {
 					state.policy.popNext();
 					state.policy.addRunnable(static_cast<Task*>(currentTask));
 					static_cast<Task*>(newTask)->switchTo();
 				}
 			}
 		} else {
-			//
+			// ???
 			if(Task* newTask = static_cast<Task*>(state.policy.popNext()))
 				newTask->switchTo();
 		}

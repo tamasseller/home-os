@@ -87,7 +87,9 @@ inline void ProfileCortexM0::Task::switchTo()
 		oldTask = currentTask;
 
 	currentTask = this;
-	Internals::Scb::Icsr::triggerPendSV();
+
+//	if(!Internals::Scb::Icsr::isInPendSV())			// TODO make a fromAsync version instead.
+		Internals::Scb::Icsr::triggerPendSV();
 }
 
 inline void ProfileCortexM0::Task::injectReturnValue(uintptr_t ret)

@@ -78,8 +78,8 @@ public:
 		});
 
 		/*
-		 * The list is in reverse order, in order to enable
-		 * sane behavior when used as queue the list is reversed.
+		 * The list is in reverse order, in order to enable sane
+		 * behavior when used as a queue, the list is reversed.
 		 */
 
 		/// _prev_ is the previous element in the original order.

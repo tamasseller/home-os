@@ -19,29 +19,32 @@ class ProfileCortexM0::CallGate {
 	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t));
 	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t));
 	static inline uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t));
-	template<class ... Args> static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args);
+
+	template<class ... Args>
+	static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args) {
+		return issueSvc((uintptr_t)args..., f);
+	}
 
 public:
-	template<class ... T> static inline uintptr_t sync(T ... ops);
-	static inline void async(void (*asyncCallHandler)());
+	template<class ... T>
+	static inline uintptr_t sync(T ... ops) {
+		return callViaSvc(ops...);
+	}
+
+	static inline void async(void (*asyncCallHandler)()) {
+		CallGate::asyncCallHandler = asyncCallHandler;
+		Internals::Scb::Icsr::triggerPendSV();
+	}
+
+	static inline void blockAsync() {
+		Internals::Scb::Icsr::blockPendSV();
+	}
+
+	static inline void unblockAsync()
+	{
+		Internals::Scb::Icsr::unblockPendSV();
+	}
 };
-
-///////////////////////////////////////////////////////////////////////////////
-
-inline void ProfileCortexM0::CallGate::async(void (*asyncCallHandler)()) {
-	CallGate::asyncCallHandler = asyncCallHandler;
-	Internals::Scb::Icsr::triggerPendSV();
-}
-
-template<class ... T>
-inline uintptr_t ProfileCortexM0::CallGate::sync(T ... ops) {
-	return callViaSvc(ops...);
-}
-
-template<class ... Args>
-inline uintptr_t ProfileCortexM0::CallGate::callViaSvc(uintptr_t (f)(Args...), Args ... args) {
-	return issueSvc((uintptr_t)args..., f);
-}
 
 inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t (*f)())
 {

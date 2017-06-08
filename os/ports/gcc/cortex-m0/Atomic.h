@@ -33,14 +33,14 @@ public:
 			"ldr %[old], [%[data]]\n"
 				: [old]"=l"(old)
 				: [data]"l"(&this->data)
-				: /* No clobbers */
+				: "memory"
 		);
 
 		Value result;
 		if(op(old, result, args...))
 			data = result;
 
-		asm volatile ("cpsie i\n");
+		asm volatile ("cpsie i\n" ::: "memory");
 		return old;
 	}
 };

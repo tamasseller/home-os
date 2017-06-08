@@ -10,15 +10,16 @@ INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex-m0
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
+SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
 SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
 SOURCES += $(ROOT)/test/SemaphoreLock.cpp
 SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
+SOURCES += $(ROOT)/test/SemaphorePrio.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Select.cpp
-
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
 SOURCES += $(ROOT)/test/TestSuite.cpp

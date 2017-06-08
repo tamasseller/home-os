@@ -52,7 +52,7 @@ template<class... Args>
 inline void Scheduler<Args...>::SleepList::delay(Task* elem, uintptr_t delay)
 {
 	elem->deadline = Profile::Timer::getTick() + delay;
-	list.add(static_cast<Sleeper*>(elem));
+	list.add(elem);
 }
 
 template<class... Args>

@@ -49,4 +49,9 @@ inline void Scheduler<Args...>::postEvent(RealEvent* event, CombinerArgs... args
 	Profile::CallGate::async(&Scheduler<Args...>::doAsync);
 }
 
+template<class... Args>
+inline bool Scheduler<Args...>::firstPreemptsSecond(Task* first, Task *second) {
+	return *first < *second;
+}
+
 #endif /* HELPERS_H_ */

@@ -7,7 +7,7 @@
 
 #include "CommonTestUtils.h"
 
-//namespace {
+namespace {
 	typedef typename OsRr::BinarySemaphore Semaphore;
 	static Semaphore s12, s23, s31;
 	static Semaphore s13, s32, s21;
@@ -37,7 +37,7 @@
 	} 	t1(s31, s12, s21, s13),
 		t2(s12, s23, s32, s21),
 		t3(s23, s31, s13, s32);
-//}
+}
 
 TEST(Select)
 {
