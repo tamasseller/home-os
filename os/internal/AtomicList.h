@@ -37,10 +37,7 @@ public:
 				 */
 				current = current->next;
 
-				arg = ret->arg([&](uintptr_t old, uintptr_t &result) {
-					result = 0;
-					return true;
-				});
+				arg = ret->arg.reset();
 
 				return ret;
 			}
@@ -69,13 +66,7 @@ public:
 		/*
 		 * Take over the current list atomically.
 		 */
-		Element* current = first([&](Element* old, Element* &result) {
-			if(!old)
-				return false;
-
-			result = nullptr;
-			return true;
-		});
+		Element* current = first.reset();
 
 		/*
 		 * The list is in reverse order, in order to enable sane

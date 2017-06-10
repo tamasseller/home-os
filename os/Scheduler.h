@@ -35,8 +35,7 @@ struct SchedulerOptions {
 	public:
 		using TickType = typename Profile::Timer::TickType;
 
-		template<class Data>
-		using Atomic = typename Profile::template Atomic<Data>;
+		template<class Data> class Atomic;
 
 		class Task;
 		class Mutex;
@@ -106,6 +105,7 @@ struct SchedulerOptions {
 template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
+#include "internal/Atomic.h"
 #include "internal/AtomicList.h"
 #include "internal/Events.h"
 #include "internal/Waker.h"

@@ -54,17 +54,11 @@ public:
 		 * indefinitely.
 		 */
 
-		criticality([](uintptr_t old, uintptr_t& result){
-			result = old + 1;
-			return true;
-		});
+		criticality.increment();
 
 		AtomicList::push(element, Combiner());
 
-		uintptr_t result = criticality([](uintptr_t old, uintptr_t& result){
-			result = old - 1;
-			return true;
-		});
+		uintptr_t result = criticality.decrement();
 
 		/*
 		 * The race condition here, introduced by using the value of the previous

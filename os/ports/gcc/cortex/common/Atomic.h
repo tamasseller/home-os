@@ -8,8 +8,10 @@
 #ifndef ATOMIC_H_
 #define ATOMIC_H_
 
-template<class Value>
-class ProfileCortexM0::Atomic
+namespace CortexCommon {
+
+template<class Value, Value (*ldrex)(volatile Value*), bool (*strex)(volatile Value*, Value), void (*clrex)()>
+class Atomic
 {
 	volatile Value data;
 public:
@@ -26,23 +28,19 @@ public:
 	template<class Op, class... Args>
 	inline Value operator()(Op&& op, Args... args)
 	{
-		Value old;
+		Value old, result;
+		do {
+			old = ldrex(&this->data);
 
-		asm volatile (
-			"cpsid i\n"
-			"ldr %[old], [%[data]]\n"
-				: [old]"=l"(old)
-				: [data]"l"(&this->data)
-				: "memory"
-		);
+			if(!op(old, result, args...))
+				clrex();
 
-		Value result;
-		if(op(old, result, args...))
-			data = result;
+		} while(!strex(&this->data, result));
 
-		asm volatile ("cpsie i\n" ::: "memory");
 		return old;
 	}
 };
+
+}
 
 #endif /* ATOMIC_H_ */

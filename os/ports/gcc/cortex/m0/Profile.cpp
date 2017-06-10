@@ -7,6 +7,8 @@
 
 #include "Profile.h"
 
+volatile bool ProfileCortexM0::exclusiveMonitor = false;
+
 volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 void (*ProfileCortexM0::Timer::tickHandler)();
 
