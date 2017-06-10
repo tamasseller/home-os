@@ -106,7 +106,7 @@ inline bool Scheduler<Args...>::Waitable::wait(uintptr_t timeout) {
 
 template<class... Args>
 inline void Scheduler<Args...>::Waitable::notify() {
-	postEvent(this);
+	state.eventList.issue(this);
 }
 
 template<class... Args>

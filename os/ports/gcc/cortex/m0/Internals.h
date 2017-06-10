@@ -32,33 +32,7 @@ class ProfileCortexM0::Internals: ProfileCortexM0 {
 			}
 
 			static inline void triggerPendSV() {
-				asm volatile ("cpsid i" ::: "memory");
-
-				if(asyncBlockCount)
-					isAsyncDeferred = true;
-				else
-					*reg = PendSvSet;
-
-				asm volatile ("cpsie i" ::: "memory");
-			}
-
-			static inline void blockPendSV() {
-				asm volatile ("cpsie i" ::: "memory");
-
-				asyncBlockCount++;
-
-				asm volatile ("cpsid i" ::: "memory");
-			}
-
-			static inline void unblockPendSV() {
-				asm volatile ("cpsid i" ::: "memory");
-
-				if(!--asyncBlockCount && isAsyncDeferred) {
-					*reg = PendSvSet;
-					isAsyncDeferred = false;
-				}
-
-				asm volatile ("cpsie i" ::: "memory");
+				*reg = PendSvSet;
 			}
 		};
 

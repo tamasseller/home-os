@@ -28,6 +28,14 @@ class Scheduler<Args...>::EventList: Scheduler<Args...>::AtomicList {
 			return true;
 		}
 	};
+
+	static void dispatchTrampoline()
+	{
+		state.eventList.dispatch();
+	}
+
+	Atomic<uintptr_t> criticality;
+
 public:
 	inline void issue(Event* event) {
 		auto element = static_cast<typename AtomicList::Element*>(event);
@@ -46,11 +54,28 @@ public:
 		 * indefinitely.
 		 */
 
-		Profile::CallGate::blockAsync();
+		criticality([](uintptr_t old, uintptr_t& result){
+			result = old + 1;
+			return true;
+		});
 
 		AtomicList::push(element, Combiner());
 
-		Profile::CallGate::unblockAsync();
+		uintptr_t result = criticality([](uintptr_t old, uintptr_t& result){
+			result = old - 1;
+			return true;
+		});
+
+		/*
+		 * The race condition here, introduced by using the value of the previous
+		 * atomic operation non-atomically is known to be benign, the worst that
+		 * can happen is that the asynchronous call is issued spuriously, but only
+		 * outside the critical section, this is ensured by the atomicity of the
+		 * counter accesses.
+		 */
+
+		if(result == 1)
+			Profile::CallGate::async(&EventList::dispatchTrampoline);
 	}
 
 	inline void dispatch()

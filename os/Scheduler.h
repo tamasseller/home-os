@@ -69,7 +69,6 @@ struct SchedulerOptions {
 		} state;
 
 		static void onTick();
-		static void doAsync();
 		static uintptr_t doStartTask(uintptr_t task);
 		static uintptr_t doExit();
 		static uintptr_t doYield();
@@ -88,9 +87,6 @@ struct SchedulerOptions {
 
 		template<bool pendOld, bool suspend = true>
 		static inline void switchToNext();
-
-		template<class RealEvent, class... Args>
-		static inline void postEvent(RealEvent*, Args... args);
 
 		static inline bool firstPreemptsSecond(Task* first, Task *second);
 
@@ -184,13 +180,7 @@ inline typename Scheduler<Args...>::Profile::Timer::TickType Scheduler<Args...>:
 template<class... Args>
 void Scheduler<Args...>::onTick()
 {
-	postEvent(&state.preemptionEvent);
-}
-
-template<class... Args>
-inline void Scheduler<Args...>:: doAsync()
-{
-	state.eventList.dispatch();
+	state.eventList.issue(&state.preemptionEvent);
 }
 
 #endif /* SCHEDULER_H_ */

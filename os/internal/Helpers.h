@@ -43,13 +43,6 @@ entypePtr(uintptr_t  x) {
 }
 
 template<class... Args>
-template<class RealEvent, class... CombinerArgs>
-inline void Scheduler<Args...>::postEvent(RealEvent* event, CombinerArgs... args) {
-	state.eventList.issue(event, args...);
-	Profile::CallGate::async(&Scheduler<Args...>::doAsync);
-}
-
-template<class... Args>
 inline bool Scheduler<Args...>::firstPreemptsSecond(Task* first, Task *second) {
 	return *first < *second;
 }

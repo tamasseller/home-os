@@ -35,15 +35,6 @@ public:
 		CallGate::asyncCallHandler = asyncCallHandler;
 		Internals::Scb::Icsr::triggerPendSV();
 	}
-
-	static inline void blockAsync() {
-		Internals::Scb::Icsr::blockPendSV();
-	}
-
-	static inline void unblockAsync()
-	{
-		Internals::Scb::Icsr::unblockPendSV();
-	}
 };
 
 inline uintptr_t ProfileCortexM0::CallGate::issueSvc(uintptr_t (*f)())

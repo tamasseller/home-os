@@ -5,7 +5,7 @@ PET = $(ROOT)/../pet
 
 INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
-INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex-m0
+INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex/m0
 
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
@@ -25,7 +25,7 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/ports/gcc/cortex-m0/Profile.cpp
+SOURCES += $(ROOT)/ports/gcc/cortex/m0/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp
@@ -54,7 +54,7 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -g3 -O3
+COMMONFLAGS += -g3 -Og
 COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 
