@@ -19,7 +19,7 @@ switchToNext()
 		if(pendOld)
 			state.policy.addRunnable(static_cast<Task*>(Profile::Task::getCurrent()));
 
-		newTask->switchTo();
+		newTask->switchToSync();
 	} else if(suspend)
 		Profile::Task::suspendExecution();
 }

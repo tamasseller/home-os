@@ -70,17 +70,8 @@ void ProfileCortexM0::Task::finishLast()
 	currentTask = nullptr;
 }
 
-__attribute__((naked))
 void SVC_Handler() {
-	asm volatile (
-		"push {r4, lr}		\n"
-		"mrs r4, psp		\n"
-		"ldmia r4, {r0-r4}	\n" // Load stored regs (r0, r1, r2, r3, r12)
-		"blx r4				\n"	// Call the one that is stored in the caller r12
-		"mrs r1, psp		\n" // Save r0 to the caller frame
-		"str r0, [r1, #0]	\n"
-		"pop {r4, pc}		\n" : : :
-	);
+	CortexCommon::DirectSvc::dispatch();
 }
 
 __attribute__((naked))

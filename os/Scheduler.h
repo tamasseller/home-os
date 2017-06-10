@@ -136,22 +136,19 @@ class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
 			state.policy.addRunnable(task);
 		}
 
-		if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-			if(Task* newTask = state.policy.peekNext()) {
+		if(Task* newTask = state.policy.peekNext()) {
+			if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
+
 				Task* currentTask = static_cast<Task*>(platformTask);
 
-				bool newInferior = firstPreemptsSecond(currentTask, newTask);
+				if(firstPreemptsSecond(currentTask, newTask))
+					return;
 
-				if(!newInferior) {
-					state.policy.popNext();
-					state.policy.addRunnable(static_cast<Task*>(currentTask));
-					static_cast<Task*>(newTask)->switchTo();
-				}
+				state.policy.addRunnable(static_cast<Task*>(currentTask));
 			}
-		} else {
-			// ???
-			if(Task* newTask = static_cast<Task*>(state.policy.popNext()))
-				newTask->switchTo();
+
+			state.policy.popNext();
+			static_cast<Task*>(newTask)->switchToAsync();
 		}
 	}
 
