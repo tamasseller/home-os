@@ -72,7 +72,7 @@ public:
 	inline void switchToSync()
 	{
 		switchToAsync();
-		Internals::Scb::Icsr::triggerPendSV();
+		CortexCommon::Scb::Icsr::triggerPendSV();
 	}
 
 	inline void injectReturnValue(uintptr_t ret)

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "../common/Atomic.h"
+#include "../common/Scb.h"
 
 class ProfileCortexM0 {
 	template<class Value> inline static Value loadExclusive(volatile Value*);
@@ -26,12 +27,9 @@ public:
 	template<class Data>
 	using Atomic = CortexCommon::Atomic<Data, &loadExclusive, &storeExclusive, &clearExclusive>;
 
-	class Internals;
-
 	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
 };
 
-#include "Internals.h"
 #include "Task.h"
 #include "Timer.h"
 #include "CallGate.h"
@@ -39,8 +37,8 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 
 inline void ProfileCortexM0::init(uint32_t ticks, uint8_t systickPrio) {
-	Internals::Scb::Syst::init(ticks);
-	Internals::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
+	CortexCommon::Scb::Syst::init(ticks);
+	CortexCommon::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
 	Timer::tick = 0;
 }
 

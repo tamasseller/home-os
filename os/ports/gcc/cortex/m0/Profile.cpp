@@ -7,20 +7,16 @@
 
 #include "Profile.h"
 
-volatile bool ProfileCortexM0::exclusiveMonitor = false;
-
-volatile uint32_t ProfileCortexM0::Timer::tick = 0;
-void (*ProfileCortexM0::Timer::tickHandler)();
-
-volatile bool ProfileCortexM0::Internals::Scb::Icsr::isAsyncDeferred;
-volatile bool isAsyncBlocked;
-volatile uint32_t ProfileCortexM0::Internals::Scb::Icsr::asyncBlockCount;
-void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
-
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::Task::oldTask;
 void* ProfileCortexM0::Task::suspendedPc;
 
+volatile bool ProfileCortexM0::exclusiveMonitor = false;
+
+volatile uint32_t ProfileCortexM0::Timer::tick = 0;
+
+void (*ProfileCortexM0::Timer::tickHandler)();
+void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
 
 __attribute__((naked))
 void ProfileCortexM0::Task::startFirst()
@@ -74,10 +70,17 @@ void SVC_Handler() {
 	CortexCommon::DirectSvc::dispatch();
 }
 
+void SysTick_Handler()
+{
+	using Timer = ProfileCortexM0::Timer;
+	Timer::tick++;
+	Timer::tickHandler();
+}
+
 __attribute__((naked))
 void PendSV_Handler() {
-	using Task = ProfileCortexM0::Internals::Task;
-	using CallGate = ProfileCortexM0::Internals::CallGate;
+	using Task = ProfileCortexM0::Task;
+	using CallGate = ProfileCortexM0::CallGate;
 
 	asm volatile (
 		".thumb					\n"
@@ -145,11 +148,4 @@ void PendSV_Handler() {
 			  "i" (&CallGate::asyncCallHandler)
 			: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12"
 	);
-}
-
-void SysTick_Handler()
-{
-	using Timer = ProfileCortexM0::Internals::Timer;
-	Timer::tick++;
-	Timer::tickHandler();
 }

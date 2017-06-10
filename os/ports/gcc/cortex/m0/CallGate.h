@@ -29,7 +29,7 @@ public:
 
 	static inline void async(void (*asyncCallHandler)()) {
 		CallGate::asyncCallHandler = asyncCallHandler;
-		Internals::Scb::Icsr::triggerPendSV();
+		CortexCommon::Scb::Icsr::triggerPendSV();
 	}
 };
 
