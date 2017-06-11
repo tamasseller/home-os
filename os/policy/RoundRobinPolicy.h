@@ -24,10 +24,6 @@ struct RoundRobinPolicy {
 		tasks.fastAddBack(task);
 	}
 
-	void removeRunnable(Task* task) {
-		tasks.fastRemove(task);
-	}
-
 	Task* popNext() {
 		if(Storage* element = tasks.popFront())
 			return static_cast<Task*>(element);

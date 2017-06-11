@@ -25,7 +25,7 @@ class Scheduler<Args...>::Task:
 		template<class Child, void (Child::*entry)()> static void entryStub(void* self);
 
 		friend Scheduler<Args...>;
-		friend Policy;
+		friend PolicyBase;
 
 		/*
 		 * Used by waitables only!

@@ -45,6 +45,9 @@ struct SchedulerOptions {
 	private:
 
 		class Blockable;
+		using PolicyBase = PolicyTemplate<Task, Blockable>;
+
+		class Policy;
 		class Sleeper;
 		class SleepList;
 		class Blocker;
@@ -56,12 +59,10 @@ struct SchedulerOptions {
 
 		class PreemptionEvent;
 
-		typedef PolicyTemplate<Task, Blockable> Policy;
-
 		static struct State {
 			Policy policy;
-			bool isRunning;
-			uintptr_t nTasks;
+			bool isRunning;   // TODO check if can be merged
+			uintptr_t nTasks; // TODO check if can be merged
 			EventList eventList;
 			SleepList sleepList;
 			PreemptionEvent preemptionEvent;
@@ -105,6 +106,7 @@ struct SchedulerOptions {
 template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
+#include "internal/Policy.h"
 #include "internal/Atomic.h"
 #include "internal/AtomicList.h"
 #include "internal/Events.h"
