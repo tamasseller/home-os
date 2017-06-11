@@ -1,12 +1,12 @@
 /*
- * CortexM0.h
+ * Profile.h
  *
  *  Created on: 2017.05.24.
  *      Author: tooma
  */
 
-#ifndef CORTEXM0_H_
-#define CORTEXM0_H_
+#ifndef PROFILE_H_
+#define PROFILE_H_
 
 #include <stdint.h>
 
@@ -30,7 +30,6 @@ public:
 	using Atomic = CortexCommon::Atomic<Data, &loadExclusive, &storeExclusive, &clearExclusive>;
 
 	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
-	static inline void setSyscallMapper(uint32_t ticks, uint8_t systickPrio=0xc0);
 
 	static inline void fatalError(const char* msg);
 };
@@ -107,4 +106,4 @@ inline void ProfileCortexM0::fatalError(const char* msg)
 	sysWrite0("!\n");
 }
 
-#endif /* CORTEXM0_H_ */
+#endif /* PROFILE_H_ */

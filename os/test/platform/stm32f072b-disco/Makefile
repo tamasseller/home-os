@@ -21,6 +21,7 @@ SOURCES += $(ROOT)/test/SemaphorePrio.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
@@ -41,6 +42,7 @@ SOURCES += semihosting.cpp
 SOURCES += st/stdperiph/src/stm32f0xx_gpio.c
 SOURCES += st/stdperiph/src/stm32f0xx_rcc.c
 SOURCES += st/stdperiph/src/stm32f0xx_misc.c
+SOURCES += st/stdperiph/src/stm32f0xx_tim.c
 SOURCES += st/stdperiph/src/stm32f0xx_dbgmcu.c
 
 INCLUDE_DIRS += .
@@ -54,7 +56,7 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -g3 -Og
+COMMONFLAGS += -g3 -O0
 COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 

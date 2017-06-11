@@ -20,6 +20,13 @@
 #define LEDB_PIN GPIO_Pin_7
 #define LEDO_PIN GPIO_Pin_8
 
+void (*interruptRoutine)();
+
+void TIM1_BRK_UP_TRG_COM_IRQHandler() {
+	TIM_ClearFlag(TIM1, TIM_FLAG_Update);
+	interruptRoutine();
+}
+
 void initHw() {
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
 	GPIO_InitTypeDef gpioInit;
@@ -32,6 +39,17 @@ void initHw() {
 	GPIO_WriteBit(LEDG_PORT, LEDG_PIN, Bit_SET);
 	GPIO_WriteBit(LEDB_PORT, LEDB_PIN, Bit_SET);
 	GPIO_WriteBit(LEDO_PORT, LEDO_PIN, Bit_SET);
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+
+	TIM_TimeBaseInitTypeDef timInit;
+	TIM_TimeBaseStructInit(&timInit);
+	TIM_TimeBaseInit(TIM1, &timInit);
+
+	NVIC_SetPriority(TIM1_BRK_UP_TRG_COM_IRQn, 0);
+	NVIC_EnableIRQ(TIM1_BRK_UP_TRG_COM_IRQn);
+
+	TIM_Cmd(TIM1, ENABLE);
 }
 
 void setFirstLed() {
@@ -78,11 +96,21 @@ void errorBlink() {
 	}
 }
 
+void reqisterIrq(void (*newInterruptRoutine)()) {
+	if(newInterruptRoutine) {
+		interruptRoutine = newInterruptRoutine;
+		TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
+	} else {
+		TIM_ITConfig(TIM1, TIM_IT_Update, DISABLE);
+		interruptRoutine = nullptr;
+	}
+}
+
 int main()
 {
 	initHw();
 
-	if(TestSuite<&blinkLeds, &setFirstLed>::runTests(48000))
+	if(TestSuite<&blinkLeds, &setFirstLed, &reqisterIrq>::runTests(48000))
 		okBlink();
 	else
 		errorBlink();

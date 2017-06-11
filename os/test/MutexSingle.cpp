@@ -7,20 +7,21 @@
 
 #include "CommonTestUtils.h"
 
-namespace {
+// namespace {
 	static OsRr::Mutex mutex;
 	static SharedData<16> data;
 
 	struct Task: public TestTask<Task> {
+		volatile int counter = -1;
 		void run() {
-			for(int i = 0; i < UINT16_MAX/2; i++) {
+			for(counter = 0; counter < UINT16_MAX/2; counter++) {
 				mutex.lock();
 				data.update();
 				mutex.unlock();
 			}
 		}
 	} t1, t2;
-}
+//}
 
 TEST(SingleMutex) {
 	t1.start();

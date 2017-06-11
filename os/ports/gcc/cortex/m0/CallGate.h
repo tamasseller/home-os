@@ -26,6 +26,9 @@ class ProfileCortexM0::CallGate {
 	}
 
 public:
+	static inline void setSyscallMapper(void* (*mapper)(void*)) {
+		syncCallMapper = mapper;
+	}
 
 	template<class ... T>
 	static inline uintptr_t sync(T ... ops) {
@@ -37,6 +40,5 @@ public:
 		CortexCommon::Scb::Icsr::triggerPendSV();
 	}
 };
-
 
 #endif /* CALLGATE_H_ */

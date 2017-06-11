@@ -139,6 +139,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "Scheduler.h"
 #include "Task.h"
 #include "BinarySemaphore.h"
+#include "CountingSemaphore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 

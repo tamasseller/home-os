@@ -14,9 +14,12 @@ template<class... Args>
 template<bool pendOld, bool suspend>
 inline void Scheduler<Args...>::switchToNext()
 {
-	if(Task* newTask = static_cast<Task*>(state.policy.popNext())) {
-		if(pendOld)
-			state.policy.addRunnable(static_cast<Task*>(Profile::Task::getCurrent()));
+	if(Task* newTask = state.policy.popNext()) {
+		if(pendOld) {
+			if(Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent()))
+					state.policy.addRunnable(currentTask);
+		}
+
 
 		newTask->switchToSync();
 	} else if(suspend)

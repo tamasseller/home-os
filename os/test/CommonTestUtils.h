@@ -19,19 +19,19 @@
 #include "policy/RealtimePolicy.h"
 
 using OsRr = Scheduler<
-		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
 		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>,
 		SchedulerOptions::EnableAssert<true>
 >;
 
 using OsRrPrio = Scheduler<
-		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
 		SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>,
 		SchedulerOptions::EnableAssert<true>
 >;
 
 using OsRt4 = Scheduler<
-		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
+		SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
 		SchedulerOptions::SchedulingPolicy<RealtimePolicy<4>::Policy>,
 		SchedulerOptions::EnableAssert<true>
 >;
@@ -81,6 +81,8 @@ public:
 	static void busyWork(uint64_t iterations);
 	static void calibrate();
 	static uint64_t getIterations(uintptr_t ms);
+
+	static void (*registerIrq)(void (*)());
 
 	template<class Os=OsRr>
 	static void start() {

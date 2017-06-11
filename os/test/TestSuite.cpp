@@ -18,4 +18,5 @@ void OsTestPlugin::beforeTest() {
 }
 
 void OsTestPlugin::afterTest() {
+	CommonTestUtils::registerIrq(nullptr);
 }

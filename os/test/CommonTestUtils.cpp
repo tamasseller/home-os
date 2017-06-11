@@ -9,6 +9,7 @@
 
 uint64_t CommonTestUtils::iterationsPerMs;
 uintptr_t CommonTestUtils::startParam;
+void (*CommonTestUtils::registerIrq)(void (*)());
 
 __attribute__((noinline)) // XXX
 void CommonTestUtils::busyWork(uint64_t iterations)

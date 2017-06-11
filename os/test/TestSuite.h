@@ -25,11 +25,11 @@ extern struct Calibrator: TestTask<Calibrator>{
 	void run();
 } calibrator;
 
-template<void (*platformTestProgressReport)(int), void (platformTestStartedReport)()>
+template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrqPtr)(void (*)())>
 class TestSuite {
 	static class Output: public pet::TraceOutput {
 		virtual void reportProgress() {
-			platformTestProgressReport(nDots);
+			testProgressReport(nDots);
 			pet::TraceOutput::reportProgress();
 		}
 	} output;
@@ -44,14 +44,20 @@ public:
 		OsTestPlugin plugin;
 		pet::TestRunner::installPlugin(&plugin);
 
-		platformTestStartedReport();
+		testStartedReport();
+
+		CommonTestUtils::registerIrq = registerIrqPtr;
 
 		return pet::TestRunner::runAllTests(&output) == 0;
 	}
+
+	static void registerIrq(void (*irq)()) {
+
+	}
 };
 
-template<void (*platformTestProgressReport)(int), void (platformTestStartedReport)()>
-typename TestSuite<platformTestProgressReport, platformTestStartedReport>::Output
-TestSuite<platformTestProgressReport, platformTestStartedReport>::output;
+template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrq)(void (*)())>
+typename TestSuite<testProgressReport, testStartedReport, registerIrq>::Output
+TestSuite<testProgressReport, testStartedReport, registerIrq>::output;
 
 #endif /* TESTSUITE_H_ */
