@@ -17,6 +17,11 @@ volatile uint32_t ProfileCortexM0::Timer::tick = 0;
 
 void (*ProfileCortexM0::Timer::tickHandler)();
 void (* volatile ProfileCortexM0::CallGate::asyncCallHandler)();
+void* (* volatile ProfileCortexM0::CallGate::syncCallMapper)(void*) = &ProfileCortexM0::CallGate::defaultSyncCallMapper;
+
+void *ProfileCortexM0::CallGate::defaultSyncCallMapper(void* arg) {
+	return arg;
+}
 
 __attribute__((naked))
 void ProfileCortexM0::Task::startFirst()
@@ -67,7 +72,7 @@ void ProfileCortexM0::Task::finishLast()
 }
 
 void SVC_Handler() {
-	CortexCommon::DirectSvc::dispatch();
+	CortexCommon::DirectSvc::dispatch(ProfileCortexM0::CallGate::syncCallMapper);
 }
 
 void SysTick_Handler()

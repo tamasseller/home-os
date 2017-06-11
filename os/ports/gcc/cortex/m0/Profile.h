@@ -19,6 +19,8 @@ class ProfileCortexM0 {
 	inline static void clearExclusive();
 
 	static volatile bool exclusiveMonitor;
+
+	static inline void sysWrite0(const char* msg);
 public:
 	class Task;
 	class Timer;
@@ -28,6 +30,9 @@ public:
 	using Atomic = CortexCommon::Atomic<Data, &loadExclusive, &storeExclusive, &clearExclusive>;
 
 	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
+	static inline void setSyscallMapper(uint32_t ticks, uint8_t systickPrio=0xc0);
+
+	static inline void fatalError(const char* msg);
 };
 
 #include "Task.h"
@@ -79,6 +84,27 @@ inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
 		);
 
 	return ret;
+}
+
+inline void ProfileCortexM0::sysWrite0(const char* msg)
+{
+	/*
+	 * SYS_WRITE0 (0x04)
+	 *
+	 * 		Writes a null-terminated string to the debug channel.
+	 * 		On entry, R1 contains a pointer to the first byte of the string.
+	 */
+
+	register uintptr_t opCode asm("r0") = 4;
+	register uintptr_t str asm("r1") = (uintptr_t)msg;
+ 	asm volatile("bkpt #0xab" : "=r"(opCode), "=r"(str) : "r" (opCode), "r" (str) : "memory");
+}
+
+inline void ProfileCortexM0::fatalError(const char* msg)
+{
+	sysWrite0("Fatal error: ");
+	sysWrite0(msg);
+	sysWrite0("!\n");
 }
 
 #endif /* CORTEXM0_H_ */

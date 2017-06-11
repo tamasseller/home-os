@@ -38,8 +38,7 @@ struct RoundRobinPolicy {
 		return nullptr;
 	}
 
-	void inheritPriority(Task* target, Task* source)
-	{
+	void priorityChanged(Task* task, Priority old) {
 	}
 
 	inline static void initialize(Task* task) {}

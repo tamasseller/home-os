@@ -9,7 +9,6 @@
 #define SLEEPLIST_H_
 
 #include "Scheduler.h"
-#include "data/OrderedDoubleList.h"
 
 template<class... Args>
 class Scheduler<Args...>::SleepList {

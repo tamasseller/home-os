@@ -16,7 +16,7 @@ class Scheduler<Args...>::Blocker
 	friend Scheduler<Args...>;
 	virtual void remove(Task*) = 0;
 	virtual void waken(Task*, Waitable*) = 0;
-	// TODO add handlePriorityChange method.
+	virtual void priorityChanged(Task*, Priority) = 0;
 };
 
 #endif /* BLOCKER_H_ */

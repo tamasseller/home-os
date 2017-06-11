@@ -10,13 +10,11 @@
 
 #include "Scheduler.h"
 
-#include <stdint.h>
-
 /**
  * Mutex front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Mutex: Policy::Priority
+class Scheduler<Args...>::Mutex: Policy::Priority, Blocker
 {
 	friend Scheduler<Args...>;
 
@@ -27,6 +25,19 @@ class Scheduler<Args...>::Mutex: Policy::Priority
 	Task *owner;
 	pet::OrderedDoubleList<Blockable, &Mutex::comparePriority> waiters;
 	uintptr_t relockCounter;
+
+	virtual void remove(Task*) {
+		assert(false, "Only priority change can be handled through the Blocker interface of a Mutex");
+	}
+
+	virtual void waken(Task*, Waitable*) {
+		assert(false, "Only priority change can be handled through the Blocker interface of a Mutex");
+	}
+
+	virtual void priorityChanged(Task* task, Priority old) {
+		waiters.remove(task);
+		waiters.add(task);
+	}
 
 public:
 	void init() {
@@ -49,12 +60,11 @@ doLock(uintptr_t mutexPtr)
 	Mutex* mutex = entypePtr<Mutex>(mutexPtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	// TODO set waitsFor
-
 	if(!mutex->owner) {
 		mutex->owner = currentTask;
 		mutex->relockCounter = 0;
-		// assert(mutex->waiters.empty());
+
+		assert(!mutex->waiters.lowest(), "Mutex waiter stuck");
 
 		/*
 		 * Save original priority now, so that it can be restored if
@@ -70,13 +80,16 @@ doLock(uintptr_t mutexPtr)
 		/*
 		 * Raise the priority of the owner to avoid priority inversion.
 		 * The original priority will be restored once the mutex is unlocked.
-		 *
-		 * TODO use waitsFor instead of the policy (it can be blocked by another mutex or waitable too).
 		 */
 		if(firstPreemptsSecond(currentTask, mutex->owner)) {
-			state.policy.inheritPriority(mutex->owner, currentTask);
+			Priority oldPrio = *mutex->owner;
+			*static_cast<typename Policy::Priority*>(mutex->owner) = *currentTask;
+
+			if(mutex->owner->blockedBy)
+				mutex->owner->blockedBy->priorityChanged(mutex->owner, oldPrio);
 		}
 
+		currentTask->blockedBy = mutex;
 		mutex->waiters.add(currentTask);
 		switchToNext<false>();
 	}
@@ -89,7 +102,7 @@ doUnlock(uintptr_t mutexPtr)
 	Mutex* mutex = entypePtr<Mutex>(mutexPtr);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	// assert(mutex->owner == currentTask);
+	assert(currentTask == mutex->owner, "Mutex unlock from non-owner task");
 
 	if(mutex->relockCounter)
 		mutex->relockCounter--;
@@ -101,8 +114,6 @@ doUnlock(uintptr_t mutexPtr)
 		 */
 		*static_cast<typename Policy::Priority*>(currentTask) = *mutex;
 
-		// TODO reset waitsFor
-
 		/*
 		 * We know that the sleeper obtained here is actually a task,
 		 * because only the block method can add elements to the
@@ -112,6 +123,7 @@ doUnlock(uintptr_t mutexPtr)
 		 * because locking with timeout is not supported (on purpose).
 		 */
 		if(Task* waken = static_cast<Task*>(mutex->waiters.popLowest())) {
+			waken->blockedBy = nullptr;
 			mutex->owner = waken;
 
 			state.policy.addRunnable(waken);

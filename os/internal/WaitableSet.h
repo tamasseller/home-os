@@ -53,6 +53,14 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 
 		task->injectReturnValue(detypePtr(source));
 	}
+
+	virtual void priorityChanged(Task*, Priority old)
+	{
+		for(uintptr_t i = 0; i < nWaiters; i++) {
+			waiters[i].waitable->waiters.remove(waiters + i);
+			waiters[i].waitable->waiters.add(waiters + i);
+		}
+	}
 };
 
 template<class... Args>
@@ -82,7 +90,7 @@ uintptr_t Scheduler<Args...>::doSelect(uintptr_t waitableSet){
 		}
 	}
 
-	currentTask->waitsFor = set;
+	currentTask->blockedBy = set;
 
 	for(uintptr_t i=0; i < set->nWaiters; i++) {
 		typename WaitableSet::Waiter *waiter = set->waiters + i;

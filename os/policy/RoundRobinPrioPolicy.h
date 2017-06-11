@@ -16,14 +16,9 @@ public:
 	class Priority{
 		friend RoundRobinPrioPolicy;
 		uintptr_t staticPriority;
-		bool isRunnable;
 	public:
 		inline bool operator <(const Priority &other) const {
 			return staticPriority < other.staticPriority;
-		}
-
-		inline void operator =(const Priority &other) {
-			staticPriority = other.staticPriority;
 		}
 
 		inline Priority() {}
@@ -40,14 +35,11 @@ public:
 
 	void addRunnable(Task* task) {
 		tasks.add(task);
-		task->isRunnable = true;
 	}
 
 	Task* popNext() {
-		if(Storage* element = tasks.popLowest()) {
-			static_cast<Task*>(element)->isRunnable = false;
+		if(Storage* element = tasks.popLowest())
 			return static_cast<Task*>(element);
-		}
 
 		return nullptr;
 	}
@@ -63,15 +55,9 @@ public:
 		task->staticPriority = prio.staticPriority;
 	}
 
-	void inheritPriority(Task* target, Task* source)
-	{
-		if(target->isRunnable)
-			tasks.remove(target);
-
-		target->staticPriority = source->staticPriority;
-
-		if(target->isRunnable)
-			tasks.add(target);
+	void priorityChanged(Task* task, Priority old) {
+		tasks.remove(task);
+		tasks.add(task);
 	}
 };
 

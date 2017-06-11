@@ -11,13 +11,13 @@
 template<class... Args>
 class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
-		// assert(arg == 1);
+		assert(arg == 1, "Tick overload, preemption event could not have been dispatched for a full tick cycle!");
 
 		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
 			Task* task = static_cast<Task*>(sleeper);
-			if(task->waitsFor) {
-				task->waitsFor->remove(task);
-				task->waitsFor = nullptr;
+			if(task->blockedBy) {
+				task->blockedBy->remove(task);
+				task->blockedBy = nullptr;
 			}
 			state.policy.addRunnable(task);
 		}

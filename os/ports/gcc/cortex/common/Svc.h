@@ -1,12 +1,12 @@
 /*
- * DirectSvc.h
+ * Svc.h
  *
  *  Created on: 2017.06.10.
  *      Author: tooma
  */
 
-#ifndef DIRECTSVC_H_
-#define DIRECTSVC_H_
+#ifndef SVC_H_
+#define SVC_H_
 
 namespace CortexCommon {
 
@@ -81,20 +81,27 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static void dispatch() {
+	inline static void dispatch(register void* (*mapper)(void*))
+	{
+		void** psp;
+		asm volatile ("mrs %[psp], psp" : [psp] "=r" (psp) : : );
+
+		void* handler = mapper(psp[4]); // Lookup r12
+
 		asm volatile (
-			"mrs r4, psp		\n"
-			"ldmia r4, {r0-r4}	\n" // Load stored regs (r0, r1, r2, r3, r12)
-			"blx r4				\n"	// Call to the address stored in the r12 of the caller
-			"mrs r1, psp		\n" // Save r0 into the frame of the caller
-			"str r0, [r1, #0]	\n" : : : "r0", "r1", "r2", "r3", "r4", "lr"
+			".thumb						\n"
+			".syntax unified			\n"
+			"ldmia %[psp]!, {r0-r3}	  	\n" // Load stored regs (r0, r1, r2, r3)
+			"blx %[handler]			  	\n"
+			"subs %[psp], #16 			\n"
+			"str r0, [%[psp]]		 	\n"
+				:
+				: [psp] "r" (psp), [handler] "r" (handler)
+				: "r0", "r1", "r2", "r3", "lr", "cc"
 		);
 	}
 };
 
 }
 
-
-
-
-#endif /* DIRECTSVC_H_ */
+#endif /* SVC_H_ */

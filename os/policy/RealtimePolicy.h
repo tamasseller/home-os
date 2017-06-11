@@ -33,14 +33,9 @@ struct RealtimePolicy {
 		class Priority{
 			friend Policy;
 			uint8_t staticPriority;
-			bool isRunnable;
 		public:
 			inline bool operator <(const Priority &other) const {
 				return staticPriority < other.staticPriority;
-			}
-
-			inline void operator =(const Priority &other) {
-				staticPriority = other.staticPriority;
 			}
 
 			inline Priority() {}
@@ -53,8 +48,6 @@ struct RealtimePolicy {
 			tasks[level].fastAddBack(task);
 
 			cache |= mask(level);
-
-			task->isRunnable = true;
 		}
 
 		Task* popNext() {
@@ -69,8 +62,6 @@ struct RealtimePolicy {
 
 			if(!tasks[level].front())
 				cache &= ~mask(level);
-
-			task->isRunnable = false;
 
 			return task;
 		}
@@ -88,29 +79,20 @@ struct RealtimePolicy {
 			return static_cast<Task*>(element);
 		}
 
-		void inheritPriority(Task* target, Task* source)
+		void priorityChanged(Task* task, Priority old)
 		{
-			if(target->isRunnable) {
-				uintptr_t level = target->staticPriority;
+			tasks[old.staticPriority].remove(task);
 
-				tasks[level].remove(target);
+			if(!tasks[old.staticPriority].front())
+				cache &= ~mask(old.staticPriority);
 
-				if(!tasks[level].front())
-					cache &= ~mask(level);
-			}
-
-			target->staticPriority = source->staticPriority;
-
-			if(target->isRunnable) {
-				uintptr_t level = target->staticPriority;
-				tasks[level].fastAddBack(target);
-				cache |= mask(level);
-			}
+			uintptr_t level = task->staticPriority;
+			tasks[level].fastAddBack(task);
+			cache |= mask(level);
 		}
 
 		inline static void initialize(Task* task, Priority prio) {
 			task->staticPriority = prio.staticPriority;
-			task->isRunnable = false;
 		}
 };
 

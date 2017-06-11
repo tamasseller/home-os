@@ -10,8 +10,6 @@
 
 #include "Scheduler.h"
 
-#include "data/OrderedDoubleList.h"
-
 template<class... Args>
 class Scheduler<Args...>::Blockable
 {

@@ -9,16 +9,21 @@
 #define SCHEDULER_H_
 
 #include <stdint.h>
-
+#include "data/OrderedDoubleList.h"
+#include "data/LinkedList.h"
 #include "meta/Configuration.h"
 
 #include "policy/RoundRobinPolicy.h"
+
 
 /*
  * Scheduler root class.
  */
 
 struct SchedulerOptions {
+	template<bool Arg>
+	struct EnableAssert: pet::ConfigValue<bool, EnableAssert, Arg> {};
+
 	template<class Arg>
 	struct HardwareProfile: pet::ConfigType<HardwareProfile, Arg> {};
 
@@ -27,10 +32,13 @@ struct SchedulerOptions {
 
 	template<class... Options>
 	class Configurable {
+		static constexpr bool assertEnabled = EnableAssert<false>::extract<Options...>::value;
+
 		using Profile = typename HardwareProfile<void>::extract<Options...>::type;
 
 		template<class... X>
 		using PolicyTemplate = typename SchedulingPolicy<RoundRobinPolicy>::extract<Options...>::template typeTemplate<X...>;
+
 
 	public:
 		using TickType = typename Profile::Timer::TickType;
@@ -46,11 +54,14 @@ struct SchedulerOptions {
 
 		class Blockable;
 		using PolicyBase = PolicyTemplate<Task, Blockable>;
+		using Priority = typename PolicyBase::Priority;
 
 		class Policy;
 		class Sleeper;
 		class SleepList;
 		class Blocker;
+
+		template<bool (*)(const Blockable&, const Blockable&)> class BlockList;
 		class Waitable;
 		class WaitableSet;
 
@@ -78,6 +89,11 @@ struct SchedulerOptions {
 		static uintptr_t doWait(uintptr_t waitable);
 		static uintptr_t doWaitTimeout(uintptr_t waitable, uintptr_t timeout);
 		static uintptr_t doSelect(uintptr_t waitableSet);
+
+		/*
+		 * Internal helpers
+		 */
+		static inline uintptr_t assert(bool, const char*);
 
 		template<class T>
 		static inline uintptr_t detypePtr(T* x);

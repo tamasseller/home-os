@@ -11,22 +11,44 @@
 template<class... Args>
 class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	virtual void remove(Task*) {
-		// assert(false);
+		assert(false,
+			"Only priority change can be handled through the Blocker interface of the Policy wrapper");
 	}
 
 	virtual void waken(Task*, Waitable*) {
-		// assert(false);
+		assert(false,
+			"Only priority change can be handled through the Blocker interface of the Policy wrapper");
+	}
+
+	virtual void priorityChanged(Task* task, Priority old) {
+		PolicyBase::priorityChanged(task, old);
 	}
 
 public:
-	using Priority = typename PolicyTemplate<Task, Blockable>::Priority;
+	using typename PolicyBase::Priority;
 
-	using PolicyBase::addRunnable;
-	using PolicyBase::popNext;
 	using PolicyBase::peekNext;
-	using PolicyBase::initialize;
 
-	using PolicyBase::inheritPriority; // TODO remove using and use through Blocker interface
+	void addRunnable(Task* task) {
+		PolicyBase::addRunnable(task);
+		task->blockedBy = this;
+	}
+
+	Task* popNext() {
+		if(Blockable* element = PolicyBase::popNext()) {
+			Task* task = static_cast<Task*>(element);
+			task->blockedBy = nullptr;
+			return task;
+		}
+
+		return nullptr;
+	}
+
+	template<class... InitArgs>
+	inline static void initialize(Task* task, InitArgs... initArgs) {
+		PolicyBase::initialize(task, initArgs...);
+		task->blockedBy = nullptr;
+	}
 };
 
 

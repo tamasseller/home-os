@@ -10,8 +10,6 @@
 
 #include "Scheduler.h"
 
-#include <stdint.h>
-
 template<class... Args>
 class Scheduler<Args...>::EventList: AtomicList
 {

@@ -10,8 +10,6 @@
 
 #include "Scheduler.h"
 
-#include "data/LinkedList.h"
-
 template<class... Args>
 class Scheduler<Args...>::Waitable: Blocker, Event {
 	friend Scheduler<Args...>;
@@ -30,7 +28,7 @@ protected:
 			if(waken->isSleeping())
 				state.sleepList.remove(waken);
 
-			waken->waitsFor->waken(waken, this);
+			waken->blockedBy->waken(waken, this);
 
 			state.policy.addRunnable(waken);
 
@@ -39,7 +37,6 @@ protected:
 
 		return false;
 	}
-
 
 private:
     /*
@@ -85,6 +82,11 @@ private:
 
 	virtual void waken(Task* task, Waitable*) final {
 		waiters.remove(task);
+	}
+
+	virtual void priorityChanged(Task* task, Priority old) {
+		waiters.remove(task);
+		waiters.add(task);
 	}
 
 	static bool comparePriority(const Blockable& a, const Blockable& b) {
@@ -133,7 +135,7 @@ uintptr_t Scheduler<Args...>::doWait(uintptr_t waitablePtr)
 
 	if(waitable->wouldBlock()) {
 		waitable->waiters.add(currentTask);
-		currentTask->waitsFor = waitable;
+		currentTask->blockedBy = waitable;
 		switchToNext<false>();
 	} else
 		waitable->acquire();
@@ -156,7 +158,7 @@ uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t tim
 		return false;
 
 	waitable->waiters.add(currentTask);
-	currentTask->waitsFor = waitable;
+	currentTask->blockedBy = waitable;
 	state.sleepList.delay(currentTask, timeout);
 	switchToNext<false>();
 

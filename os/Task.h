@@ -10,8 +10,6 @@
 
 #include "Scheduler.h"
 
-#include <stdint.h>
-
 /**
  * Task front-end object.
  */
@@ -26,7 +24,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 		friend Scheduler<Args...>;
 		friend PolicyBase;
 
-		Blocker* waitsFor = nullptr;
+		Blocker* blockedBy = nullptr;
 
 		static Task* getTaskVirtual(Blockable* self) {
 			return static_cast<Task*>(self);
@@ -71,7 +69,7 @@ yield() {
 template<class... Args>
 inline void Scheduler<Args...>::sleep(uintptr_t time)
 {
-	// assert(time <= INTPTR_MAX);
+	assert(time <= INTPTR_MAX, "Delay time too big!");
 	Profile::CallGate::sync(&Scheduler<Args...>::doSleep, time);
 }
 

@@ -20,17 +20,20 @@
 
 using OsRr = Scheduler<
 		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
-		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>
+		SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>,
+		SchedulerOptions::EnableAssert<true>
 >;
 
 using OsRrPrio = Scheduler<
 		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
-		SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>
+		SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>,
+		SchedulerOptions::EnableAssert<true>
 >;
 
 using OsRt4 = Scheduler<
 		SchedulerOptions::HardwareProfile<ProfileCortexM0>,
-		SchedulerOptions::SchedulingPolicy<RealtimePolicy<4>::Policy>
+		SchedulerOptions::SchedulingPolicy<RealtimePolicy<4>::Policy>,
+		SchedulerOptions::EnableAssert<true>
 >;
 
 

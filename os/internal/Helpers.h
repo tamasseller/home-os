@@ -8,7 +8,7 @@
 #ifndef HELPERS_H_
 #define HELPERS_H_
 
-#include <stdint.h>
+#include "Scheduler.h"
 
 template<class... Args>
 template<bool pendOld, bool suspend>
@@ -41,6 +41,13 @@ template<class... Args>
 inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Task *second)
 {
 	return *first < *second;
+}
+
+template<class... Args>
+inline uintptr_t Scheduler<Args...>::assert(bool cond, const char* msg) {
+	if(assertEnabled && !cond) {
+		Profile::fatalError(msg);
+	}
 }
 
 #endif /* HELPERS_H_ */

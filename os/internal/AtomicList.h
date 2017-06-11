@@ -10,8 +10,6 @@
 
 #include "Scheduler.h"
 
-#include "data/LinkedList.h"
-
 template<class... Args>
 class Scheduler<Args...>::AtomicList
 {
