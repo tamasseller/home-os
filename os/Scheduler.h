@@ -116,6 +116,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Blockable.h"
 #include "internal/Waitable.h"
 #include "internal/WaitableSet.h"
+#include "internal/Preemption.h"
 
 #include "Mutex.h"
 #include "Scheduler.h"
@@ -123,40 +124,6 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "Semaphore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
-
-template<class... Args>
-class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
-	static inline void execute(Event* self, uintptr_t arg) {
-		// assert(arg == 1);
-
-		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
-			Task* task = static_cast<Task*>(sleeper);
-			if(task->waitsFor) {
-				task->waitsFor->remove(task);
-				task->waitsFor = nullptr;
-			}
-			state.policy.addRunnable(task);
-		}
-
-		if(Task* newTask = state.policy.peekNext()) {
-			if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
-
-				Task* currentTask = static_cast<Task*>(platformTask);
-
-				if(firstPreemptsSecond(currentTask, newTask))
-					return;
-
-				state.policy.addRunnable(static_cast<Task*>(currentTask));
-			}
-
-			state.policy.popNext();
-			static_cast<Task*>(newTask)->switchToAsync();
-		}
-	}
-
-public:
-	inline PreemptionEvent(): Event(execute) {}
-};
 
 template<class... Args>
 typename Scheduler<Args...>::State Scheduler<Args...>::state;
@@ -174,12 +141,6 @@ inline void Scheduler<Args...>::start(T... t) {
 template<class... Args>
 inline typename Scheduler<Args...>::Profile::Timer::TickType Scheduler<Args...>::getTick() {
 	return Profile::Timer::getTick();
-}
-
-template<class... Args>
-void Scheduler<Args...>::onTick()
-{
-	state.eventList.issue(&state.preemptionEvent);
 }
 
 #endif /* SCHEDULER_H_ */
