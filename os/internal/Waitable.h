@@ -13,7 +13,7 @@
 #include "data/LinkedList.h"
 
 template<class... Args>
-class Scheduler<Args...>::Waitable: Waker, Event {
+class Scheduler<Args...>::Waitable: Blocker, Event {
 	friend Scheduler<Args...>;
 protected:
 

@@ -47,7 +47,7 @@ struct SchedulerOptions {
 		class Blockable;
 		class Sleeper;
 		class SleepList;
-		class Waker;
+		class Blocker;
 		class Waitable;
 		class WaitableSet;
 
@@ -108,7 +108,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Atomic.h"
 #include "internal/AtomicList.h"
 #include "internal/Events.h"
-#include "internal/Waker.h"
+#include "internal/Blocker.h"
 #include "internal/Helpers.h"
 #include "internal/Sleepers.h"
 #include "internal/Blockable.h"

@@ -30,7 +30,7 @@ class Scheduler<Args...>::Task:
 		/*
 		 * Used by waitables only!
 		 */
-		Waker* waitsFor = nullptr;
+		Blocker* waitsFor = nullptr;
 
 		static Task* getTaskVirtual(Blockable*);
 	protected:

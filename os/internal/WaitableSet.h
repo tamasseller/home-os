@@ -10,7 +10,7 @@
 
 
 template<class... Args>
-class Scheduler<Args...>::WaitableSet final: Waker
+class Scheduler<Args...>::WaitableSet final: Blocker
 {
 	friend Scheduler<Args...>;
 
