@@ -16,44 +16,31 @@
  * Mutex front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Mutex: Scheduler<Args...>::Policy::Priority
+class Scheduler<Args...>::Mutex: Policy::Priority
 {
 	friend Scheduler<Args...>;
-	static bool comparePriority(const Blockable&, const Blockable&);
+
+	static bool comparePriority(const Blockable& a, const Blockable& b) {
+		return firstPreemptsSecond(static_cast<const Task*>(&a), static_cast<const Task*>(&b));
+	}
 
 	Task *owner;
 	pet::OrderedDoubleList<Blockable, &Mutex::comparePriority> waiters;
 	uintptr_t relockCounter;
 
 public:
-	void init();
-	void lock();
-	void unlock();
+	void init() {
+		owner = nullptr;
+	}
+
+	void lock() {
+		Profile::CallGate::sync(&Scheduler<Args...>::doLock, detypePtr(this));
+	}
+
+	void unlock() {
+		Profile::CallGate::sync(&Scheduler<Args...>::doUnlock, detypePtr(this));
+	}
 };
-
-template<class... Args>
-void Scheduler<Args...>::
-Mutex::init() {
-	owner = nullptr;
-}
-
-template<class... Args>
-void Scheduler<Args...>::
-Mutex::lock() {
-	Profile::CallGate::sync(&Scheduler<Args...>::doLock, detypePtr(this));
-}
-
-template<class... Args>
-void Scheduler<Args...>::
-Mutex::unlock() {
-	Profile::CallGate::sync(&Scheduler<Args...>::doUnlock, detypePtr(this));
-}
-
-template<class... Args>
-bool Scheduler<Args...>::
-Mutex::comparePriority(const Blockable& a, const Blockable& b) {
-	return static_cast<const Task&>(a) < static_cast<const Task&>(b);
-}
 
 template<class... Args>
 uintptr_t Scheduler<Args...>::

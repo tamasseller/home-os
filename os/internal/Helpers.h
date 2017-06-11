@@ -12,8 +12,7 @@
 
 template<class... Args>
 template<bool pendOld, bool suspend>
-inline void Scheduler<Args...>::
-switchToNext()
+inline void Scheduler<Args...>::switchToNext()
 {
 	if(Task* newTask = static_cast<Task*>(state.policy.popNext())) {
 		if(pendOld)
@@ -24,26 +23,23 @@ switchToNext()
 		Profile::Task::suspendExecution();
 }
 
-/*
- * Helpers.
- */
-
 template<class... Args>
 template<class T>
-inline uintptr_t Scheduler<Args...>::
-detypePtr(T* x) {
+inline uintptr_t Scheduler<Args...>::detypePtr(T* x)
+{
 	return reinterpret_cast<uintptr_t>(x);
 }
 
 template<class... Args>
 template<class T>
-inline T* Scheduler<Args...>::
-entypePtr(uintptr_t  x) {
+inline T* Scheduler<Args...>::entypePtr(uintptr_t  x)
+{
 	return reinterpret_cast<T*>(x);
 }
 
 template<class... Args>
-inline bool Scheduler<Args...>::firstPreemptsSecond(Task* first, Task *second) {
+inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Task *second)
+{
 	return *first < *second;
 }
 

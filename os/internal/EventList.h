@@ -1,27 +1,20 @@
 /*
- * Events.h
+ * EventList.h
  *
  *  Created on: 2017.05.28.
  *      Author: tooma
  */
 
-#ifndef EVENTS_H_
-#define EVENTS_H_
+#ifndef EVENTLIST_H_
+#define EVENTLIST_H_
 
 #include "Scheduler.h"
 
 #include <stdint.h>
 
 template<class... Args>
-class Scheduler<Args...>::Event: Scheduler<Args...>::AtomicList::Element {
-	friend EventList;
-	void (* const callback)(Event*, uintptr_t);
-protected:
-	inline Event(void (* callback)(Event*, uintptr_t)): callback(callback) {}
-};
-
-template<class... Args>
-class Scheduler<Args...>::EventList: Scheduler<Args...>::AtomicList {
+class Scheduler<Args...>::EventList: AtomicList
+{
 	struct Combiner {
 		inline bool operator()(uintptr_t old, uintptr_t& result) const {
 			result = old+1;
@@ -82,4 +75,4 @@ public:
 	}
 };
 
-#endif /* EVENTS_H_ */
+#endif /* EVENTLIST_H_ */

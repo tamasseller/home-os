@@ -8,7 +8,6 @@
 #ifndef POLICY_H_
 #define POLICY_H_
 
-
 template<class... Args>
 class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	virtual void remove(Task*) {

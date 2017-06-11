@@ -1,17 +1,17 @@
 /*
- * Semaphore.h
+ * BinarySemaphore.h
  *
  *  Created on: 2017.06.02.
  *      Author: tooma
  */
 
-#ifndef SEMAPHORE_H_
-#define SEMAPHORE_H_
+#ifndef BINARYSEMAPHORE_H_
+#define BINARYSEMAPHORE_H_
 
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::BinarySemaphore: public Scheduler<Args...>::Waitable
+class Scheduler<Args...>::BinarySemaphore: public Waitable
 {
 	friend Scheduler<Args...>;
 	bool open = true;
@@ -25,10 +25,10 @@ class Scheduler<Args...>::BinarySemaphore: public Scheduler<Args...>::Waitable
 		open = false;
 	}
 
-	virtual void release(typename Waitable::WakeSession& session, uintptr_t arg)
+	virtual void release(uintptr_t arg)
 	{
 		if(!open) {
-			if(!Waitable::wakeOne(session))
+			if(!Waitable::wakeOne())
 				open = true;
 		}
 	}
@@ -40,4 +40,4 @@ public:
 	}
 };
 
-#endif /* SEMAPHORE_H_ */
+#endif /* BINARYSEMAPHORE_H_ */

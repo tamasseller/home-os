@@ -11,7 +11,8 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::Blocker {	// TODO rename to somthing prioqueue like.
+class Scheduler<Args...>::Blocker
+{
 	friend Scheduler<Args...>;
 	virtual void remove(Task*) = 0;
 	virtual void waken(Task*, Waitable*) = 0;

@@ -9,7 +9,7 @@
 #define PREEMPTION_H_
 
 template<class... Args>
-class Scheduler<Args...>::PreemptionEvent: public Scheduler<Args...>::Event {
+class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
 		// assert(arg == 1);
 

@@ -12,7 +12,7 @@
 
 template<class... Args>
 template<class Data>
-struct Scheduler<Args...>::Atomic: Scheduler<Args...>::Profile::template Atomic<Data>
+struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 {
 	inline Atomic(): Profile::template Atomic<Data>(0) {}
 	inline Atomic(const Data& value): Profile::template Atomic<Data>(value) {}

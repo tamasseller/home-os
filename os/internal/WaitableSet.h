@@ -19,7 +19,10 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 		Task* task;
 		Waitable* waitable;
 
-		static Task* getTask(Blockable* b);
+		static Task* getTask(Blockable* b) {
+			return static_cast<Waiter*>(b)->task;
+		}
+
 		inline Waiter(): Blockable(&Waiter::getTask) {};
 	};
 
@@ -27,43 +30,30 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 	Waiter* volatile const waiters;
 
 	template<class... T>
-	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... waitables);
+	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... waitables): waiters(&waiters[0]), nWaiters(sizeof...(T))
+	{
+		Waitable* const tempArray[] = {static_cast<Waitable*>(waitables)...};
 
-	virtual void remove(Task* task);
-	virtual void waken(Task* task, Waitable* source);
+		volatile Waiter* it = waiters;
+
+		for(Waitable* waitable: tempArray)
+			(*it++).waitable = waitable;
+	}
+
+	virtual void remove(Task* task)
+	{
+		for(uintptr_t i = 0; i < nWaiters; i++)
+			waiters[i].waitable->waiters.remove(waiters + i);
+	}
+
+	virtual void waken(Task* task, Waitable* source)
+	{
+		for(uintptr_t i = 0; i < nWaiters; i++)
+			waiters[i].waitable->waiters.remove(waiters + i);
+
+		task->injectReturnValue(detypePtr(source));
+	}
 };
-
-template<class... Args>
-typename Scheduler<Args...>::Task* Scheduler<Args...>::WaitableSet::Waiter::getTask(Blockable* b) {
-	return static_cast<Waiter*>(b)->task;
-}
-
-template<class... Args>
-template<class... T>
-Scheduler<Args...>::WaitableSet::WaitableSet(Waiter (& waiters)[sizeof...(T)], T... waitables):
-	waiters(&waiters[0]), nWaiters(sizeof...(T))
-{
-	Waitable* const tempArray[] = {static_cast<Waitable*>(waitables)...};
-	volatile Waiter* it = waiters;
-	for(Waitable* waitable: tempArray)
-		(*it++).waitable = waitable;
-}
-
-template<class... Args>
-void Scheduler<Args...>::WaitableSet::remove(Task* task)
-{
-	for(uintptr_t i = 0; i < nWaiters; i++)
-		waiters[i].waitable->waiters.remove(waiters + i);
-}
-
-template<class... Args>
-void Scheduler<Args...>::WaitableSet::waken(Task* task, Waitable* source)
-{
-	for(uintptr_t i = 0; i < nWaiters; i++)
-		waiters[i].waitable->waiters.remove(waiters + i);
-
-	task->injectReturnValue(detypePtr(source));
-}
 
 template<class... Args>
 template<class... T>

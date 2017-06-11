@@ -13,7 +13,8 @@
 #include "data/OrderedDoubleList.h"
 
 template<class... Args>
-class Scheduler<Args...>::Blockable {
+class Scheduler<Args...>::Blockable
+{
 	friend pet::DoubleList<Blockable>;
 
 	Blockable *prev, *next;

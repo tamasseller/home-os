@@ -88,13 +88,12 @@ struct SchedulerOptions {
 		template<bool pendOld, bool suspend = true>
 		static inline void switchToNext();
 
-		static inline bool firstPreemptsSecond(Task* first, Task *second);
+		static inline bool firstPreemptsSecond(const Task* first, const Task *second);
 
 	public:
 		inline static TickType getTick();
 
 		template<class... T> inline static void start(T... t);
-
 
 		inline static void yield();
 		inline static void sleep(uintptr_t time);
@@ -109,10 +108,12 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Policy.h"
 #include "internal/Atomic.h"
 #include "internal/AtomicList.h"
-#include "internal/Events.h"
+#include "internal/Event.h"
+#include "internal/EventList.h"
 #include "internal/Blocker.h"
 #include "internal/Helpers.h"
-#include "internal/Sleepers.h"
+#include "internal/Sleeper.h"
+#include "internal/SleepList.h"
 #include "internal/Blockable.h"
 #include "internal/Waitable.h"
 #include "internal/WaitableSet.h"
@@ -121,7 +122,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "Mutex.h"
 #include "Scheduler.h"
 #include "Task.h"
-#include "Semaphore.h"
+#include "BinarySemaphore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 

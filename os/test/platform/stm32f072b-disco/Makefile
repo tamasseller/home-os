@@ -54,7 +54,7 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -g3 -O0
+COMMONFLAGS += -g3 -Og
 COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 
