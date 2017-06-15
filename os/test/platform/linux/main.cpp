@@ -46,6 +46,7 @@ int main()
     struct sigaction sa;
     memset(&sa, 0, sizeof (sa));
 	sa.sa_handler = handlerTrampoline;
+	sigfillset(&sa.sa_mask);
 	sigaction(SIGUSR2, &sa, NULL);
 
     auto parentPid = getpid();
