@@ -72,5 +72,3 @@ TEST(SemaphoreFromIrq) {
 	CHECK(t4.counter == 200);
 	CHECK(irqCounter == 400);
 }
-
-

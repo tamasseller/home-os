@@ -45,11 +45,21 @@ inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Tas
 	return *first < *second;
 }
 
+/*
+ * Obviously the assert function should not be go through the active
+ * branch when the system is intact, so LCOV_EXCL_START is placed
+ * to avoid confusing the test coverage analytis.
+ */
+
 template<class... Args>
 inline void Scheduler<Args...>::assert(bool cond, const char* msg) {
 	if(assertEnabled && !cond) {
 		Profile::fatalError(msg);
 	}
 }
+
+/*
+ * LCOV_EXCL_STOP is placed here to balance the previous lcov directive.
+ */
 
 #endif /* HELPERS_H_ */

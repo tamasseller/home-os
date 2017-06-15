@@ -10,6 +10,12 @@
 
 template<class... Args>
 class Scheduler<Args...>::Policy: Blocker, PolicyBase {
+
+	/*
+	 * These two methods are never called during normal operation, so
+	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
+	 */
+
 	virtual void remove(Task*) {
 		assert(false,
 			"Only priority change can be handled through the Blocker interface of the Policy wrapper");
@@ -19,6 +25,11 @@ class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 		assert(false,
 			"Only priority change can be handled through the Blocker interface of the Policy wrapper");
 	}
+
+	/*
+	 * From here on, the rest should be check for test coverage, so
+	 * LCOV_EXCL_STOP is placed here.
+	 */
 
 	virtual void priorityChanged(Task* task, Priority old) {
 		PolicyBase::priorityChanged(task, old);

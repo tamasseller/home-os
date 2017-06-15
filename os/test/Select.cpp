@@ -37,9 +37,26 @@ namespace {
 	} 	t1(s31, s12, s21, s13),
 		t2(s12, s23, s32, s21),
 		t3(s23, s31, s13, s32);
+
+	OsRr::BinarySemaphore semTo;
+	bool error = false;
+	struct TaskTo: TestTask<TaskTo> {
+		void run() {
+
+			if(OsRr::selectTimeout(0, &semTo) != &semTo)
+				error = true;
+
+			if(OsRr::selectTimeout(0, &semTo) != nullptr)
+				error = true;
+
+			for(int i=0; i<10; i++)
+				if(OsRr::selectTimeout(10, &semTo) != nullptr)
+					error = true;
+		}
+	} tTo;
 }
 
-TEST(Select)
+TEST(SelectPassaround)
 {
 	s12.init(true);
 	s23.init(false);
@@ -58,4 +75,14 @@ TEST(Select)
 	CHECK(t1.counter == UINT16_MAX/3);
 	CHECK(t2.counter == UINT16_MAX/3);
 	CHECK(t3.counter == UINT16_MAX/3);
+}
+
+TEST(SelectTimeout)
+{
+	semTo.init(true);
+	tTo.start();
+
+	CommonTestUtils::start();
+
+	CHECK(!error);
 }

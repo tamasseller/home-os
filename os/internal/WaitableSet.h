@@ -61,18 +61,53 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 			waiters[i].waitable->waiters.add(waiters + i);
 		}
 	}
+
+	Waitable* acquireAny()
+	{
+		for(uintptr_t i=0; i < nWaiters; i++) {
+			Waitable *waitable = waiters[i].waitable;
+			if(!waitable->wouldBlock()) {
+				waitable->acquire();
+				return waitable;
+			}
+		}
+
+		return nullptr;
+	}
+
+	void blockOnAll(Task* task)
+	{
+		task->blockedBy = this;
+
+		for(uintptr_t i=0; i < nWaiters; i++) {
+			Waiter *waiter = waiters + i;
+			Waitable *waitable = waiter->waitable;
+			waiter->task = task;
+			waitable->waiters.add(waiter);
+		}
+	}
 };
 
 template<class... Args>
 template<class... T>
 inline typename Scheduler<Args...>::Waitable* Scheduler<Args...>::select(T... t)
 {
-	using CallGate = typename Profile::CallGate;
-
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = CallGate::sync(&Scheduler<Args...>::doSelect, detypePtr(&set));
+	auto ret = Profile::CallGate::sync(&Scheduler<Args...>::doSelect, detypePtr(&set));
+
+	return entypePtr<Waitable>(ret);
+}
+
+template<class... Args>
+template<class... T>
+inline typename Scheduler<Args...>::Waitable* Scheduler<Args...>::selectTimeout(uintptr_t timeout, T... t)
+{
+	typename WaitableSet::Waiter waiters[sizeof...(t)];
+	WaitableSet set(waiters, t...);
+
+	auto ret = Profile::CallGate::sync(&Scheduler<Args...>::doSelectTimeout, detypePtr(&set), timeout);
 
 	return entypePtr<Waitable>(ret);
 }
@@ -82,24 +117,33 @@ uintptr_t Scheduler<Args...>::doSelect(uintptr_t waitableSet){
 	WaitableSet *set = entypePtr<WaitableSet>(waitableSet);
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 
-	for(uintptr_t i=0; i < set->nWaiters; i++) {
-		Waitable *waitable = set->waiters[i].waitable;
-		if(!waitable->wouldBlock()) {
-			waitable->acquire();
-			return detypePtr(waitable);
-		}
-	}
+	if(auto ret = set->acquireAny())
+		return detypePtr(ret);
 
-	currentTask->blockedBy = set;
-
-	for(uintptr_t i=0; i < set->nWaiters; i++) {
-		typename WaitableSet::Waiter *waiter = set->waiters + i;
-		Waitable *waitable = waiter->waitable;
-		waiter->task = currentTask;
-		waitable->waiters.add(waiter);
-	}
+	set->blockOnAll(currentTask);
 
 	switchToNext<false>();
+
+	/*
+	 * The waker will inject the actual return value.
+	 */
+	return 0;
+}
+
+
+template<class... Args>
+uintptr_t Scheduler<Args...>::doSelectTimeout(uintptr_t waitableSet, uintptr_t timeout){
+	WaitableSet *set = entypePtr<WaitableSet>(waitableSet);
+	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+
+	if(auto ret = set->acquireAny())
+		return detypePtr(ret);
+
+	if(timeout) {
+		set->blockOnAll(currentTask);
+		state.sleepList.delay(currentTask, timeout);
+		switchToNext<false>();
+	}
 
 	/*
 	 * The waker will inject the actual return value.

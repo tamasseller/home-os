@@ -76,7 +76,8 @@ template<class... Args>
 inline void Scheduler<Args...>::exit()
 {
 	Profile::CallGate::sync(&Scheduler<Args...>::doExit);
-}
+} // LCOV_EXCL_LINE: this line is never reached.
+
 
 template<class... Args>
 uintptr_t Scheduler<Args...>::doStartTask(uintptr_t task)

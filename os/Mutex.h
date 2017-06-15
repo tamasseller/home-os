@@ -26,6 +26,11 @@ class Scheduler<Args...>::Mutex: Policy::Priority, Blocker
 	pet::OrderedDoubleList<Blockable, &Mutex::comparePriority> waiters;
 	uintptr_t relockCounter;
 
+	/*
+	 * These two methods are never called during normal operation, so
+	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
+	 */
+
 	virtual void remove(Task*) {
 		assert(false, "Only priority change can be handled through the Blocker interface of a Mutex");
 	}
@@ -33,6 +38,11 @@ class Scheduler<Args...>::Mutex: Policy::Priority, Blocker
 	virtual void waken(Task*, Waitable*) {
 		assert(false, "Only priority change can be handled through the Blocker interface of a Mutex");
 	}
+
+	/*
+	 * From here on, the rest should be check for test coverage, so
+	 * LCOV_EXCL_STOP is placed here.
+	 */
 
 	virtual void priorityChanged(Task* task, Priority old) {
 		waiters.remove(task);

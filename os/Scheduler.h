@@ -89,6 +89,7 @@ struct SchedulerOptions {
 		static uintptr_t doWait(uintptr_t waitable);
 		static uintptr_t doWaitTimeout(uintptr_t waitable, uintptr_t timeout);
 		static uintptr_t doSelect(uintptr_t waitableSet);
+		static uintptr_t doSelectTimeout(uintptr_t waitableSet, uintptr_t timeout);
 
 		/*
 		 * Internal helpers
@@ -115,6 +116,7 @@ struct SchedulerOptions {
 		inline static void sleep(uintptr_t time);
 		inline static void exit();
 		template<class... T> inline static Waitable* select(T... t);
+		template<class... T> inline static Waitable* selectTimeout(uintptr_t timout, T... t);
 	};
 };
 
