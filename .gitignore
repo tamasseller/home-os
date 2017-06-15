@@ -4,3 +4,4 @@
 .o
 *.pyc
 fw.elf
+os/test/platform/linux/coverage/

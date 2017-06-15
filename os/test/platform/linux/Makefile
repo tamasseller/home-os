@@ -76,6 +76,9 @@ CXXFLAGS += -fsanitize=bool
 CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
 
+CXXFLAGS += -rdynamic								# Allows meaningful backrtaces 
+CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
+
 CXX = /opt/gcc-5.3.0/bin/g++
 LD = $(CXX) 
 
