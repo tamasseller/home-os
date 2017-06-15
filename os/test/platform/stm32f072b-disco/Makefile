@@ -22,6 +22,7 @@ SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
+SOURCES += $(ROOT)/test/Policy.cpp
 
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
@@ -56,7 +57,7 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -g3 -O0
+COMMONFLAGS += -g3 -O3
 COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 

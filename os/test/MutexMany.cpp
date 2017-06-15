@@ -14,7 +14,7 @@ namespace {
 	struct Task: public TestTask<Task> {
 		OsRr::Mutex &m1, &m2;
 		SharedData<8> &d1, &d2;
-		Task(SharedData<8> &d1, SharedData<8> &d2, OsRr::Mutex &m1, OsRr::Mutex &m2): d1(d1), d2(d2), m1(m1), m2(m2) {}
+		Task(SharedData<8> &d1, SharedData<8> &d2, OsRr::Mutex &m1, OsRr::Mutex &m2): m1(m1), m2(m2), d1(d1), d2(d2)  {}
 
 		void run() {
 			for(int i = 0; i < UINT16_MAX/2; i++) {

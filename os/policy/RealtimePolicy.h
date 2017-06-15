@@ -22,11 +22,11 @@ struct RealtimePolicy {
 
 		bool findCurrentLevel(uintptr_t& ret) {
 			ret = clz(cache);
-			return ret < maxLevels;
+			return ret < priorityLevels;
 		}
 
 		static inline uintptr_t mask(uintptr_t level) {
-			return (1 << (maxLevels - level - 1));
+			return (uintptr_t)1 << (maxLevels - level - 1);
 		}
 
 	public:
@@ -38,7 +38,7 @@ struct RealtimePolicy {
 				return staticPriority < other.staticPriority;
 			}
 
-			inline Priority() {}
+			inline Priority(): staticPriority(0) {}
 			inline Priority(uintptr_t staticPriority): staticPriority(staticPriority) {}
 		};
 

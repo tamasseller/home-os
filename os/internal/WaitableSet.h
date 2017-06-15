@@ -30,7 +30,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 	Waiter* volatile const waiters;
 
 	template<class... T>
-	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... waitables): waiters(&waiters[0]), nWaiters(sizeof...(T))
+	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... waitables): nWaiters(sizeof...(T)), waiters(&waiters[0])
 	{
 		Waitable* const tempArray[] = {static_cast<Waitable*>(waitables)...};
 

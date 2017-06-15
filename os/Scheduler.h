@@ -93,7 +93,7 @@ struct SchedulerOptions {
 		/*
 		 * Internal helpers
 		 */
-		static inline uintptr_t assert(bool, const char*);
+		static inline void assert(bool, const char*);
 
 		template<class T>
 		static inline uintptr_t detypePtr(T* x);

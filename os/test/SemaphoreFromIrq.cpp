@@ -7,7 +7,7 @@
 
 #include "CommonTestUtils.h"
 
-namespace {
+//namespace {
 	static typename OsRrPrio::CountingSemaphore sem;
 
 	bool error = false;
@@ -53,7 +53,7 @@ namespace {
 		sem.notify();
 		sem.notify();
 	}
-}
+//}
 
 TEST(SemaphoreFromIrq) {
 	t1.start(0);

@@ -103,7 +103,7 @@ private:
 		waitable->release(arg);
 
 		if(Task* newTask = static_cast<Task*>(state.policy.peekNext())) {
-			if(firstPreemptsSecond(newTask, currentTask))
+			if(!currentTask || firstPreemptsSecond(newTask, currentTask))
 				switchToNext<true>();
 		}
 	}

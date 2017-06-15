@@ -61,8 +61,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 };
 
 template<class... Args>
-inline void Scheduler<Args...>::
-yield() {
+inline void Scheduler<Args...>::yield() {
 	Profile::CallGate::sync(&Scheduler<Args...>::doYield);
 }
 
@@ -84,12 +83,15 @@ uintptr_t Scheduler<Args...>::doStartTask(uintptr_t task)
 {
 	state.nTasks++;
 	state.policy.addRunnable(entypePtr<Task>(task));
+
+	return true;
 }
 
 template<class... Args>
 uintptr_t Scheduler<Args...>::doYield()
 {
 	switchToNext<true, false>();
+	return true;
 }
 
 template<class... Args>
@@ -98,6 +100,8 @@ uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
 	state.sleepList.delay(currentTask, time);
 	switchToNext<false>();
+
+	return true;
 }
 
 template<class... Args>
@@ -109,6 +113,8 @@ uintptr_t Scheduler<Args...>::doExit()
 		state.isRunning = false;
 		Profile::Task::getCurrent()->finishLast();
 	}
+
+	return true;
 }
 
 #endif /* TASK_H_ */

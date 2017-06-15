@@ -75,11 +75,11 @@ inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
 		"	str %[in], [%[adr]]		\n" // 		4. store the new value.
 		"1: strb %[tmp], [%[mon]]	\n" // 		5. reset monitor.
 		"	cpsie i\n"
-			: [ret] "=&r" (ret)
-			: [mon] "r"   (&exclusiveMonitor),
-			  [tmp] "r"   (temp),
-			  [adr] "r"   (addr),
-			  [in]  "r"   (in) :
+			: [ret] "=&l" (ret)
+			: [mon] "l"   (&exclusiveMonitor),
+			  [tmp] "l"   (temp),
+			  [adr] "l"   (addr),
+			  [in]  "l"   (in) :
 		);
 
 	return ret;

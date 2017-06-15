@@ -25,7 +25,7 @@ namespace {
 }
 
 TEST(SemaphoreLock) {
-	for(int i=0; i<sizeof(t)/sizeof(t[0]); i++)
+	for(unsigned int i=0; i<sizeof(t)/sizeof(t[0]); i++)
 		t[i].start();
 
 	sem.init(true);

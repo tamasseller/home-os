@@ -49,7 +49,7 @@ struct TestStackPool {
 	}
 
 	static void clear() {
-		for(int i=0; i<sizeof(stacks)/sizeof(stacks[0]); i++)
+		for(unsigned int i=0; i<sizeof(stacks)/sizeof(stacks[0]); i++)
 			stacks[i] = 0x1badc0de;
 		current = stacks;
 	}

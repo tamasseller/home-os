@@ -7,7 +7,7 @@
 
 #include "CommonTestUtils.h"
 
-// namespace {
+namespace {
 	static OsRr::Mutex mutex;
 	static SharedData<16> data;
 
@@ -21,7 +21,7 @@
 			}
 		}
 	} t1, t2;
-//}
+}
 
 TEST(SingleMutex) {
 	t1.start();

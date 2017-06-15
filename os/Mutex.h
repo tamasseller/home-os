@@ -93,6 +93,8 @@ doLock(uintptr_t mutexPtr)
 		mutex->waiters.add(currentTask);
 		switchToNext<false>();
 	}
+
+	return true;
 }
 
 template<class... Args>
@@ -135,6 +137,8 @@ doUnlock(uintptr_t mutexPtr)
 		}
 
 	}
+
+	return true;
 }
 
 #endif /* MUTEX_H_ */

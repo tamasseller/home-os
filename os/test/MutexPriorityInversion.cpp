@@ -10,15 +10,14 @@
 #include "algorithm/Str.h"
 
 namespace {
-	typedef OsRt4 Os;
-	typedef Os::Mutex Mutex;
+	typedef OsRt4::Mutex Mutex;
 	Mutex m;
-	char trace[32] = {'\0',}, *tp = trace;
+	char trace[32] = {'\0',}, * volatile tp = trace;
 
-	struct T1: public TestTask<T1, Os> {
+	struct T1: public TestTask<T1, OsRt4> {
 		void run() {
 			*tp++ = 'a';
-			Os::sleep(2);
+			OsRt4::sleep(2);
 			*tp++ = 'f';
 			m.lock();
 			*tp++ = 'h';
@@ -27,18 +26,18 @@ namespace {
 		}
 	} t1;
 
-	struct T2: public TestTask<T2, Os> {
+	struct T2: public TestTask<T2, OsRt4> {
 		bool done = false;
 		void run() {
 			*tp++ = 'b';
-			Os::sleep(1);
+			OsRt4::sleep(1);
 			*tp++ = 'e';
 			CommonTestUtils::busyWork(CommonTestUtils::getIterations(80));
 			*tp++ = 'j';
 		}
 	} t2;
 
-	struct T3: public TestTask<T3, Os> {
+	struct T3: public TestTask<T3, OsRt4> {
 		void run() {
 			*tp++ = 'c';
 			m.lock();
@@ -53,12 +52,12 @@ namespace {
 
 TEST(MutexPriorityInversion)
 {
-	m.init();
 	t1.start(0);
 	t2.start(1);
 	t3.start(2);
+	m.init();
 
-	CommonTestUtils::start<Os>();
+	CommonTestUtils::start<OsRt4>();
 
 	CHECK(pet::Str::ncmp(trace, "abcdefghijk", sizeof(trace)) == 0);
 }

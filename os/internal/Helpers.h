@@ -20,7 +20,6 @@ inline void Scheduler<Args...>::switchToNext()
 					state.policy.addRunnable(currentTask);
 		}
 
-
 		newTask->switchToSync();
 	} else if(suspend)
 		Profile::Task::suspendExecution();
@@ -47,7 +46,7 @@ inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Tas
 }
 
 template<class... Args>
-inline uintptr_t Scheduler<Args...>::assert(bool cond, const char* msg) {
+inline void Scheduler<Args...>::assert(bool cond, const char* msg) {
 	if(assertEnabled && !cond) {
 		Profile::fatalError(msg);
 	}
