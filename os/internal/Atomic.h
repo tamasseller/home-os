@@ -24,6 +24,13 @@ struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 		});
 	}
 
+	Data increment(Data amount) {
+		return (*this)([](Data old, Data& result, Data amount){
+			result = old + amount;
+			return true;
+		}, amount);
+	}
+
 	Data decrement() {
 		return (*this)([](Data old, Data& result){
 			result = old - 1;

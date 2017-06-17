@@ -1,7 +1,6 @@
 API
 ---
 
- - Test mutex prio inversion avoidance vs select.
  - Move sleep/yield/etc into Task from Scheduler.
  - Create forced scheduler exit for error handling.
  - Ensure correct finalization for forced exit.
@@ -15,6 +14,8 @@ Internals
  - Implement object registry option.
  - Implement mutex deadlock detection option.
  - Implement event tracing callback interface.
+ - Introduce helper for priority setting.
+ - Introduce proper method for comparing priorities in policy instead of < operator.
 
 Backend
 -------

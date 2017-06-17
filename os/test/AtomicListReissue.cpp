@@ -10,18 +10,15 @@
 namespace {
 	OsRr::AtomicList list;
 
-	int argMax = 0;
+	uintptr_t argMax = 0;
 
 	struct Element: OsRr::AtomicList::Element {
 		OsRr::Atomic<int> data = 0;
-		void work(int arg) {
+		void work(uintptr_t arg) {
 			if(argMax < arg)
 				argMax = arg;
 
-			data([](int old, int &result, int arg){
-				result = old + arg;
-				return true;
-			}, arg);
+			data.increment(static_cast<int>(arg));
 		}
 	};
 

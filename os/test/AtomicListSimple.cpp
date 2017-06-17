@@ -12,11 +12,11 @@ namespace {
 
 	bool error = false;
 	bool otherOnesDone = false;
-	int argMax = 0;
+	uintptr_t argMax = 0;
 
 	struct Element: OsRr::AtomicList::Element {
-		int data = 0;
-		void work(int arg) {
+		uintptr_t data = 0;
+		void work(uintptr_t arg) {
 			if(argMax < arg)
 				argMax = arg;
 

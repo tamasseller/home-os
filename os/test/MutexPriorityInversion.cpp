@@ -65,10 +65,10 @@ namespace {
 
 TEST(MutexPriorityInversion)
 {
-	t0.start(0);
-	t1.start(1);
-	t2.start(2);
-	t3.start(3);
+	t0.start((uint8_t)0);
+	t1.start((uint8_t)1);
+	t2.start((uint8_t)2);
+	t3.start((uint8_t)3);
 	m1.init();
 	m2.init();
 

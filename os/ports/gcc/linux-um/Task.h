@@ -79,7 +79,7 @@ class ProfileLinuxUm::Task {
 public:
 	void startFirst();
 	void finishLast();
-	void initialize(void (*entry)(void*), void (*exit)(), void* stack, uint32_t stackSize, void* arg);
+	void initialize(void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg);
 
 	inline void switchToAsync()
 	{

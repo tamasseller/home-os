@@ -8,33 +8,33 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc/linux-um
 
 # Atomic list related tests.
-#SOURCES += $(ROOT)/test/AtomicListSimple.cpp
-#SOURCES += $(ROOT)/test/AtomicListReissue.cpp
+SOURCES += $(ROOT)/test/AtomicListSimple.cpp
+SOURCES += $(ROOT)/test/AtomicListReissue.cpp
 
 
 # Mutex related tests.
 
-#SOURCES += $(ROOT)/test/MutexMany.cpp
-#SOURCES += $(ROOT)/test/MutexSingle.cpp
-#SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
+SOURCES += $(ROOT)/test/MutexMany.cpp
+SOURCES += $(ROOT)/test/MutexSingle.cpp
+SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
 SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
-
+SOURCES += $(ROOT)/test/MutexVsSelect.cpp
 
 # Semaphore tests.
 
-#SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
-#SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
-#SOURCES += $(ROOT)/test/SemaphorePrio.cpp
-#SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
-#SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
+SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
+SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
+SOURCES += $(ROOT)/test/SemaphorePrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
+SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
 
 # General task management.
 
-#SOURCES += $(ROOT)/test/Yield.cpp
-#SOURCES += $(ROOT)/test/Sleep.cpp
-#SOURCES += $(ROOT)/test/TaskStart.cpp
+SOURCES += $(ROOT)/test/Yield.cpp
+SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/TaskStart.cpp
 
 
 # Policy sanity checking.
@@ -77,6 +77,9 @@ CXXFLAGS += -Wcast-align
 CXXFLAGS += -Wdisabled-optimization
 CXXFLAGS += -Wno-unused
 CXXFLAGS += -Werror
+CXXFLAGS += -Wconversion
+CXXFLAGS += -Wuseless-cast
+CXXFLAGS += -Wcast-align
 CXXFLAGS += -fsanitize=undefined
 CXXFLAGS += -fsanitize=shift
 CXXFLAGS += -fsanitize=integer-divide-by-zero

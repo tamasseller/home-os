@@ -12,7 +12,7 @@
 
 typedef ProfileLinuxUm PlatformHardwareProfile;
 
-static constexpr auto testStackSize = 1024*1024u;
-static constexpr auto testStackCount = 10u;
+static constexpr uintptr_t testStackSize = 1024*1024u;
+static constexpr uintptr_t testStackCount = 10u;
 
 #endif /* PLATFORM_H_ */

@@ -27,7 +27,7 @@ public:
 	class CallGate;
 	template<class Data> class Atomic;
 
-	static void init(int tickUs);
+	static void init(uintptr_t tickUs);
 
 	static inline void fatalError(const char* msg);
 };

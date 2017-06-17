@@ -61,7 +61,7 @@ void ProfileLinuxUm::sigUsr1Handler(int sig)
 	}
 }
 
-void ProfileLinuxUm::init(int tickUs)
+void ProfileLinuxUm::init(uintptr_t tickUs)
 {
     sigset_t set;
     sigfillset(&set);
@@ -127,14 +127,14 @@ void ProfileLinuxUm::Task::finishLast() {
 	setcontext(&final);
 }
 
-void ProfileLinuxUm::Task::initialize(void (*entry)(void*), void (*exit)(), void* stack, uint32_t stackSize, void* arg)
+void ProfileLinuxUm::Task::initialize(void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg)
 {
     getcontext(&exitContext);
     exitContext.uc_link = 0;
     exitContext.uc_stack.ss_sp = exitStack;
     exitContext.uc_stack.ss_size = sizeof(exitStack);
     exitContext.uc_stack.ss_flags = 0;
-    makecontext(&exitContext, (void (*)())exit, 0);
+    makecontext(&exitContext, exit, 0);
 
     getcontext(&savedContext);
     savedContext.uc_link = &exitContext;

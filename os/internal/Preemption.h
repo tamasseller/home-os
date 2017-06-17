@@ -30,7 +30,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 				if(firstPreemptsSecond(currentTask, newTask))
 					return;
 
-				state.policy.addRunnable(static_cast<Task*>(currentTask));
+				state.policy.addRunnable(currentTask);
 			}
 
 			state.policy.popNext();

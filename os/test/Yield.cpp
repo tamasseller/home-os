@@ -17,13 +17,13 @@ namespace {
 	} t[nTasks];
 
 	void Task::run() {
-		int selfIdx = this - t;
+		uintptr_t selfIdx = this - t;
 		for(int i = 0; i < 1000; i++) {
 			data[selfIdx]++;
 			OsRr::yield();
 		}
 
-		for(int i = 0; i < nTasks; i++)
+		for(auto i = 0u; i < nTasks; i++)
 			if(i != selfIdx && data[i])
 				return;
 

@@ -39,7 +39,7 @@ struct RealtimePolicy {
 			}
 
 			inline Priority(): staticPriority(0) {}
-			inline Priority(uintptr_t staticPriority): staticPriority(staticPriority) {}
+			inline Priority(uint8_t staticPriority): staticPriority(staticPriority) {}
 		};
 
 
