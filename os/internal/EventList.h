@@ -60,7 +60,7 @@ public:
 		 */
 
 		if(result == 1)
-			Profile::CallGate::async(&EventList::dispatchTrampoline);
+			Profile::async(&EventList::dispatchTrampoline);
 	}
 
 	inline void dispatch()

@@ -55,11 +55,11 @@ public:
 	}
 
 	void lock() {
-		Profile::CallGate::sync(&Scheduler<Args...>::doLock, detypePtr(this));
+		Profile::sync(&Scheduler<Args...>::doLock, detypePtr(this));
 	}
 
 	void unlock() {
-		Profile::CallGate::sync(&Scheduler<Args...>::doUnlock, detypePtr(this));
+		Profile::sync(&Scheduler<Args...>::doUnlock, detypePtr(this));
 	}
 };
 
@@ -68,7 +68,7 @@ uintptr_t Scheduler<Args...>::
 doLock(uintptr_t mutexPtr)
 {
 	Mutex* mutex = entypePtr<Mutex>(mutexPtr);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	if(!mutex->owner) {
 		mutex->owner = currentTask;
@@ -112,7 +112,7 @@ uintptr_t Scheduler<Args...>::
 doUnlock(uintptr_t mutexPtr)
 {
 	Mutex* mutex = entypePtr<Mutex>(mutexPtr);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	assert(currentTask == mutex->owner, "Mutex unlock from non-owner task");
 

@@ -77,7 +77,7 @@ private:
 
 	virtual void remove(Task* task) final {
 		waiters.remove(task);
-		task->injectReturnValue(false);
+		Profile::injectReturnValue(task, false);
 	}
 
 	virtual void waken(Task* task, Waitable*) final {
@@ -98,7 +98,7 @@ private:
 	static void doNotify(Event* event, uintptr_t arg)
 	{
 		Waitable* waitable = static_cast<Waitable*>(event);
-		Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+		Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 		waitable->release(arg);
 
@@ -113,11 +113,11 @@ public:
 
 	inline void wait()
 	{
-		Profile::CallGate::sync(&Scheduler<Args...>::doWait, detypePtr(this));
+		Profile::sync(&Scheduler<Args...>::doWait, detypePtr(this));
 	}
 
 	inline bool wait(uintptr_t timeout) {
-		return Profile::CallGate::sync(&Scheduler<Args...>::doWaitTimeout, detypePtr(this), timeout);
+		return Profile::sync(&Scheduler<Args...>::doWaitTimeout, detypePtr(this), timeout);
 	}
 
 	inline void notify() {
@@ -131,7 +131,7 @@ template<class... Args>
 uintptr_t Scheduler<Args...>::doWait(uintptr_t waitablePtr)
 {
 	Waitable* waitable = entypePtr<Waitable>(waitablePtr);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	if(waitable->wouldBlock()) {
 		waitable->waiters.add(currentTask);
@@ -147,7 +147,7 @@ template<class... Args>
 uintptr_t Scheduler<Args...>::doWaitTimeout(uintptr_t waitablePtr, uintptr_t timeout)
 {
 	Waitable* waitable = entypePtr<Waitable>(waitablePtr);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	if(!waitable->wouldBlock()) {
 		waitable->acquire();

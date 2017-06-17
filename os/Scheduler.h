@@ -41,7 +41,7 @@ struct SchedulerOptions {
 
 
 	public:
-		using TickType = typename Profile::Timer::TickType;
+		using TickType = typename Profile::TickType;
 
 		template<class Data> class Atomic;
 
@@ -153,14 +153,14 @@ template<class... T>
 inline void Scheduler<Args...>::start(T... t) {
 	Task* firstTask = state.policy.popNext();
 	state.isRunning = true;
-	Profile::Timer::setTickHandler(&Scheduler<Args...>::onTick);
+	Profile::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);
-	firstTask->startFirst();
+	Profile::startFirst(firstTask);
 }
 
 template<class... Args>
-inline typename Scheduler<Args...>::Profile::Timer::TickType Scheduler<Args...>::getTick() {
-	return Profile::Timer::getTick();
+inline typename Scheduler<Args...>::Profile::TickType Scheduler<Args...>::getTick() {
+	return Profile::getTick();
 }
 
 #endif /* SCHEDULER_H_ */

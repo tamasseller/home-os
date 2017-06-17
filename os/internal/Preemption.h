@@ -23,7 +23,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 		}
 
 		if(Task* newTask = state.policy.peekNext()) {
-			if(typename Profile::Task* platformTask = Profile::Task::getCurrent()) {
+			if(typename Profile::Task* platformTask = Profile::getCurrent()) {
 
 				Task* currentTask = static_cast<Task*>(platformTask);
 
@@ -34,7 +34,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 			}
 
 			state.policy.popNext();
-			static_cast<Task*>(newTask)->switchToAsync();
+			Profile::switchToAsync(newTask);
 		}
 	}
 

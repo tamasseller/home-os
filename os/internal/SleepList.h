@@ -21,7 +21,7 @@ class Scheduler<Args...>::SleepList {
 public:
 	inline void delay(Task* elem, uintptr_t delay)
 	{
-		elem->deadline = Profile::Timer::getTick() + delay;
+		elem->deadline = Profile::getTick() + delay;
 		list.add(elem);
 	}
 
@@ -33,7 +33,7 @@ public:
 
 	inline Task* getWakeable() {
 		if(Sleeper* ret = list.lowest()) {
-			if(ret->deadline <= Profile::Timer::getTick()) {
+			if(ret->deadline <= Profile::getTick()) {
 				list.popLowest();
 				ret->invalidate();
 				return static_cast<Task*>(ret);

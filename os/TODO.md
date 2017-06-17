@@ -4,7 +4,7 @@ API
  - Move sleep/yield/etc into Task from Scheduler.
  - Create forced scheduler exit for error handling.
  - Ensure correct finalization for forced exit.
- - Implement ReaderWriterLock (possible with upgrade option).
+ - Implement ReaderWriterLock (possibly with upgrade option).
  
 Internals
 ---------
@@ -20,7 +20,6 @@ Internals
 Backend
 -------
 
- - Flatten structure, move everything into the Profile class.
  - Find some way to keep track of high-res task running time.
  - Port to cortex-m3 (with real exclusive access instructions).
  - Port to cortex-m4f (with non-lazy float context saving).

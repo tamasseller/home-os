@@ -39,13 +39,13 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 				void* arg,
 				StartArgs... startArgs)
 		{
-			Profile::Task::initialize(entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
+			Profile::initialize(this, entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
 			Policy::initialize(this, startArgs...);
 
 			auto task = detypePtr(static_cast<Task*>(this));
 
 			if(state.isRunning)
-				Profile::CallGate::sync(&Scheduler<Args...>::doStartTask, task);
+				Profile::sync(&Scheduler<Args...>::doStartTask, task);
 			else
 				doStartTask(task);
 		}
@@ -62,20 +62,20 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 
 template<class... Args>
 inline void Scheduler<Args...>::yield() {
-	Profile::CallGate::sync(&Scheduler<Args...>::doYield);
+	Profile::sync(&Scheduler<Args...>::doYield);
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::sleep(uintptr_t time)
 {
 	assert(time <= INTPTR_MAX, "Delay time too big!");
-	Profile::CallGate::sync(&Scheduler<Args...>::doSleep, time);
+	Profile::sync(&Scheduler<Args...>::doSleep, time);
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::exit()
 {
-	Profile::CallGate::sync(&Scheduler<Args...>::doExit);
+	Profile::sync(&Scheduler<Args...>::doExit);
 } // LCOV_EXCL_LINE: this line is never reached.
 
 
@@ -98,7 +98,7 @@ uintptr_t Scheduler<Args...>::doYield()
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 {
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 	state.sleepList.delay(currentTask, time);
 	switchToNext<false>();
 
@@ -112,7 +112,7 @@ uintptr_t Scheduler<Args...>::doExit()
 		switchToNext<false>();
 	} else {
 		state.isRunning = false;
-		Profile::Task::getCurrent()->finishLast();
+		Profile::finishLast();
 	}
 
 	return true;

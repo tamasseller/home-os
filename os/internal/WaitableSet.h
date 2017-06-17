@@ -51,7 +51,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 		for(uintptr_t i = 0; i < nWaiters; i++)
 			waiters[i].waitable->waiters.remove(waiters + i);
 
-		task->injectReturnValue(detypePtr(source));
+		Profile::injectReturnValue(task, detypePtr(source));
 	}
 
 	virtual void priorityChanged(Task*, Priority old)
@@ -95,7 +95,7 @@ inline typename Scheduler<Args...>::Waitable* Scheduler<Args...>::select(T... t)
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = Profile::CallGate::sync(&Scheduler<Args...>::doSelect, detypePtr(&set));
+	auto ret = Profile::sync(&Scheduler<Args...>::doSelect, detypePtr(&set));
 
 	return entypePtr<Waitable>(ret);
 }
@@ -107,7 +107,7 @@ inline typename Scheduler<Args...>::Waitable* Scheduler<Args...>::selectTimeout(
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = Profile::CallGate::sync(&Scheduler<Args...>::doSelectTimeout, detypePtr(&set), timeout);
+	auto ret = Profile::sync(&Scheduler<Args...>::doSelectTimeout, detypePtr(&set), timeout);
 
 	return entypePtr<Waitable>(ret);
 }
@@ -115,7 +115,7 @@ inline typename Scheduler<Args...>::Waitable* Scheduler<Args...>::selectTimeout(
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSelect(uintptr_t waitableSet){
 	WaitableSet *set = entypePtr<WaitableSet>(waitableSet);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	if(auto ret = set->acquireAny())
 		return detypePtr(ret);
@@ -134,7 +134,7 @@ uintptr_t Scheduler<Args...>::doSelect(uintptr_t waitableSet){
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSelectTimeout(uintptr_t waitableSet, uintptr_t timeout){
 	WaitableSet *set = entypePtr<WaitableSet>(waitableSet);
-	Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent());
+	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	if(auto ret = set->acquireAny())
 		return detypePtr(ret);

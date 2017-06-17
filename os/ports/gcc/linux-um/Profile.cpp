@@ -7,59 +7,19 @@
 
 #include "Profile.h"
 
-ProfileLinuxUm::Task* volatile ProfileLinuxUm::Task::currentTask;
-ProfileLinuxUm::Task* volatile ProfileLinuxUm::Task::oldTask;
-bool ProfileLinuxUm::Task::suspend;
-bool ProfileLinuxUm::Task::suspended;
+void (*ProfileLinuxUm::tickHandler)();
+void (* volatile ProfileLinuxUm::asyncCallHandler)();
+void* (* volatile ProfileLinuxUm::syncCallMapper)(void*);
 
-ucontext_t ProfileLinuxUm::Task::final;
-ucontext_t ProfileLinuxUm::Task::idle;
-uintptr_t ProfileLinuxUm::Task::idleStack[1024];
+volatile uint32_t ProfileLinuxUm::tick = 0;
 
-
-volatile uint32_t ProfileLinuxUm::Timer::tick = 0;
-
-void (*ProfileLinuxUm::Timer::tickHandler)();
-void (* volatile ProfileLinuxUm::CallGate::asyncCallHandler)();
-void* (* volatile ProfileLinuxUm::CallGate::syncCallMapper)(void*);
-
-void ProfileLinuxUm::Timer::sigAlrmHandler(int) {
-	tick++;
-	tickHandler();
-}
-
-void ProfileLinuxUm::sigUsr1Handler(int sig)
-{
-	Task* realCurrentTask = Task::realCurrentTask();
-
-	if(realCurrentTask->syscall) {
-		void (* call)(Task*) = realCurrentTask->syscall;
-		realCurrentTask->syscall = nullptr;
-		call(realCurrentTask);
-	}
-
-	if(CallGate::asyncCallHandler) {
-		void (* handler)() = CallGate::asyncCallHandler;
-		CallGate::asyncCallHandler = nullptr;
-		handler();
-	}
-
-	if(Task::oldTask) {
-		if(Task::suspended) {
-			Task::suspended = false;
-			Task::oldTask = nullptr;
-			swapcontext(&Task::idle, &Task::currentTask->savedContext);
-		} else {
-			Task* old = Task::oldTask;
-			Task::oldTask = nullptr;
-			swapcontext(&old->savedContext, &Task::currentTask->savedContext);
-		}
-	} else if(Task::suspend) {
-		Task::suspend = false;
-		Task::suspended = true;
-		swapcontext(&Task::currentTask->savedContext, &Task::idle);
-	}
-}
+ProfileLinuxUm::Task* volatile ProfileLinuxUm::currentTask;
+ProfileLinuxUm::Task* volatile ProfileLinuxUm::oldTask;
+ucontext_t ProfileLinuxUm::final;
+ucontext_t ProfileLinuxUm::idle;
+uintptr_t ProfileLinuxUm::idleStack[1024];
+bool ProfileLinuxUm::suspend;
+bool ProfileLinuxUm::suspended;
 
 void ProfileLinuxUm::init(uintptr_t tickUs)
 {
@@ -67,17 +27,17 @@ void ProfileLinuxUm::init(uintptr_t tickUs)
     sigfillset(&set);
     sigprocmask(SIG_SETMASK, &set, NULL);
 
-    getcontext(&Task::idle);
-    Task::idle.uc_link = 0;
-    Task::idle.uc_stack.ss_sp = Task::idleStack;
-    Task::idle.uc_stack.ss_size = sizeof(Task::idleStack);
-    Task::idle.uc_stack.ss_flags = 0;
-    makecontext(&Task::idle, (void (*)())Task::idler, 0);
+    getcontext(&idle);
+    idle.uc_link = 0;
+    idle.uc_stack.ss_sp = idleStack;
+    idle.uc_stack.ss_size = sizeof(idleStack);
+    idle.uc_stack.ss_flags = 0;
+    makecontext(&idle, (void (*)())idler, 0);
 
     struct sigaction sa;
 
     memset (&sa, 0, sizeof (sa));
-    sa.sa_handler = &Timer::sigAlrmHandler;
+    sa.sa_handler = &sigAlrmHandler;
     sigfillset(&sa.sa_mask);
     sigaction (SIGALRM, &sa, NULL);
 
@@ -99,8 +59,83 @@ void ProfileLinuxUm::init(uintptr_t tickUs)
     sigprocmask(SIG_SETMASK, &set, NULL);
 }
 
-void ProfileLinuxUm::Task::startFirst() {
-	currentTask = this;
+
+void ProfileLinuxUm::sigAlrmHandler(int) {
+	tick++;
+	tickHandler();
+}
+
+void ProfileLinuxUm::sigUsr1Handler(int sig)
+{
+	Task* task = realCurrentTask();
+
+	if(task->syscall) {
+		void (* call)(Task*) = task->syscall;
+		task->syscall = nullptr;
+		call(task);
+	}
+
+	if(asyncCallHandler) {
+		void (* handler)() = asyncCallHandler;
+		asyncCallHandler = nullptr;
+		handler();
+	}
+
+	if(oldTask) {
+		if(suspended) {
+			suspended = false;
+			oldTask = nullptr;
+			swapcontext(&idle, &currentTask->savedContext);
+		} else {
+			Task* old = oldTask;
+			oldTask = nullptr;
+			swapcontext(&old->savedContext, &currentTask->savedContext);
+		}
+	} else if(suspend) {
+		suspend = false;
+		suspended = true;
+		swapcontext(&currentTask->savedContext, &idle);
+	}
+}
+
+void ProfileLinuxUm::dispatchSyscall(Task* self) {
+	uintptr_t *args = self->syscallArgs.args;
+	void* functPtr = (void*)args[0];
+
+	switch(self->syscallArgs.nArgs) {
+	case 0:
+		self->returnValue = ((uintptr_t (*)())functPtr)();
+		break;
+	case 1:
+		self->returnValue = ((uintptr_t (*)(uintptr_t))functPtr)(args[1]);
+		break;
+	case 2:
+		self->returnValue = ((uintptr_t (*)(uintptr_t, uintptr_t))functPtr)(args[1], args[2]);
+		break;
+	case 3:
+		self->returnValue = ((uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t))functPtr)(args[1], args[2], args[3]);
+		break;
+	case 4:
+		self->returnValue = ((uintptr_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))functPtr)(args[1], args[2], args[3], args[4]);
+		break;
+	}
+}
+
+void ProfileLinuxUm::idler()
+{
+	sigset_t mask, oldMask;
+	sigfillset(&mask);
+
+	while(1) {
+		sigprocmask(SIG_UNBLOCK, &mask, &oldMask);
+		pause();
+		sigprocmask(SIG_SETMASK, &oldMask, 0);
+	}
+}
+
+void ProfileLinuxUm::startFirst(Task* task)
+{
+	currentTask = task;
 
 	sigset_t sig;
 	sigemptyset (&sig);
@@ -108,7 +143,7 @@ void ProfileLinuxUm::Task::startFirst() {
 	sigaddset(&sig, SIGALRM);
 	sigprocmask(SIG_BLOCK, &sig, NULL);
 
-	swapcontext(&final, &savedContext);
+	swapcontext(&final, &task->savedContext);
 
 	struct itimerval timer;
 	timer.it_value.tv_sec = 0;
@@ -120,26 +155,25 @@ void ProfileLinuxUm::Task::startFirst() {
 	usleep(1000);
 
 	sigprocmask(SIG_UNBLOCK, &sig, NULL);
-
 }
 
-void ProfileLinuxUm::Task::finishLast() {
+void ProfileLinuxUm::finishLast() {
 	setcontext(&final);
 }
 
-void ProfileLinuxUm::Task::initialize(void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg)
+void ProfileLinuxUm::initialize(Task* task, void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg)
 {
-    getcontext(&exitContext);
-    exitContext.uc_link = 0;
-    exitContext.uc_stack.ss_sp = exitStack;
-    exitContext.uc_stack.ss_size = sizeof(exitStack);
-    exitContext.uc_stack.ss_flags = 0;
-    makecontext(&exitContext, exit, 0);
+    getcontext(&task->exitContext);
+    task->exitContext.uc_link = 0;
+    task->exitContext.uc_stack.ss_sp = task->exitStack;
+    task->exitContext.uc_stack.ss_size = sizeof(Task::exitStack);
+    task->exitContext.uc_stack.ss_flags = 0;
+    makecontext(&task->exitContext, exit, 0);
 
-    getcontext(&savedContext);
-    savedContext.uc_link = &exitContext;
-    savedContext.uc_stack.ss_sp = stack;
-    savedContext.uc_stack.ss_size = stackSize;
-    savedContext.uc_stack.ss_flags = 0;
-    makecontext(&savedContext, (void (*)())entry, 1, arg);
+    getcontext(&task->savedContext);
+    task->savedContext.uc_link = &task->exitContext;
+    task->savedContext.uc_stack.ss_sp = stack;
+    task->savedContext.uc_stack.ss_size = stackSize;
+    task->savedContext.uc_stack.ss_flags = 0;
+    makecontext(&task->savedContext, (void (*)())entry, 1, arg);
 }

@@ -16,13 +16,13 @@ inline void Scheduler<Args...>::switchToNext()
 {
 	if(Task* newTask = state.policy.popNext()) {
 		if(pendOld) {
-			if(Task* currentTask = static_cast<Task*>(Profile::Task::getCurrent()))
+			if(Task* currentTask = static_cast<Task*>(Profile::getCurrent()))
 					state.policy.addRunnable(currentTask);
 		}
 
-		newTask->switchToSync();
+		Profile::switchToSync(newTask);
 	} else if(suspend)
-		Profile::Task::suspendExecution();
+		Profile::suspendExecution();
 }
 
 template<class... Args>
