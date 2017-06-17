@@ -12,51 +12,168 @@
 
 #include "../common/Atomic.h"
 #include "../common/Scb.h"
+#include "../common/Svc.h"
 
 class ProfileCortexM0 {
-	template<class Value> inline static Value loadExclusive(volatile Value*);
+	friend void PendSV_Handler();
+	friend void SVC_Handler();
+	friend void SysTick_Handler();
+
 	template<class Value> inline static bool storeExclusive(volatile Value*, Value);
-	inline static void clearExclusive();
 
-	static volatile bool exclusiveMonitor;
+	template<class Value>
+	static inline Value loadExclusive(volatile Value* addr)
+	{
+		exclusiveMonitor = true;
+		Value ret = *addr;
+		asm volatile("":::"memory");
+		return ret;
+	}
 
-	static inline void sysWrite0(const char* msg);
+	static inline void clearExclusive()
+	{
+		exclusiveMonitor = false;
+		asm volatile("":::"memory");
+	}
+
 public:
-	class Task;
-	class Timer;
-	class CallGate;
+	class Task {
+		friend ProfileCortexM0;
+		void* sp;
+	};
 
 	template<class Data>
 	using Atomic = CortexCommon::Atomic<Data, &loadExclusive, &storeExclusive, &clearExclusive>;
 
-	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0);
+	typedef uint32_t TickType;
+	typedef uint32_t ClockType;
 
-	static inline void fatalError(const char* msg);
+private:
+	static void (* volatile asyncCallHandler)();
+	static void* (* volatile syncCallMapper)(void*);
+
+	static volatile uint32_t tick;
+	static void (*tickHandler)();
+
+	static volatile bool exclusiveMonitor;
+
+	static Task* volatile currentTask;
+	static Task* volatile oldTask;
+	static void* suspendedPc;
+
+	static void *defaultSyncCallMapper(void*);
+	static inline void sysWrite0(const char* msg);
+
+	template<class ... Args>
+	static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args) {
+		return CortexCommon::DirectSvc::issueSvc((uintptr_t)args..., f);
+	}
+
+	static inline void* &irqEntryStackedPc() {
+		void **psp;
+		asm volatile ("mrs %0, psp\n"  : "=r" (psp));
+		return psp[6];
+	}
+
+public:
+	static inline void init(uint32_t ticks, uint8_t systickPrio=0xc0) {
+		CortexCommon::Scb::Syst::init(ticks);
+		CortexCommon::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
+		tick = 0;
+	}
+
+
+	static inline void setSyscallMapper(void* (*mapper)(void*)) {
+		syncCallMapper = mapper;
+	}
+
+	template<class ... T>
+	static inline uintptr_t sync(T ... ops) {
+		return callViaSvc(ops...);
+	}
+
+	static inline void async(void (*handler)()) {
+		asyncCallHandler = handler;
+		CortexCommon::Scb::Icsr::triggerPendSV();
+	}
+
+	static inline TickType getTick() {
+		return tick;
+	}
+
+	static inline ClockType getClockCycle() {
+		return 0;
+	}
+
+	static inline void setTickHandler(void (*handler)()) {
+		tickHandler = handler;
+	}
+
+	static void startFirst(Task* task);
+	static void finishLast();
+
+	static inline void initialize(Task*, void (*)(void*), void (*)(), void*, uint32_t, void*);
+	static inline void switchToAsync(Task* task)
+	{
+		if(suspendedPc) {
+			irqEntryStackedPc() = suspendedPc;
+			suspendedPc = nullptr;
+		}
+
+		if(!oldTask)
+			oldTask = currentTask;
+
+		currentTask = task;
+	}
+
+	static inline void switchToSync(Task* task)
+	{
+		switchToAsync(task);
+		CortexCommon::Scb::Icsr::triggerPendSV();
+	}
+
+	static inline void injectReturnValue(Task* task, uintptr_t ret)
+	{
+		if(suspendedPc && task == currentTask) {
+			uintptr_t* frame;
+			asm volatile ("mrs %0, psp\n"  : "=r" (frame));
+			frame[0] = ret;
+		} else {
+			uintptr_t* frame = reinterpret_cast<uintptr_t*>(task->sp);
+			frame[4] = ret;
+		}
+	}
+
+	static inline Task* getCurrent()
+	{
+		if(suspendedPc)
+			return nullptr;
+
+		return currentTask;
+	}
+
+	static inline void suspendExecution() {
+		struct Idler {
+			__attribute__((naked))
+			static void sleep() {
+				asm("sleep_until_interrupted:		\n"
+					"	wfi							\n"
+					"	b sleep_until_interrupted	\n");
+			}
+		};
+
+		suspendedPc = irqEntryStackedPc();
+		irqEntryStackedPc() = (void*)&Idler::sleep;
+	}
+
+	static inline void fatalError(const char* msg) {
+		sysWrite0("Fatal error: ");
+		sysWrite0(msg);
+		sysWrite0("!\n");
+	}
 };
 
-#include "Task.h"
-#include "Timer.h"
-#include "CallGate.h"
-
 ///////////////////////////////////////////////////////////////////////////////
-
-inline void ProfileCortexM0::init(uint32_t ticks, uint8_t systickPrio) {
-	CortexCommon::Scb::Syst::init(ticks);
-	CortexCommon::Scb::Shpr::init(0xc0, systickPrio, 0xc0);
-	Timer::tick = 0;
-}
-
-template<class Value>
-inline Value ProfileCortexM0::loadExclusive(volatile Value* addr)
-{
-	exclusiveMonitor = true;
-	return *addr;
-}
-
-inline void ProfileCortexM0::clearExclusive()
-{
-	exclusiveMonitor = false;
-}
 
 template<class Value>
 inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
@@ -79,12 +196,11 @@ inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
 			: [mon] "l"   (&exclusiveMonitor),
 			  [tmp] "l"   (temp),
 			  [adr] "l"   (addr),
-			  [in]  "l"   (in) :
+			  [in]  "l"   (in) : "memory"
 		);
 
 	return ret;
 }
-
 inline void ProfileCortexM0::sysWrite0(const char* msg)
 {
 	/*
@@ -99,11 +215,30 @@ inline void ProfileCortexM0::sysWrite0(const char* msg)
  	asm volatile("bkpt #0xab" : "=r"(opCode), "=r"(str) : "r" (opCode), "r" (str) : "memory");
 }
 
-inline void ProfileCortexM0::fatalError(const char* msg)
+inline void ProfileCortexM0::initialize(Task* task, void (*entry)(void*), void (*exit)(),
+		void* stack, uint32_t stackSize, void* arg)
 {
-	sysWrite0("Fatal error: ");
-	sysWrite0(msg);
-	sysWrite0("!\n");
+	uintptr_t* data = (uintptr_t*) stack + (stackSize / 4 - 1);
+
+	// assert(stackSize >= frameSize);
+
+	*data-- = 0x01000000;		// xpsr (with thumb bit set)
+	*data-- = (uintptr_t) entry;// pc
+	*data-- = (uintptr_t) exit;	// lr
+	*data-- = 0xbaadf00d;		// r12
+	*data-- = 0xbaadf00d;		// r3
+	*data-- = 0xbaadf00d;		// r2
+	*data-- = 0xbaadf00d;		// r1
+	*data-- = (uintptr_t) arg;	// r0
+	*data-- = 0xbaadf00d;		// r11
+	*data-- = 0xbaadf00d;		// r10
+	*data-- = 0xbaadf00d;		// r9
+	*data-- = 0xbaadf00d;		// r8
+	task->sp = data + 1;
+	*data-- = 0xbaadf00d;		// r7
+	*data-- = 0xbaadf00d;		// r6
+	*data-- = 0xbaadf00d;		// r5
+	*data-- = 0xbaadf00d;		// r4
 }
 
 #endif /* PROFILE_H_ */

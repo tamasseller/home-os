@@ -25,6 +25,7 @@ SOURCES += $(ROOT)/test/MutexVsSelect.cpp
 SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
 SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
 SOURCES += $(ROOT)/test/SemaphorePrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreLock.cpp
 SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
 SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp

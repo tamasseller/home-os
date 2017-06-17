@@ -7,22 +7,48 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex/m0
 
+# Atomic list related tests.
+SOURCES += $(ROOT)/test/AtomicListSimple.cpp
+SOURCES += $(ROOT)/test/AtomicListReissue.cpp
+
+
+# Mutex related tests.
+
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
 SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
-SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
-SOURCES += $(ROOT)/test/Sleep.cpp
-SOURCES += $(ROOT)/test/AtomicListSimple.cpp
-SOURCES += $(ROOT)/test/AtomicListReissue.cpp
-SOURCES += $(ROOT)/test/SemaphoreLock.cpp
+SOURCES += $(ROOT)/test/MutexVsSelect.cpp
+
+# Semaphore tests.
+
 SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
+SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
 SOURCES += $(ROOT)/test/SemaphorePrio.cpp
-SOURCES += $(ROOT)/test/Yield.cpp
-SOURCES += $(ROOT)/test/Select.cpp
-SOURCES += $(ROOT)/test/PolicyPrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreLock.cpp
+SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
 SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
+SOURCES += $(ROOT)/test/Select.cpp
+
+
+# General task management.
+
+SOURCES += $(ROOT)/test/Yield.cpp
+SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/TaskStart.cpp
+
+
+# Policy sanity checking.
+
 SOURCES += $(ROOT)/test/Policy.cpp
+SOURCES += $(ROOT)/test/PolicyPrio.cpp
+
+
+# Testing utilities.
+
+SOURCES += $(ROOT)/test/TestSuite.cpp
+SOURCES += $(ROOT)/test/CommonTestUtils.cpp
+
 
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
