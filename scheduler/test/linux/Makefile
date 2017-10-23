@@ -1,11 +1,11 @@
 OUTPUT = test
 
-ROOT = ../../..
+ROOT = ../..
 PET = $(ROOT)/../pet
 
 INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
-INCLUDE_DIRS += $(ROOT)/ports/gcc/linux-um
+INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
 # Atomic list related tests.
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
@@ -49,7 +49,7 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/ports/gcc/linux-um/Profile.cpp
+SOURCES += $(ROOT)/ports/gcc-linux-um/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp
@@ -103,9 +103,12 @@ CXXFLAGS += -fsanitize=vptr
 CXXFLAGS += -rdynamic								# Allows meaningful backrtaces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
 
-CXX = /opt/gcc-5.3.0/bin/g++
 LD = $(CXX) 
 
 LIBS += pthread rt gcc_eh
 
-include ../../ultimate-makefile/Makefile.ultimate
+include ../toolchains/Compiler.host.mk
+include ../ultimate-makefile/Makefile.ultimate
+
+enter:
+	CD_TO=$(ROOT)/.. make -C $(ROOT)/test/toolchains/ enter-the-matrix 

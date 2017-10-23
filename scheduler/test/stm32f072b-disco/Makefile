@@ -1,16 +1,16 @@
 OUTPUT = fw.elf
 
-ROOT = ../../..
+ROOT = ../..
 PET = $(ROOT)/../pet
 
 INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
-INCLUDE_DIRS += $(ROOT)/ports/gcc/cortex/m0
+INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-m0
+INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-common
 
 # Atomic list related tests.
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
-
 
 # Mutex related tests.
 
@@ -53,7 +53,7 @@ SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 SOURCES += $(ROOT)/test/TestSuite.cpp
 SOURCES += $(ROOT)/test/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/ports/gcc/cortex/m0/Profile.cpp
+SOURCES += $(ROOT)/ports/gcc-cortex-m0/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp
@@ -95,19 +95,14 @@ CXXFLAGS += -fno-exceptions #-S
 CFLAGS += $(COMMONFLAGS)
 CFLAGS += -std=c11
 
-GCCPATH = /opt/gcc-arm-none-eabi-5_4-2016q3
-GCCPREF = $(GCCPATH)/bin/arm-none-eabi-
-CC = $(GCCPREF)gcc
-CXX = $(GCCPREF)g++
-LD = $(GCCPREF)ld
-
 LDFLAGS += -gc-sections
 LDFLAGS += -nostartfiles
 LDFLAGS += -Tstm32.ld
 
 LIBS += gcc c
 
-LIB_DIRS += $(GCCPATH)/arm-none-eabi/lib/armv6-m/ 
-LIB_DIRS += $(GCCPATH)/lib/gcc/arm-none-eabi/5.4.1/armv6-m/  
+include ../toolchains/Compiler.arm.mk
+include ../ultimate-makefile/Makefile.ultimate
 
-include ../../ultimate-makefile/Makefile.ultimate
+enter:
+	CD_TO=$(ROOT)/.. make -C $(ROOT)/test/toolchains/ enter-the-matrix 

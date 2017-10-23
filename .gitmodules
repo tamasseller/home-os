@@ -2,5 +2,8 @@
 	path = pet
 	url = http://github.com/tamasseller/pet
 [submodule "os/test/ultimate-makefile"]
-	path = os/test/ultimate-makefile
+	path = scheduler/test/ultimate-makefile
 	url = http://github.com/tamasseller/ultimate-makefile
+[submodule "scheduler/test/toolchains"]
+	path = scheduler/test/toolchains
+	url = http://github.com/tamasseller/toolchains.git

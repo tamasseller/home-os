@@ -10,20 +10,20 @@
 
 template<class... Args>
 class Scheduler<Args...>::Sleeper {
-	static constexpr Sleeper *invalid = (Sleeper *)0xffffffff;
+	static constexpr Sleeper *invalid() {return (Sleeper *)0xffffffff;}
 
 	friend pet::DoubleList<Sleeper>;
-	Sleeper *prev = invalid, *next;
+	Sleeper *prev = invalid(), *next;
 
 public:
 	uintptr_t deadline;
 
 	inline bool isSleeping() {
-		return prev != invalid;
+		return prev != invalid();
 	}
 
 	inline void invalidate() {
-		prev = invalid;
+		prev = invalid();
 	}
 };
 

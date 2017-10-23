@@ -137,11 +137,10 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/WaitableSet.h"
 #include "internal/Preemption.h"
 
-#include "Mutex.h"
-#include "Scheduler.h"
-#include "Task.h"
-#include "BinarySemaphore.h"
-#include "CountingSemaphore.h"
+#include "frontend/Mutex.h"
+#include "frontend/Task.h"
+#include "frontend/BinarySemaphore.h"
+#include "frontend/CountingSemaphore.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 

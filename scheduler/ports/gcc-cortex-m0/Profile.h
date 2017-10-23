@@ -10,9 +10,9 @@
 
 #include <stdint.h>
 
-#include "../common/Atomic.h"
-#include "../common/Scb.h"
-#include "../common/Svc.h"
+#include "../gcc-cortex-common/Atomic.h"
+#include "../gcc-cortex-common/Scb.h"
+#include "../gcc-cortex-common/Svc.h"
 
 class ProfileCortexM0 {
 	friend void PendSV_Handler();
