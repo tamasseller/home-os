@@ -1,0 +1,132 @@
+/*
+ * WaitableSet.h
+ *
+ *  Created on: 2017.06.05.
+ *      Author: tooma
+ */
+
+#ifndef WAITABLESET_H_
+#define WAITABLESET_H_
+
+
+template<class... Args>
+class Scheduler<Args...>::WaitableSet final: Blocker
+{
+	friend Scheduler<Args...>;
+	static constexpr uintptr_t blockedReturnValue = 0;
+	static constexpr uintptr_t timeoutReturnValue = 0;
+
+	struct Waiter: Blockable {
+		friend WaitableSet;
+		Task* task;
+		Blocker* blocker;
+
+		static Task* getTask(Blockable* b) {
+			return static_cast<Waiter*>(b)->task;
+		}
+
+		inline Waiter(): Blockable(&Waiter::getTask) {};
+	};
+
+	volatile const uintptr_t nWaiters;
+	Waiter* volatile const waiters;
+
+	template<class... T>
+	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... blockers): nWaiters(sizeof...(T)), waiters(&waiters[0])
+	{
+		Blocker* const tempArray[] = {static_cast<Blocker*>(blockers)...};
+
+		volatile Waiter* it = waiters;
+
+		for(Blocker* blocker: tempArray)
+			(*it++).blocker = blocker;
+	}
+
+	static inline uintptr_t take(Blocker* blocker, Task* task) {
+		blocker->acquire(task);
+		return detypePtr(blocker);
+	}
+
+	virtual void remove(Blockable* blockable, Blocker* blocker) override final
+	{
+		assert(blockable == waiters[0].task, "WTF internal error");
+
+		for(uintptr_t i = 0; i < nWaiters; i++)
+			waiters[i].blocker->remove(waiters + i, this);
+
+		if(!blocker)
+			Profile::injectReturnValue(static_cast<Task*>(blockable), detypePtr(blocker));
+	}
+
+	virtual void priorityChanged(Blockable*, Priority old) override final
+	{
+		for(uintptr_t i = 0; i < nWaiters; i++)
+			waiters[i].blocker->priorityChanged(waiters + i, old);
+	}
+
+	virtual Blocker* getTakeable(Task* task) override final
+	{
+		for(uintptr_t i=0; i < nWaiters; i++) {
+			if(Blocker *receiver = waiters[i].blocker->getTakeable(task))
+				return receiver;
+		}
+
+		return nullptr;
+	}
+
+	virtual void block(Blockable* b) override final {
+		for(uintptr_t i=0; i < nWaiters; i++) {
+			Waiter *waiter = waiters + i;
+			Blocker *blocker = waiter->blocker;
+			waiter->task = b->getTask();
+			blocker->block(waiter);
+		}
+	}
+
+	/*
+	 * These two methods are never called during normal operation, so
+	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
+	 */
+
+	virtual uintptr_t acquire(Task*) override final {
+		assert(false, "Internal error, this method should never have been called.");
+		return 0;
+	}
+
+	virtual bool release(uintptr_t arg) override final {
+		assert(false, "Internal error, this method should never have been called.");
+		return false;
+	}
+
+	/*
+	 * From here on, the rest should be check for test coverage, so
+	 * LCOV_EXCL_STOP is placed here.
+	 */
+public:
+};
+
+template<class... Args>
+template<class... T>
+inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::select(T... t)
+{
+	typename WaitableSet::Waiter waiters[sizeof...(t)];
+	WaitableSet set(waiters, t...);
+
+	auto ret = Profile::sync(&Scheduler<Args...>::doBlock<WaitableSet>, detypePtr(&set));
+
+	return entypePtr<Blocker>(ret);
+}
+
+template<class... Args>
+template<class... T>
+inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(uintptr_t timeout, T... t)
+{
+	typename WaitableSet::Waiter waiters[sizeof...(t)];
+	WaitableSet set(waiters, t...);
+
+	auto ret = Profile::sync(&Scheduler<Args...>::doTimedBlock<WaitableSet>, detypePtr(&set), timeout);
+
+	return entypePtr<Blocker>(ret);
+}
+
+#endif /* WAITABLESET_H_ */

@@ -1,8 +1,10 @@
 Goals
 =====
 
-The goals of the project are defined from the aspects, one set is plain
-functional requirements, the other group is more about implementation.
+The goals of the project are defined from two aspects:
+
+ 1. functional requirements, 
+ 2. and implementation constraints.
 
 High-level functional requirements
 ----------------------------------
@@ -11,24 +13,24 @@ In addition to regular RTOS-es, the project aims to have:
 
  - Minimal platform dependence.
  - Optimal performance on cortex-m devices.
- - No global interrupt disable, on platforms where possible (where atomic access is possible).
+ - No global interrupt disable, on platforms where possible (where atomic access primitives are supported).
  - Support for fully static allocation of every object.
- - Ability have configurable and extendable scheduling policies.
+ - Ability to have configurable and extendable scheduling policies.
  - Configurable debug and security features, that need no (or minimal) changes to application code.
 
 Differences from the mainstream RTOS-es:
  
- - No timeout locking of mutexes (waiting with timeout for all non-mutexes).
- - Support waiting for multiple non-mutex synchronization objects.
- - No flag/event group primitive (multiple waiting can be used for that).
+ - No timeout locking of mutexes (timed waiting is supported for all non-mutex objects).
+ - Supports waiting for multiple non-mutex synchronization objects.
+ - No flag/event group primitive (multiple waiting can be used instead).
  - Non-mutex synchronization objects are customizable by application.
  
 Implementation requirements
 ---------------------------
 
- - Truely object oriented structire.
+ - Truely object oriented structure.
  - Source language: C++11. (no ANSI c bullshit anymore, it's 2017)
- - Use real polymorphism where needed (no switch on enum values).
+ - Use real, virtual method call based, polymorphism where needed (no switch on enum values).
  - No macro magic, at all. Configuration is done through template parameters.
  - No _NUMBER_OF_SOMTHING_ arguments, application allocates everything statically.
  - Handling of task switching caused by high priority interrupt, whithout explicit end-of-interrupt-routine calls.
@@ -45,8 +47,8 @@ is always waiting for something. There are two types of waiting: time-based and 
 mixed when the task is waiting for an event, but with a timeout. In that case it does both simultaneously.
 
 The fact that a task is waiting for something needs to be kept track of by the scheduler, this is implemented
-by putting the task (or something that can identify it) in the adequate container. So the core activites of
-the scheduler can be described in terms of containers and their elements.
+by putting the task (or an auxiliary object that can identify it) in the adequate container. So most of the 
+basic activites of the scheduler can be described in terms of containers and their elements.
 
 ### Event-based waiting
 
@@ -62,7 +64,7 @@ needs to be represented. This is done by introducing several intermediary object
 
 ### Time-based waiting
 
-If a task is waiting for a given instant of time, then it is also contained in a single sleep list.
+If a task is waiting for a given instant of time, then it is also contained in a centralized sleep list.
 The sleep list only ever contains tasks.
 
 Objects
@@ -70,10 +72,11 @@ Objects
 
 The internal runtime objects that the system operates on are:
 
- - Mutex, a priority-inversion safe, recursive mutex that can be _locked_ and _unlocked_ whith **no** timeout option.
+ - Mutex, a priority-inversion safe, recursive mutex that can be _locked_ and _unlocked_ whith **no timeout option**.
  - Waitable, base class for all non-mutex or semaphore-like objects. One or more can be waited for with or without 
    timeout (like unix _select_).
- - Policy (single): the ready-task storage, that implements the configured scheduling policy.
+ - Policy: central storage for task that are ready to run. It implements the configured scheduling policy, for 
+   selecting the next runnable task.
 
 Interfaces
 ----------

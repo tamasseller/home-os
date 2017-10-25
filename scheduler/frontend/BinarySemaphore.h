@@ -11,32 +11,34 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::BinarySemaphore: public Waitable
+class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySemaphore>
 {
 	friend Scheduler<Args...>;
 	bool open = true;
 
-	virtual bool wouldBlock() {
-		return !open;
+	virtual Blocker* getTakeable(Task*) override final {
+		return open ? this : nullptr;
 	}
 
-	virtual void acquire()
-	{
+	virtual uintptr_t acquire(Task*) override final {
 		open = false;
+		return true;
 	}
 
-	virtual void release(uintptr_t arg)
-	{
+	virtual bool release(uintptr_t arg) override final {
 		if(!open) {
-			if(!Waitable::wakeOne())
+			if(!this->wakeOne()) {
 				open = true;
+			} else
+				return true;
 		}
+
+		return false;
 	}
 
 public:
 	void init(bool open) {
 		this->open = open;
-		Waitable::init();
 	}
 };
 

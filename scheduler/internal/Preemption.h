@@ -16,7 +16,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
 			Task* task = static_cast<Task*>(sleeper);
 			if(task->blockedBy) {
-				task->blockedBy->remove(task);
+				task->blockedBy->remove(task, nullptr);
 				task->blockedBy = nullptr;
 			}
 			state.policy.addRunnable(task);

@@ -60,9 +60,11 @@ struct SchedulerOptions {
 		class Sleeper;
 		class SleepList;
 		class Blocker;
+		class SharedBlocker;
+		template<class> class AsyncBlocker;
+		template<class> class SemaphoreLikeBlocker;
 
 		template<bool (*)(const Blockable&, const Blockable&)> class BlockList;
-		class Waitable;
 		class WaitableSet;
 
 		class Event;
@@ -84,12 +86,9 @@ struct SchedulerOptions {
 		static uintptr_t doExit();
 		static uintptr_t doYield();
 		static uintptr_t doSleep(uintptr_t time);
-		static uintptr_t doLock(uintptr_t mutex);
-		static uintptr_t doUnlock(uintptr_t mutex);
-		static uintptr_t doWait(uintptr_t waitable);
-		static uintptr_t doWaitTimeout(uintptr_t waitable, uintptr_t timeout);
-		static uintptr_t doSelect(uintptr_t waitableSet);
-		static uintptr_t doSelectTimeout(uintptr_t waitableSet, uintptr_t timeout);
+		template<class> static uintptr_t doBlock(uintptr_t blocker);
+		template<class> static uintptr_t doTimedBlock(uintptr_t blocker, uintptr_t time);
+		template<class> static uintptr_t doRelease(uintptr_t blocker);
 
 		/*
 		 * Internal helpers
@@ -115,27 +114,31 @@ struct SchedulerOptions {
 		inline static void yield();
 		inline static void sleep(uintptr_t time);
 		inline static void exit();
-		template<class... T> inline static Waitable* select(T... t);
-		template<class... T> inline static Waitable* selectTimeout(uintptr_t timout, T... t);
+		template<class... T> inline static Blocker* select(T... t);
+		template<class... T> inline static Blocker* selectTimeout(uintptr_t timout, T... t);
 	};
 };
 
 template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
-#include "internal/Policy.h"
 #include "internal/Atomic.h"
 #include "internal/AtomicList.h"
 #include "internal/Event.h"
 #include "internal/EventList.h"
-#include "internal/Blocker.h"
-#include "internal/Helpers.h"
-#include "internal/Sleeper.h"
-#include "internal/SleepList.h"
-#include "internal/Blockable.h"
-#include "internal/Waitable.h"
-#include "internal/WaitableSet.h"
 #include "internal/Preemption.h"
+
+#include "blocking/Policy.h"
+#include "blocking/Blocker.h"
+#include "blocking/SharedBlocker.h"
+#include "blocking/AsyncBlocker.h"
+#include "blocking/SemaphoreLikeBlocker.h"
+#include "blocking/Sleeper.h"
+#include "blocking/SleepList.h"
+#include "blocking/Blockable.h"
+#include "blocking/WaitableSet.h"
+
+#include "syscall/Helpers.h"
 
 #include "frontend/Mutex.h"
 #include "frontend/Task.h"

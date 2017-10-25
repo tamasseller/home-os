@@ -11,34 +11,37 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::CountingSemaphore: public Waitable
+class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<CountingSemaphore>
 {
 	friend Scheduler<Args...>;
 	uintptr_t counter;
 
-	virtual bool wouldBlock() {
-		return !counter;
+	virtual Blocker* getTakeable(Task*) override final {
+		return counter ? this : nullptr;
 	}
 
-	virtual void acquire()
-	{
+	virtual uintptr_t acquire(Task*) override final {
 		counter--;
+		return true;
 	}
 
-	virtual void release(uintptr_t arg)
-	{
+	virtual bool release(uintptr_t arg) override final {
+		bool ret = false;
+
 		if(!counter) {
-			while(arg && Waitable::wakeOne())
+			while(arg && this->wakeOne())
 				arg--;
 
-			counter += arg;
+			ret = true;
 		}
+
+		counter += arg;
+		return ret;
 	}
 
 public:
 	void init(uintptr_t count) {
 		counter = count;
-		Waitable::init();
 	}
 };
 

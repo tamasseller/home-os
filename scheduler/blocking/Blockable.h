@@ -10,19 +10,58 @@
 
 #include "Scheduler.h"
 
+/**
+ * An object that can stand for a task in a blocking queue.
+ *
+ * It serves two purposes:
+ *
+ *  - It is container of the _next_ and _prev_ pointers for
+ *    the doubly linked list used by the Blocker to queue
+ *    the blocked items.
+ *  - It provides a method the query the blocked task that
+ *    it represents.
+ */
 template<class... Args>
 class Scheduler<Args...>::Blockable
 {
+
+	/**
+	 * Friendship is needed to allow access only for the
+	 * doubly linked list selectively.
+	 */
 	friend pet::DoubleList<Blockable>;
 
+	/**
+	 * The prev and next pointers used by the list.
+	 */
 	Blockable *prev, *next;
 
+	/**
+	 * Virtual method pointer, this ad-hoc solution for runtime
+	 * polymorphism is justified by the added performance,
+	 * gained by avoiding one of the two indirections of the
+	 * regular vtable method.
+	 */
 	Task* (* const getTaskVirtual)(Blockable*);
 
 protected:
+
+	/**
+	 * Virtual pointer initializer constructor.
+	 *
+	 * Subclasses must use this constructor to fill the
+	 * virtual method pointer.
+	 */
 	inline Blockable(Task* (*getTaskVirtual)(Blockable*)): getTaskVirtual(getTaskVirtual) {}
 
 public:
+
+	/**
+	 * Get the blocked task.
+	 *
+	 * This method uses the virtual method pointer to
+	 * get the task that this blocker object stands for.
+	 */
 	inline const Task *getTask() const {
 		/*
 		 * The reason for **const_cast** here is that if
@@ -38,6 +77,7 @@ public:
 		return getTaskVirtual(const_cast<Blockable*>(this));
 	}
 
+	/// @see Above.
 	inline Task *getTask() {
 		return getTaskVirtual(this);
 	}
