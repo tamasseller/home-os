@@ -64,7 +64,6 @@ struct SchedulerOptions {
 		template<class> class AsyncBlocker;
 		template<class> class SemaphoreLikeBlocker;
 
-		template<bool (*)(const Blockable&, const Blockable&)> class BlockList;
 		class WaitableSet;
 
 		class Event;
