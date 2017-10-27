@@ -8,12 +8,11 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
 # Atomic list related tests.
+SOURCES += $(ROOT)/test/TestLimitedCTree.cpp
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
 
-
 # Mutex related tests.
-
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
@@ -43,7 +42,6 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
-
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/TestSuite.cpp
@@ -64,7 +62,7 @@ INCLUDE_DIRS += $(PET)
 
 CXXFLAGS += -std=c++11 
 CXXFLAGS += -g3 
-CXXFLAGS += -O1
+CXXFLAGS += -O0
 CXXFLAGS += -fno-rtti
 CXXFLAGS += -fno-exceptions 
 CXXFLAGS += -pedantic 
