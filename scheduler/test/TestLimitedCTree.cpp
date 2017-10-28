@@ -239,7 +239,7 @@ TEST(LimitedCTreePublic, Multiple) {
 }
 
 TEST(LimitedCTreePublic, Stress) {
-	static constexpr auto n = 4096;
+	static constexpr auto n = 2048;
 
 	std::vector<TestNode*> fresh;
 	std::set<TestNode*, less> added;
@@ -257,6 +257,11 @@ TEST(LimitedCTreePublic, Stress) {
 
 		CHECK(tree.add<&compare>(node));
 		added.insert(node);
+
+		for(auto x: added) {
+			CHECK(tree.contains<&compare>(x));
+			CHECK(!tree.add<&compare>(x));
+		}
 
 		tree.expect((int)std::ceil(std::log2(added.size() + 1)), added);
 	}

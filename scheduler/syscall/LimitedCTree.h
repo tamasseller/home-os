@@ -266,14 +266,16 @@ protected:
 	}
 
 	/**
-	 * Get the active's left for an inactive _Node_.
+	 * Bring the left node of an inactive _Node_ from the active
+	 * domain and translate it to the currently inactive one.
 	 */
 	Node* transLeft(Node* alt) {
 		return translate<RealToAlt>(translate<AltToReal>(alt)->left);
 	}
 
 	/**
-	 * Get the active's right for an inactive _Node_.
+	 * Bring the right node of an inactive _Node_ from the active
+	 * domain and translate it to the currently inactive one.
 	 */
 	Node* transRight(Node* alt) {
 		return translate<RealToAlt>(translate<AltToReal>(alt)->right);
@@ -286,12 +288,14 @@ protected:
 		bool goingUp = false;
 
 		while(true) {
-			if(!goingUp && transRight(it) && transRight(it) != it->right) {
-					it->addRight(transRight(it));
+			Node* right = transRight(it);
+			if(!goingUp && right) {
+					it->addRight(right);
 					it = it->right;
 			} else {
-				if(transLeft(it) && transLeft(it) != it->left)  {
-					it->addLeft(transLeft(it));
+				Node* left = transLeft(it);
+				if(left)  {
+					it->addLeft(left);
 					goingUp = false;
 				} else
 					goingUp = true;
@@ -312,12 +316,14 @@ protected:
 		bool goingUp = false;
 
 		while(it) {
-			if(!goingUp && transLeft(it) && transLeft(it) != it->left) {
-					it->addLeft(transLeft(it));
+			Node* left = transLeft(it);
+			if(!goingUp && left) {
+					it->addLeft(left);
 					it = it->left;
 			} else {
-				if(transRight(it) && transRight(it) != it->right) {
-					it->addRight(transRight(it));
+				Node* right = transRight(it);
+				if(right) {
+					it->addRight(right);
 					goingUp = false;
 				} else
 					goingUp = true;
