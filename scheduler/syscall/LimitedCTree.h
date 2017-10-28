@@ -456,9 +456,12 @@ public:
 			parent = translate<RealToAlt>(parent);
 			Node* smallest = linearize();
 
-			if(isLeft)
+			if(isLeft) {
 				parent->addLeft(node);
-			else
+
+				if(parent == smallest)
+					smallest = node;
+			} else
 				parent->addRight(node);
 
 			strip(smallest);

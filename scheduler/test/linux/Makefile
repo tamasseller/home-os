@@ -7,17 +7,23 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
+
 # Atomic list related tests.
+
 SOURCES += $(ROOT)/test/TestLimitedCTree.cpp
+ifeq ('x',)
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
 
+
 # Mutex related tests.
+
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
 SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
 SOURCES += $(ROOT)/test/MutexVsSelect.cpp
+
 
 # Semaphore tests.
 
@@ -41,6 +47,7 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
+endif
 
 # Testing utilities.
 
