@@ -61,7 +61,4 @@ public:
 	}
 };
 
-
-
-
 #endif /* ROUNDROBINPRIOPOLICY_H_ */

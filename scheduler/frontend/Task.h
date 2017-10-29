@@ -44,10 +44,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 
 			auto task = detypePtr(static_cast<Task*>(this));
 
-			if(state.isRunning)
-				Profile::sync(&Scheduler<Args...>::doStartTask, task);
-			else
-				doStartTask(task);
+			conditionalSyscall(&Scheduler<Args...>::doStartTask, task);
 		}
 
 		inline Task(): Blockable(&Task::getTaskVirtual) {}
@@ -80,10 +77,11 @@ inline void Scheduler<Args...>::exit()
 
 
 template<class... Args>
-uintptr_t Scheduler<Args...>::doStartTask(uintptr_t task)
+uintptr_t Scheduler<Args...>::doStartTask(uintptr_t taskPtr)
 {
 	state.nTasks++;
-	state.policy.addRunnable(entypePtr<Task>(task));
+	Task* task = reinterpret_cast<Task*>(taskPtr);
+	state.policy.addRunnable(task);
 
 	return true;
 }

@@ -45,10 +45,29 @@ inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Tas
 	return *first < *second;
 }
 
+namespace {
+	struct Helper {
+		template<class Method, class... Args>
+		static inline uintptr_t directCall(Method method, Args... args) {
+			return method(args...);
+		}
+	};
+}
+
+template<class... Args>
+template<class ... T>
+inline uintptr_t Scheduler<Args...>::conditionalSyscall(T ... ops)
+{
+	if(state.isRunning)
+		return Profile::sync(ops...);
+	else
+		return Helper::directCall(ops...);
+}
+
 /*
- * Obviously the assert function should not be go through the active
+ * Obviously the assert function should not go through the active
  * branch when the system is intact, so LCOV_EXCL_START is placed
- * to avoid confusing the test coverage analytis.
+ * to avoid confusing the test coverage analysis.
  */
 
 template<class... Args>

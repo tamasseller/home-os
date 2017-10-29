@@ -9,7 +9,6 @@
 
 namespace SemaphorePassaround {
 	typedef typename OsRr::BinarySemaphore Semaphore;
-	static Semaphore s1, s2, s3;
 	static SharedData<16> data;
 	bool error = false;
 
@@ -38,12 +37,25 @@ namespace SemaphorePassaround {
 			this->to = to;
 			TestTask::start();
 		}
-	} t1(s1, s2), t2(s2, s3), t3(s3, s1);
+	};
 }
+
+namespace SemaphorePassaroundCtx1 {
+	static SemaphorePassaround::Semaphore s1, s2, s3;
+	SemaphorePassaround::Task t1(s1, s2), t2(s2, s3), t3(s3, s1);
+}
+
+namespace SemaphorePassaroundCtx2 {
+	static SemaphorePassaround::Semaphore s1, s2, s3;
+	SemaphorePassaround::Task t1(s1, s2), t2(s2, s3), t3(s3, s1);
+}
+
 
 TEST(SemaphorePassaround)
 {
 	using namespace SemaphorePassaround;
+	using namespace SemaphorePassaroundCtx1;
+
 	data.reset();
 	t1.start(false);
 	t2.start(false);
@@ -64,6 +76,8 @@ TEST(SemaphorePassaround)
 TEST(SemaphorePassaroundWithTimeout)
 {
 	using namespace SemaphorePassaround;
+	using namespace SemaphorePassaroundCtx2;
+
 	data.reset();
 	t1.start(true);
 	t2.start(true);

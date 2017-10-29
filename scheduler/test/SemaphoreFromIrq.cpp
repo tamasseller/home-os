@@ -15,16 +15,22 @@ namespace {
 	template<class Child>
 	struct Common: public TestTask<Common<Child>, OsRrPrio> {
 		int counter = 0;
-		bool started = false, finished = false;
+
+		bool started() {
+			return counter != 0;
+		}
+
+		bool finished() {
+			return counter == 201;
+		}
 
 		void run() {
 			for(int i = 0; i < 200; i++) {
 				sem.wait();
-				started = true;
 				counter++;
 			}
 
-			finished = true;
+			counter++;
 			((Child*)this)->check();
 		}
 
@@ -34,12 +40,23 @@ namespace {
 	struct T2: Common<T2> { void check(); } t3, t4;
 
 	void T1::check() {
-		if(!(t1.started && t2.started && (!t3.started || !t4.started)))
+		bool highStarted = t1.started() && t2.started();
+		bool highFinished = t1.finished() && t2.finished();
+		bool lowNotStarted = !t3.started() || !t4.started();
+
+		if(!highStarted)
 			error = true;
+
+		if(!highFinished)
+			if(!lowNotStarted)
+				error = true;
 	}
 
 	void T2::check() {
-		if(!(t1.finished && t2.finished && t3.started && t4.started))
+		bool highFinished = t1.finished() && t2.finished();
+		bool lowStarted = t3.started() && t4.started();
+
+		if(!(highFinished && lowStarted))
 			error = true;
 	}
 
@@ -66,9 +83,9 @@ TEST(SemaphoreFromIrq) {
 	CommonTestUtils::start<OsRrPrio>();
 
 	CHECK(!error);
-	CHECK(t1.counter == 200);
-	CHECK(t2.counter == 200);
-	CHECK(t3.counter == 200);
-	CHECK(t4.counter == 200);
+	CHECK(t1.finished());
+	CHECK(t2.finished());
+	CHECK(t3.finished());
+	CHECK(t4.finished());
 	CHECK(irqCounter == 400);
 }

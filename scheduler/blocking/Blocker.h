@@ -184,7 +184,7 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doBlock(uintptr_t blockerPtr)
 {
-	ActualBlocker* blocker = entypePtr<ActualBlocker>(blockerPtr);
+	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
 	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
     /*
@@ -225,7 +225,7 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doTimedBlock(uintptr_t blockerPtr, uintptr_t timeout)
 {
-	ActualBlocker* blocker = entypePtr<ActualBlocker>(blockerPtr);
+	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
 	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 	/*
@@ -278,7 +278,7 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr)
 {
-	ActualBlocker* blocker = entypePtr<ActualBlocker>(blockerPtr);
+	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
 
 	/*
 	 * Call release with zero argument signifying a synchronous call.

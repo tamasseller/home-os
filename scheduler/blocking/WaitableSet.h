@@ -10,7 +10,7 @@
 
 
 template<class... Args>
-class Scheduler<Args...>::WaitableSet final: Blocker
+class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::ObjectBase
 {
 	friend Scheduler<Args...>;
 	static constexpr uintptr_t blockedReturnValue = 0;
@@ -40,6 +40,12 @@ class Scheduler<Args...>::WaitableSet final: Blocker
 
 		for(Blocker* blocker: tempArray)
 			(*it++).blocker = blocker;
+
+		Registry<WaitableSet>::registerObject(this);
+	}
+
+	~WaitableSet() {
+		Registry<WaitableSet>::unregisterObject(this);
 	}
 
 	static inline uintptr_t take(Blocker* blocker, Task* task) {
@@ -114,7 +120,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::select(T... t)
 
 	auto ret = Profile::sync(&Scheduler<Args...>::doBlock<WaitableSet>, detypePtr(&set));
 
-	return entypePtr<Blocker>(ret);
+	return reinterpret_cast<Blocker*>(ret);
 }
 
 template<class... Args>
@@ -126,7 +132,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(u
 
 	auto ret = Profile::sync(&Scheduler<Args...>::doTimedBlock<WaitableSet>, detypePtr(&set), timeout);
 
-	return entypePtr<Blocker>(ret);
+	return reinterpret_cast<Blocker*>(ret);
 }
 
 #endif /* WAITABLESET_H_ */

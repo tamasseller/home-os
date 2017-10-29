@@ -28,7 +28,8 @@ void ProfileCortexM0::startFirst(Task* task)
 {
 	currentTask = task;
 	asm volatile (
-		"cpsid i			\n" // On the Cortex-M0 system interrupts can not be masked selectively.
+		"cpsid i			\n" // Only the systick, SVC and PendSV interrupts are needed to be disabled,
+								// but on the Cortex-M0 the system interrupts can not be masked selectively.
 		"push {r4-r7, lr}	\n" // ABI: r0-r3 and r12 can be destroyed during a procedure call.
 		"mov r4, r8			\n" // r4-r11 and lr are stored here in a platform-convenient order.
 		"mov r5, r9			\n" // pc will be restored by loading lr (i.e. returning)

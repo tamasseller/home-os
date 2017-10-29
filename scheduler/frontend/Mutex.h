@@ -14,7 +14,7 @@
  * Mutex front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker
+class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex>::ObjectBase
 {
 	friend Scheduler<Args...>;
 	static constexpr uintptr_t blockedReturnValue = 0;
@@ -120,17 +120,22 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker
 	}
 
 public:
-	void init() {
+	inline void init() {
 		owner = nullptr;
 		relockCounter = 0;
+		Registry<Mutex>::registerObject(this);
 	}
 
-	void lock() {
+	inline void lock() {
 		Profile::sync(&Scheduler<Args...>::doBlock<Mutex>, detypePtr(this));
 	}
 
-	void unlock() {
+	inline void unlock() {
 		Profile::sync(&Scheduler<Args...>::doRelease<Mutex>, detypePtr(this));
+	}
+
+	inline ~Mutex() {
+		Registry<Mutex>::unregisterObject(this);
 	}
 };
 

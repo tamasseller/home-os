@@ -8,9 +8,13 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-m0
 INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-common
 
+
 # Atomic list related tests.
+
+SOURCES += $(ROOT)/test/LimitedCTree.cpp
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
+
 
 # Mutex related tests.
 
@@ -19,6 +23,7 @@ SOURCES += $(ROOT)/test/MutexSingle.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
 SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
 SOURCES += $(ROOT)/test/MutexVsSelect.cpp
+
 
 # Semaphore tests.
 
@@ -83,7 +88,7 @@ COMMONFLAGS += -Wno-attributes
 COMMONFLAGS += -DSTM32F072=1
 COMMONFLAGS += -DUSE_STDPERIPH_DRIVER=1
 COMMONFLAGS += -mcpu=cortex-m0 -mthumb 
-COMMONFLAGS += -g3 -O3
+COMMONFLAGS += -g3 -Os
 COMMONFLAGS += -fomit-frame-pointer 
 COMMONFLAGS += -static
 

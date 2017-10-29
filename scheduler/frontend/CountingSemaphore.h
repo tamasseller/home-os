@@ -11,7 +11,7 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<CountingSemaphore>
+class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<CountingSemaphore>, Registry<CountingSemaphore>::ObjectBase
 {
 	friend Scheduler<Args...>;
 	uintptr_t counter;
@@ -40,8 +40,13 @@ class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<Countin
 	}
 
 public:
-	void init(uintptr_t count) {
+	inline void init(uintptr_t count) {
 		counter = count;
+		Registry<CountingSemaphore>::registerObject(this);
+	}
+
+	 ~CountingSemaphore() {
+		Registry<CountingSemaphore>::unregisterObject(this);
 	}
 };
 

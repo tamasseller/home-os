@@ -60,6 +60,7 @@ namespace {
 
 TEST(TaskStart) {
 	root.start();
+	root.sem.init(false);
 	CommonTestUtils::start();
 	CHECK(root.checkDone());
 	CHECK(!error);

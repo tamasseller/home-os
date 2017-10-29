@@ -15,6 +15,7 @@ template<class ActualBlocker>
 class Scheduler<Args...>::AsyncBlocker: protected Event {
 	static void doNotify(Event* event, uintptr_t arg) {
 		ActualBlocker* blocker = static_cast<ActualBlocker*>(event);
+		Registry<ActualBlocker>::check(blocker);
 		Task* currentTask = static_cast<Task*>(Profile::getCurrent());
 
 		if(blocker->ActualBlocker::release(arg)) {

@@ -7,7 +7,7 @@
 
 #include "CommonTestUtils.h"
 
-namespace {
+namespace asd {
 	typedef typename OsRr::BinarySemaphore Semaphore;
 	static Semaphore s12, s23, s31;
 	static Semaphore s13, s32, s21;
@@ -58,12 +58,13 @@ namespace {
 
 TEST(SelectPassaround)
 {
+	using namespace asd;
 	s12.init(true);
 	s23.init(false);
 	s31.init(false);
 
-	s32.init(true);
-	s21.init(false);
+	s32.init(false);
+	s21.init(true);
 	s13.init(false);
 
 	t1.start();
@@ -79,6 +80,7 @@ TEST(SelectPassaround)
 
 TEST(SelectTimeout)
 {
+	using namespace asd;
 	semTo.init(true);
 	tTo.start();
 

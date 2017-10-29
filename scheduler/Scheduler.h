@@ -24,6 +24,9 @@ struct SchedulerOptions {
 	template<bool Arg>
 	struct EnableAssert: pet::ConfigValue<bool, EnableAssert, Arg> {};
 
+	template<bool Arg>
+	struct EnableRegistry: pet::ConfigValue<bool, EnableRegistry, Arg> {};
+
 	template<class Arg>
 	struct HardwareProfile: pet::ConfigType<HardwareProfile, Arg> {};
 
@@ -33,6 +36,7 @@ struct SchedulerOptions {
 	template<class... Options>
 	class Configurable {
 		static constexpr bool assertEnabled = EnableAssert<false>::extract<Options...>::value;
+		static constexpr bool registryEnabled = EnableRegistry<assertEnabled>::template extract<Options...>::value;
 
 		using Profile = typename HardwareProfile<void>::extract<Options...>::type;
 
@@ -53,23 +57,25 @@ struct SchedulerOptions {
 	private:
 
 		class Blockable;
-		using PolicyBase = PolicyTemplate<Task, Blockable>;
-		using Priority = typename PolicyBase::Priority;
-
-		class Policy;
-		class Sleeper;
-		class SleepList;
 		class Blocker;
 		class SharedBlocker;
 		template<class> class AsyncBlocker;
 		template<class> class SemaphoreLikeBlocker;
-
 		class WaitableSet;
+
+		class Policy;
+		class Sleeper;
+		class SleepList;
 
 		class Event;
 		class EventList;
-
 		class PreemptionEvent;
+
+		template<class, bool> class ObjectRegistry;
+
+		template<class Object> using Registry = ObjectRegistry<Object, registryEnabled>;
+		using PolicyBase = PolicyTemplate<Task, Blockable>;
+		using Priority = typename PolicyBase::Priority;
 
 		static struct State {
 			Policy policy;
@@ -85,6 +91,8 @@ struct SchedulerOptions {
 		static uintptr_t doExit();
 		static uintptr_t doYield();
 		static uintptr_t doSleep(uintptr_t time);
+		template<class> static uintptr_t doRegisterObject(uintptr_t object);
+		template<class> static uintptr_t doUnregisterObject(uintptr_t object);
 		template<class> static uintptr_t doBlock(uintptr_t blocker);
 		template<class> static uintptr_t doTimedBlock(uintptr_t blocker, uintptr_t time);
 		template<class> static uintptr_t doRelease(uintptr_t blocker);
@@ -100,9 +108,8 @@ struct SchedulerOptions {
 		template<class T>
 		static inline T* entypePtr(uintptr_t  x);
 
-		template<bool pendOld, bool suspend = true>
-		static inline void switchToNext();
-
+		template<bool pendOld, bool suspend = true> static inline void switchToNext();
+		template<class ... T> static inline uintptr_t conditionalSyscall(T ... ops);
 		static inline bool firstPreemptsSecond(const Task* first, const Task *second);
 
 	public:
@@ -138,6 +145,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "blocking/WaitableSet.h"
 
 #include "syscall/Helpers.h"
+#include "syscall/ObjectRegistry.h"
 
 #include "frontend/Mutex.h"
 #include "frontend/Task.h"

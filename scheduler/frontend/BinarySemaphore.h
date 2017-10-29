@@ -11,7 +11,7 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySemaphore>
+class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySemaphore>, Registry<BinarySemaphore>::ObjectBase
 {
 	friend Scheduler<Args...>;
 	bool open = true;
@@ -37,8 +37,13 @@ class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySem
 	}
 
 public:
-	void init(bool open) {
+	inline void init(bool open) {
 		this->open = open;
+		Registry<BinarySemaphore>::registerObject(this);
+	}
+
+	inline ~BinarySemaphore() {
+		Registry<BinarySemaphore>::unregisterObject(this);
 	}
 };
 

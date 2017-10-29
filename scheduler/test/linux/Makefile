@@ -10,7 +10,8 @@ INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
 # Atomic list related tests.
 
-SOURCES += $(ROOT)/test/TestLimitedCTree.cpp
+SOURCES += $(ROOT)/test/TestLimitedCTreeHostOnly.cpp
+SOURCES += $(ROOT)/test/LimitedCTree.cpp
 SOURCES += $(ROOT)/test/AtomicListSimple.cpp
 SOURCES += $(ROOT)/test/AtomicListReissue.cpp
 
@@ -46,9 +47,6 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
-
-ifeq ('x',)
-endif
 
 # Testing utilities.
 
