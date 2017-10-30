@@ -96,8 +96,8 @@ struct SchedulerOptions {
 		template<class> static uintptr_t doTimedBlock(uintptr_t blocker, uintptr_t time);
 		template<class> static uintptr_t doRelease(uintptr_t blocker, uintptr_t arg);
 
-		template<class M, class... T> static uintptr_t syscall(M, T...);
-		template<class M, class... T> static inline uintptr_t conditionalSyscall(M, T... );
+		template<class Syscall, class... T> static uintptr_t syscall(T...);
+		template<class Syscall, class... T> static inline uintptr_t conditionalSyscall(T... );
 
 		/*
 		 * Internal helpers
@@ -106,7 +106,7 @@ struct SchedulerOptions {
 
 		template<bool pendOld, bool suspend = true> static inline void switchToNext();
 
-		template<class...> class SyscallMap;
+		struct SyscallMap;
 		static inline void* syscallMapper(uintptr_t);
 
 		static inline Task* getCurrentTask();
@@ -133,6 +133,10 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/EventList.h"
 #include "internal/Preemption.h"
 
+#include "syscall/Helpers.h"
+#include "syscall/Syscall.h"
+#include "syscall/ObjectRegistry.h"
+
 #include "blocking/Policy.h"
 #include "blocking/Blocker.h"
 #include "blocking/AsyncBlocker.h"
@@ -142,10 +146,6 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "blocking/SleepList.h"
 #include "blocking/Blockable.h"
 #include "blocking/WaitableSet.h"
-
-#include "syscall/Helpers.h"
-#include "syscall/Syscall.h"
-#include "syscall/ObjectRegistry.h"
 
 #include "frontend/Mutex.h"
 #include "frontend/Task.h"

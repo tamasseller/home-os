@@ -47,7 +47,8 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
-
+ifeq ('x','')
+endif
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp

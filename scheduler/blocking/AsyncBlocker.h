@@ -29,7 +29,7 @@ public:
 	}
 
     inline void notifyFromTask() {
-        syscall(&Scheduler<Args...>::doRelease<ActualBlocker>, Registry<ActualBlocker>::getRegisteredId(static_cast<ActualBlocker*>(this)), (uintptr_t)1);
+        syscall<SYSCALL(doRelease<ActualBlocker>)>(Registry<ActualBlocker>::getRegisteredId(static_cast<ActualBlocker*>(this)), (uintptr_t)1);
     }
 
 };

@@ -53,7 +53,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 
 			auto task = reinterpret_cast<uintptr_t>(static_cast<Task*>(this));
 
-			conditionalSyscall(&Scheduler<Args...>::doStartTask, task);
+			conditionalSyscall<SYSCALL(doStartTask)>(task);
 		}
 
 		inline Task(): Blockable(&Task::getTaskVirtual) {}
@@ -68,20 +68,20 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 
 template<class... Args>
 inline void Scheduler<Args...>::yield() {
-	syscall(&Scheduler<Args...>::doYield);
+    syscall<SYSCALL(doYield)>();
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::sleep(uintptr_t time)
 {
 	assert(time <= INTPTR_MAX, "Delay time too big!");
-	syscall(&Scheduler<Args...>::doSleep, time);
+	syscall<SYSCALL(doSleep)>(time);
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::exit()
 {
-	syscall(&Scheduler<Args...>::doExit);
+    syscall<SYSCALL(doExit)>();
 } // LCOV_EXCL_LINE: this line is never reached.
 
 

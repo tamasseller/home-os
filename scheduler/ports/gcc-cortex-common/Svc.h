@@ -11,7 +11,7 @@
 namespace CortexCommon {
 
 struct DirectSvc {
-	inline static uintptr_t issueSvc(uintptr_t (*f)())
+	inline static uintptr_t issueSvc(uintptr_t f)
 	{
 		register uintptr_t func asm("r12") = (uintptr_t)f;
 		register uintptr_t ret asm("r0");
@@ -23,7 +23,7 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static uintptr_t issueSvc(uintptr_t arg1, uintptr_t (*f)(uintptr_t))
+	inline static uintptr_t issueSvc(uintptr_t f, uintptr_t arg1)
 	{
 		register uintptr_t func asm("r12") = (uintptr_t)f;
 		register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
@@ -36,7 +36,7 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t (*f)(uintptr_t, uintptr_t))
+	inline static uintptr_t issueSvc(uintptr_t f, uintptr_t arg1, uintptr_t arg2)
 	{
 		register uintptr_t func asm("r12") = (uintptr_t)f;
 		register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
@@ -50,7 +50,7 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t))
+	inline static uintptr_t issueSvc(uintptr_t f, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 	{
 		register uintptr_t func asm("r12") = (uintptr_t)f;
 		register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;
@@ -65,7 +65,7 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static uintptr_t issueSvc(uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t (*f)(uintptr_t, uintptr_t, uintptr_t, uintptr_t))
+	inline static uintptr_t issueSvc(uintptr_t f, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4)
 	{
 		register uintptr_t func asm("r12") = (uintptr_t)f;
 		register uintptr_t arg_1 asm("r0") = (uintptr_t)arg1;

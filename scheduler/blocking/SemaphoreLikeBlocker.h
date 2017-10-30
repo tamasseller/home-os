@@ -46,12 +46,12 @@ protected:
 public:
 	inline void wait() {
 		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
-		syscall(&Scheduler<Args...>::doBlock<Semaphore>, id);
+		syscall<SYSCALL(doBlock<Semaphore>)>(id);
 	}
 
 	inline bool wait(uintptr_t timeout) {
 		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
-		return syscall(&Scheduler<Args...>::doTimedBlock<Semaphore>, id, timeout);
+		return syscall<SYSCALL(doTimedBlock<Semaphore>)>(id, timeout);
 	}
 };
 

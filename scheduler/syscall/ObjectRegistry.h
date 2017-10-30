@@ -20,9 +20,9 @@
  * interrupts enabling the system to detect any kind of invalid
  * pointer related errors on the system call interface.
  */
-template<class... Options>
+template<class... Args>
 template<class Object>
-class Scheduler<Options...>::ObjectRegistry<Object, true>
+class Scheduler<Args...>::ObjectRegistry<Object, true>
 {
 	public:
 		/**
@@ -34,8 +34,8 @@ class Scheduler<Options...>::ObjectRegistry<Object, true>
 		};
 
 	private:
-		template<class> friend uintptr_t Scheduler<Options...>::doRegisterObject(uintptr_t objectPtr);
-		template<class> friend uintptr_t Scheduler<Options...>::doUnregisterObject(uintptr_t objectPtr);
+		template<class> friend uintptr_t Scheduler<Args...>::doRegisterObject(uintptr_t objectPtr);
+		template<class> friend uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr);
 
 		static LimitedCTree tree;
 
@@ -58,7 +58,7 @@ class Scheduler<Options...>::ObjectRegistry<Object, true>
 	public:
 		static inline void check(Object* object) {
 			bool ok = tree.contains<&ObjectRegistry::compare>(object);
-			Scheduler<Options...>::assert(ok, "Invalid object pointer as syscall argument");
+			Scheduler<Args...>::assert(ok, "Invalid object pointer as syscall argument");
 		}
 
 		static inline Object* lookup(uintptr_t objectPtr) {
@@ -72,17 +72,17 @@ class Scheduler<Options...>::ObjectRegistry<Object, true>
 		}
 
 		static void registerObject(Object* object) {
-			Scheduler<Options...>::conditionalSyscall(&Scheduler<Options...>::doRegisterObject<Object>, reinterpret_cast<uintptr_t>(object));
+			Scheduler<Args...>::conditionalSyscall<SYSCALL(doRegisterObject<Object>)>(reinterpret_cast<uintptr_t>(object));
 		}
 
 		static void unregisterObject(Object* object) {
-			Scheduler<Options...>::conditionalSyscall(&Scheduler<Options...>::doUnregisterObject<Object>, reinterpret_cast<uintptr_t>(object));
+			Scheduler<Args...>::conditionalSyscall<SYSCALL(doUnregisterObject<Object>)>(reinterpret_cast<uintptr_t>(object));
 		}
 };
 
-template<class... Options>
+template<class... Args>
 template<class Object>
-class Scheduler<Options...>::ObjectRegistry<Object, false>
+class Scheduler<Args...>::ObjectRegistry<Object, false>
 {
 public:
 	class ObjectBase {};
@@ -101,22 +101,22 @@ public:
 };
 
 
-template<class... Options>
+template<class... Args>
 template<class T>
-LimitedCTree Scheduler<Options...>::ObjectRegistry<T, true>::tree;
+LimitedCTree Scheduler<Args...>::ObjectRegistry<T, true>::tree;
 
-template<class... Options>
+template<class... Args>
 template<class Object>
-uintptr_t Scheduler<Options...>::doRegisterObject(uintptr_t objectPtr)
+uintptr_t Scheduler<Args...>::doRegisterObject(uintptr_t objectPtr)
 {
 	bool ok = Registry<Object>::add(reinterpret_cast<Object*>(objectPtr));
 	assert(ok, "Object registered multiple times");
 	return ok;
 }
 
-template<class... Options>
+template<class... Args>
 template<class Object>
-uintptr_t Scheduler<Options...>::doUnregisterObject(uintptr_t objectPtr)
+uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr)
 {
 	bool ok = Registry<Object>::remove(reinterpret_cast<Object*>(objectPtr));
 	assert(ok, "Non-registered object unregistered");

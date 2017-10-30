@@ -63,11 +63,6 @@ private:
 
 	static inline void sysWrite0(const char* msg);
 
-	template<class ... Args>
-	static inline uintptr_t callViaSvc(uintptr_t (f)(Args...), Args ... args) {
-		return CortexCommon::DirectSvc::issueSvc((uintptr_t)args..., f);
-	}
-
 	static inline void* &irqEntryStackedPc() {
 		void **psp;
 		asm volatile ("mrs %0, psp\n"  : "=r" (psp));
@@ -88,7 +83,7 @@ public:
 
 	template<class ... T>
 	static inline uintptr_t sync(T ... ops) {
-		return callViaSvc(ops...);
+        return CortexCommon::DirectSvc::issueSvc((uintptr_t)ops...);
 	}
 
 	static inline void async(void (*handler)()) {

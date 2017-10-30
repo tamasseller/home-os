@@ -118,7 +118,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::select(T... t)
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = syscall(&Scheduler<Args...>::doBlock<WaitableSet>, Registry<WaitableSet>::getRegisteredId(&set));
+	auto ret = syscall<SYSCALL(doBlock<WaitableSet>)>(Registry<WaitableSet>::getRegisteredId(&set));
 
 	return reinterpret_cast<Blocker*>(ret);
 }
@@ -130,7 +130,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(u
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = syscall(&Scheduler<Args...>::doTimedBlock<WaitableSet>, Registry<WaitableSet>::getRegisteredId(&set), timeout);
+	auto ret = syscall<SYSCALL(doTimedBlock<WaitableSet>)>(Registry<WaitableSet>::getRegisteredId(&set), timeout);
 
 	return reinterpret_cast<Blocker*>(ret);
 }
