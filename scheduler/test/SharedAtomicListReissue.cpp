@@ -8,11 +8,11 @@
 #include "common/CommonTestUtils.h"
 
 namespace {
-	OsRr::AtomicList list;
+	OsRr::SharedAtomicList list;
 
 	uintptr_t argMax = 0;
 
-	struct Element: OsRr::AtomicList::Element {
+	struct Element: OsRr::SharedAtomicList::Element {
 		OsRr::Atomic<int> data = 0;
 		void work(uintptr_t arg) {
 			if(argMax < arg)
@@ -36,6 +36,8 @@ namespace {
 				list.push(&e1, combiner);
 				list.push(&e2, combiner);
 				list.push(&e3, combiner);
+
+				OsRr::sleep(1);
 
 				uintptr_t arg;
 				auto it = list.read();

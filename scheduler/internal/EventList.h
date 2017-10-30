@@ -11,7 +11,7 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::EventList: AtomicList
+class Scheduler<Args...>::EventList: SharedAtomicList
 {
 	struct Combiner {
 		inline bool operator()(uintptr_t old, uintptr_t& result) const {
@@ -45,7 +45,7 @@ public:
 
 		criticality.increment();
 
-		AtomicList::push(event, Combiner());
+		SharedAtomicList::push(event, Combiner());
 
 		uintptr_t result = criticality.decrement();
 
@@ -64,7 +64,7 @@ public:
 	inline void dispatch()
 	{
 		uintptr_t arg;
-		for(auto reader = AtomicList::read(); auto* element = reader.pop(arg);) {
+		for(auto reader = SharedAtomicList::read(); auto* element = reader.pop(arg);) {
 			Event* event = static_cast<Event*>(element);
 			event->callback(event, arg);
 		}

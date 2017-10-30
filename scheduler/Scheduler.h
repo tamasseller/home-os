@@ -35,7 +35,7 @@ struct SchedulerOptions {
 
 	template<class... Options>
 	class Configurable {
-		static constexpr bool assertEnabled = EnableAssert<false>::extract<Options...>::value;
+		static constexpr bool assertEnabled = EnableAssert<false>::template extract<Options...>::value;
 		static constexpr bool registryEnabled = EnableRegistry<assertEnabled>::template extract<Options...>::value;
 
 		using Profile = typename HardwareProfile<void>::extract<Options...>::type;
@@ -51,7 +51,7 @@ struct SchedulerOptions {
 
 		class Task;
 		class Mutex;
-		class AtomicList;
+		class SharedAtomicList;
 		class BinarySemaphore;
 		class CountingSemaphore;
 	private:
@@ -59,6 +59,7 @@ struct SchedulerOptions {
 		class Blockable;
 		class Blocker;
 		class SharedBlocker;
+		class UniqueBlocker;
 		template<class> class AsyncBlocker;
 		template<class> class SemaphoreLikeBlocker;
 		class WaitableSet;
@@ -128,7 +129,7 @@ template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
 #include "internal/Atomic.h"
-#include "internal/AtomicList.h"
+#include "internal/SharedAtomicList.h"
 #include "internal/Event.h"
 #include "internal/EventList.h"
 #include "internal/Preemption.h"

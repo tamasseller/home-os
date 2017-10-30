@@ -12,8 +12,8 @@ INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
 SOURCES += $(ROOT)/test/TestLimitedCTreeHostOnly.cpp
 SOURCES += $(ROOT)/test/LimitedCTree.cpp
-SOURCES += $(ROOT)/test/AtomicListSimple.cpp
-SOURCES += $(ROOT)/test/AtomicListReissue.cpp
+SOURCES += $(ROOT)/test/SharedAtomicListSimple.cpp
+SOURCES += $(ROOT)/test/SharedAtomicListReissue.cpp
 
 
 # Mutex related tests.

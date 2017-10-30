@@ -8,13 +8,13 @@
 #include "common/CommonTestUtils.h"
 
 namespace {
-	OsRr::AtomicList list;
+	OsRr::SharedAtomicList list;
 
 	bool error = false;
 	bool otherOnesDone = false;
 	uintptr_t argMax = 0;
 
-	struct Element: OsRr::AtomicList::Element {
+	struct Element: OsRr::SharedAtomicList::Element {
 		uintptr_t data = 0;
 		void work(uintptr_t arg) {
 			if(argMax < arg)

@@ -11,18 +11,18 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::AtomicList
+class Scheduler<Args...>::SharedAtomicList
 {
 public:
 	class Element {
-		friend AtomicList;
+		friend class SharedAtomicList;
 		Atomic<uintptr_t> arg;
 		Element* next;
 	};
 
 	class Reader {
 		Element* current;
-		friend AtomicList;
+		friend class SharedAtomicList;
 
 		inline Reader(Element* current): current(current) {}
 	public:

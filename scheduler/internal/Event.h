@@ -9,7 +9,7 @@
 #define EVENT_H_
 
 template<class... Args>
-class Scheduler<Args...>::Event: AtomicList::Element
+class Scheduler<Args...>::Event: SharedAtomicList::Element
 {
 	friend EventList;
 	void (* const callback)(Event*, uintptr_t);
