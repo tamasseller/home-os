@@ -12,18 +12,7 @@
 #include "1test/TestRunner.h"
 
 #include "CommonTestUtils.h"
-
-class OsTestPlugin: public pet::TestPlugin
-{
-	virtual void beforeTest();
-	virtual void afterTest();
-public:
-	inline virtual ~OsTestPlugin() {}
-};
-
-extern struct Calibrator: TestTask<Calibrator>{
-	void run();
-} calibrator;
+#include "OsTestPlugin.h"
 
 template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrqPtr)(void (*)())>
 class TestSuite {
@@ -33,6 +22,12 @@ class TestSuite {
 			pet::TraceOutput::reportProgress();
 		}
 	} output;
+
+	static struct Calibrator: TestTask<Calibrator>{
+	    inline void run() {
+	        CommonTestUtils::calibrate();
+	    }
+	} calibrator;
 
 public:
 	static bool runTests(uintptr_t tickFreq) {
@@ -55,5 +50,9 @@ public:
 template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrq)(void (*)())>
 typename TestSuite<testProgressReport, testStartedReport, registerIrq>::Output
 TestSuite<testProgressReport, testStartedReport, registerIrq>::output;
+
+template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrq)(void (*)())>
+typename TestSuite<testProgressReport, testStartedReport, registerIrq>::Calibrator
+    TestSuite<testProgressReport, testStartedReport, registerIrq>::calibrator;
 
 #endif /* TESTSUITE_H_ */

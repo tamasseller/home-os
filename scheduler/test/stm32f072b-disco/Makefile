@@ -51,12 +51,7 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
 # Testing utilities.
 
-SOURCES += $(ROOT)/test/TestSuite.cpp
-SOURCES += $(ROOT)/test/CommonTestUtils.cpp
-
-
-SOURCES += $(ROOT)/test/TestSuite.cpp
-SOURCES += $(ROOT)/test/CommonTestUtils.cpp
+SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp
 
 SOURCES += $(ROOT)/ports/gcc-cortex-m0/Profile.cpp
 

@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "CommonTestUtils.h"
+#include "common/CommonTestUtils.h"
 
 namespace {
 	OsRr::AtomicList list;

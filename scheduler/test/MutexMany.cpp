@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "CommonTestUtils.h"
+#include "common/CommonTestUtils.h"
 
 namespace {
 	OsRr::Mutex m1, m2, m3;

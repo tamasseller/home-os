@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "TestSuite.h"
+#include "common/TestSuite.h"
 
 #include <stdint.h>
 #include <malloc.h>

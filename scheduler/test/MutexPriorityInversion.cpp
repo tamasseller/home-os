@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "CommonTestUtils.h"
+#include "common/CommonTestUtils.h"
 
 #include "algorithm/Str.h"
 
@@ -45,7 +45,7 @@ namespace {
 			*tp++ = 'c';
 			OsRt4::sleep(1);
 			*tp++ = 'f';
-			CommonTestUtils::busyWork(CommonTestUtils::getIterations(80));
+			CommonTestUtils::busyWorkMs(80);
 			*tp++ = 'm';
 		}
 	} t2;
@@ -55,7 +55,7 @@ namespace {
 			*tp++ = 'd';
 			m1.lock();
 			*tp++ = 'e';
-			CommonTestUtils::busyWork(CommonTestUtils::getIterations(10));
+			CommonTestUtils::busyWorkMs(10);
 			*tp++ = 'i';
 			m1.unlock();
 			*tp++ = 'n';

@@ -9,7 +9,7 @@
 #include "stm32f0xx_gpio.h"
 #include "stm32f0xx_rcc.h"
 
-#include "TestSuite.h"
+#include "common/TestSuite.h"
 
 #define LEDR_PORT GPIOC
 #define LEDG_PORT GPIOC

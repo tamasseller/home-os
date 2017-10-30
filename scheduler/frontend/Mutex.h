@@ -110,7 +110,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 
 				state.policy.addRunnable(waken);
 
-				return waken->getPriority() < currentTask->getPriority();
+				return true;
 			} else {
 				owner = nullptr;
 			}

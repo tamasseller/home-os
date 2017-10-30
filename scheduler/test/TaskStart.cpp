@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "CommonTestUtils.h"
+#include "common/CommonTestUtils.h"
 
 namespace {
 	constexpr auto nTasks = 5;
@@ -19,7 +19,7 @@ namespace {
 		bool done = false;
 
 		void run() {
-			CommonTestUtils::busyWork(CommonTestUtils::getIterations(10));
+			CommonTestUtils::busyWorkMs(10);
 			done = true;
 			sem.notifyFromTask();
 		}

@@ -5,7 +5,7 @@
  *      Author: tooma
  */
 
-#include "CommonTestUtils.h"
+#include "common/CommonTestUtils.h"
 
 namespace {
 
@@ -65,7 +65,7 @@ typename Test<Os>::T3 Test<Os>::t5;
 template<class Os>
 void Test<Os>::T1::run() {
 	started = true;
-	CommonTestUtils::busyWork(CommonTestUtils::getIterations(100));
+	CommonTestUtils::busyWorkMs(100);
 	done = true;
 
 	if(!(t1.started && t2.started && !t3.started && !t4.started && !t5.started))
@@ -75,7 +75,7 @@ void Test<Os>::T1::run() {
 template<class Os>
 void Test<Os>::T2::run() {
 	started = true;
-	CommonTestUtils::busyWork(CommonTestUtils::getIterations(100));
+	CommonTestUtils::busyWorkMs(100);
 	done = true;
 
 	if(!(t1.done && t2.done && !t4.started && !t5.started))
@@ -85,7 +85,7 @@ void Test<Os>::T2::run() {
 template<class Os>
 void Test<Os>::T3::run() {
 	started = true;
-	CommonTestUtils::busyWork(CommonTestUtils::getIterations(100));
+	CommonTestUtils::busyWorkMs(100);
 	done = true;
 
 	if(!(t1.done && t2.done && t3.done && t4.started && t5.started))
