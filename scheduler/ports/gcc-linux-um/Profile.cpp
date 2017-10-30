@@ -9,7 +9,7 @@
 
 void (*ProfileLinuxUm::tickHandler)();
 void (* volatile ProfileLinuxUm::asyncCallHandler)();
-void* (* volatile ProfileLinuxUm::syncCallMapper)(void*);
+void* (* volatile ProfileLinuxUm::syncCallMapper)(uintptr_t);
 
 volatile uint32_t ProfileLinuxUm::tick = 0;
 
@@ -100,7 +100,7 @@ void ProfileLinuxUm::sigUsr1Handler(int sig)
 
 void ProfileLinuxUm::dispatchSyscall(Task* self) {
 	uintptr_t *args = self->syscallArgs.args;
-	void* functPtr = (void*)args[0];
+	void* functPtr = syncCallMapper(args[0]);
 
 	switch(self->syscallArgs.nArgs) {
 	case 0:

@@ -11,57 +11,26 @@
 #include "Scheduler.h"
 
 template<class... Args>
+inline typename Scheduler<Args...>::Task* Scheduler<Args...>::getCurrentTask() {
+	if(auto platformTask = Profile::getCurrent())
+		return static_cast<Task*>(platformTask);
+
+	return nullptr;
+}
+
+template<class... Args>
 template<bool pendOld, bool suspend>
 inline void Scheduler<Args...>::switchToNext()
 {
 	if(Task* newTask = state.policy.popNext()) {
 		if(pendOld) {
-			if(Task* currentTask = static_cast<Task*>(Profile::getCurrent()))
+			if(Task* currentTask = getCurrentTask())
 					state.policy.addRunnable(currentTask);
 		}
 
 		Profile::switchToSync(newTask);
 	} else if(suspend)
 		Profile::suspendExecution();
-}
-
-template<class... Args>
-template<class T>
-inline uintptr_t Scheduler<Args...>::detypePtr(T* x)
-{
-	return reinterpret_cast<uintptr_t>(x);
-}
-
-template<class... Args>
-template<class T>
-inline T* Scheduler<Args...>::entypePtr(uintptr_t  x)
-{
-	return reinterpret_cast<T*>(x);
-}
-
-template<class... Args>
-inline bool Scheduler<Args...>::firstPreemptsSecond(const Task* first, const Task *second)
-{
-	return *first < *second;
-}
-
-namespace {
-	struct Helper {
-		template<class Method, class... Args>
-		static inline uintptr_t directCall(Method method, Args... args) {
-			return method(args...);
-		}
-	};
-}
-
-template<class... Args>
-template<class ... T>
-inline uintptr_t Scheduler<Args...>::conditionalSyscall(T ... ops)
-{
-	if(state.isRunning)
-		return Profile::sync(ops...);
-	else
-		return Helper::directCall(ops...);
 }
 
 /*

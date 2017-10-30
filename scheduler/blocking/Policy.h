@@ -8,6 +8,8 @@
 #ifndef POLICY_H_
 #define POLICY_H_
 
+#include "Scheduler.h"
+
 template<class... Args>
 class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 
@@ -44,15 +46,17 @@ class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	 * LCOV_EXCL_STOP is placed here.
 	 */
 
-	virtual void priorityChanged(Blockable* b, Priority old) override final {
+	virtual void priorityChanged(Blockable* b, typename PolicyBase::Priority old) override final {
 		assert(b->getTask() == b, "Only tasks can be handled by the policy container");
 		PolicyBase::priorityChanged(static_cast<Task*>(b), old);
 	}
 
 public:
-	using typename PolicyBase::Priority;
+	using Priority = typename PolicyBase::Priority;
 
-	using PolicyBase::peekNext;
+	Task* peekNext() {
+		return static_cast<Task*>(PolicyBase::peekNext());
+	}
 
 	void addRunnable(Task* task) {
 		PolicyBase::addRunnable(task);

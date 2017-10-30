@@ -45,7 +45,7 @@ private:
 	static void *defaultSyncCallMapper(void*);
 
 	static void (* volatile asyncCallHandler)();
-	static void* (* volatile syncCallMapper)(void*);
+	static void* (* volatile syncCallMapper)(uintptr_t);
 	static void (*tickHandler)();
 	static volatile uint32_t tick;
 
@@ -88,7 +88,7 @@ public:
 		tickHandler = handler;
 	}
 
-	static inline void setSyscallMapper(void* (*mapper)(void*)) {
+	static inline void setSyscallMapper(void* (*mapper)(uintptr_t)) {
 		syncCallMapper = mapper;
 	}
 

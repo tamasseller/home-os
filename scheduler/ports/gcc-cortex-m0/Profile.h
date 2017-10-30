@@ -50,7 +50,7 @@ public:
 
 private:
 	static void (* volatile asyncCallHandler)();
-	static void* (* volatile syncCallMapper)(void*);
+	static void* (* volatile syncCallMapper)(uintptr_t);
 
 	static volatile uint32_t tick;
 	static void (*tickHandler)();
@@ -61,7 +61,6 @@ private:
 	static Task* volatile oldTask;
 	static void* suspendedPc;
 
-	static void *defaultSyncCallMapper(void*);
 	static inline void sysWrite0(const char* msg);
 
 	template<class ... Args>
@@ -83,7 +82,7 @@ public:
 	}
 
 
-	static inline void setSyscallMapper(void* (*mapper)(void*)) {
+	static inline void setSyscallMapper(void* (*mapper)(uintptr_t)) {
 		syncCallMapper = mapper;
 	}
 

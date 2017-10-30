@@ -61,10 +61,14 @@ class Scheduler<Options...>::ObjectRegistry<Object, true>
 			Scheduler<Options...>::assert(ok, "Invalid object pointer as syscall argument");
 		}
 
-		static inline Object* check(uintptr_t objectPtr) {
+		static inline Object* lookup(uintptr_t objectPtr) {
 			Object* ret = reinterpret_cast<Object*>(objectPtr);
 			check(ret);
 			return ret;
+		}
+
+		static inline uintptr_t getRegisteredId(Object* object) {
+			return reinterpret_cast<uintptr_t>(object);
 		}
 
 		static void registerObject(Object* object) {
@@ -85,10 +89,15 @@ public:
 
 	static inline void registerObject(Object* object) {}
 	static inline void unregisterObject(Object* object) {}
-	static inline Object* check(uintptr_t objectPtr) {
-		return reinterpret_cast<Object*>(objectPtr);
+	static inline void check(Object* object) {}
+
+	static inline uintptr_t getRegisteredId(Object* object) {
+		return reinterpret_cast<uintptr_t >(object);
 	}
 
+	static inline Object* lookup(uintptr_t objectPtr) {
+		return reinterpret_cast<Object*>(objectPtr);
+	}
 };
 
 

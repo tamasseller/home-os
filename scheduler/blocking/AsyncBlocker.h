@@ -16,11 +16,11 @@ class Scheduler<Args...>::AsyncBlocker: protected Event {
 	static void doNotify(Event* event, uintptr_t arg) {
 		ActualBlocker* blocker = static_cast<ActualBlocker*>(event);
 		Registry<ActualBlocker>::check(blocker);
-		Task* currentTask = static_cast<Task*>(Profile::getCurrent());
+		Task* currentTask = getCurrentTask();
 
 		if(blocker->ActualBlocker::release(arg)) {
-			if (Task *newTask = static_cast<Task*>(state.policy.peekNext())) {
-				if (!currentTask || firstPreemptsSecond(newTask, currentTask))
+			if (Task *newTask = state.policy.peekNext()) {
+				if (!currentTask || (newTask->getPriority() < currentTask->getPriority()))
 					switchToNext<true>();
 			}
 		}

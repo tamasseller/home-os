@@ -17,11 +17,7 @@ volatile uint32_t ProfileCortexM0::tick = 0;
 
 void (*ProfileCortexM0::tickHandler)();
 void (* volatile ProfileCortexM0::asyncCallHandler)();
-void* (* volatile ProfileCortexM0::syncCallMapper)(void*) = &ProfileCortexM0::defaultSyncCallMapper;
-
-void *ProfileCortexM0::defaultSyncCallMapper(void* arg) {
-	return arg;
-}
+void* (* volatile ProfileCortexM0::syncCallMapper)(uintptr_t);
 
 __attribute__((naked))
 void ProfileCortexM0::startFirst(Task* task)

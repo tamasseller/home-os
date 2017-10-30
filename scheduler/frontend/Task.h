@@ -30,6 +30,15 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			return static_cast<Task*>(self);
 		}
 
+		typename Policy::Priority &accessPriority() {
+			return *static_cast<typename Policy::Priority*>(this);
+		}
+
+		typename Policy::Priority getPriority() const {
+			return *static_cast<const typename Policy::Priority*>(this);
+		}
+
+
 	public:
 		template<class... StartArgs>
 		inline void start(
@@ -42,7 +51,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			Profile::initialize(this, entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
 			Policy::initialize(this, startArgs...);
 
-			auto task = detypePtr(static_cast<Task*>(this));
+			auto task = reinterpret_cast<uintptr_t>(static_cast<Task*>(this));
 
 			conditionalSyscall(&Scheduler<Args...>::doStartTask, task);
 		}
@@ -59,20 +68,20 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 
 template<class... Args>
 inline void Scheduler<Args...>::yield() {
-	Profile::sync(&Scheduler<Args...>::doYield);
+	syscall(&Scheduler<Args...>::doYield);
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::sleep(uintptr_t time)
 {
 	assert(time <= INTPTR_MAX, "Delay time too big!");
-	Profile::sync(&Scheduler<Args...>::doSleep, time);
+	syscall(&Scheduler<Args...>::doSleep, time);
 }
 
 template<class... Args>
 inline void Scheduler<Args...>::exit()
 {
-	Profile::sync(&Scheduler<Args...>::doExit);
+	syscall(&Scheduler<Args...>::doExit);
 } // LCOV_EXCL_LINE: this line is never reached.
 
 
@@ -96,8 +105,7 @@ uintptr_t Scheduler<Args...>::doYield()
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 {
-	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
-	state.sleepList.delay(currentTask, time);
+	state.sleepList.delay(getCurrentTask(), time);
 	switchToNext<false>();
 
 	return true;

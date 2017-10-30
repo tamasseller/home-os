@@ -50,7 +50,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 
 	static inline uintptr_t take(Blocker* blocker, Task* task) {
 		blocker->acquire(task);
-		return detypePtr(blocker);
+		return reinterpret_cast<uintptr_t>(blocker);
 	}
 
 	virtual void remove(Blockable* blockable, Blocker* blocker) override final
@@ -61,10 +61,10 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 			waiters[i].blocker->remove(waiters + i, this);
 
 		if(!blocker)
-			Profile::injectReturnValue(static_cast<Task*>(blockable), detypePtr(blocker));
+			Profile::injectReturnValue(static_cast<Task*>(blockable), reinterpret_cast<uintptr_t>(blocker));
 	}
 
-	virtual void priorityChanged(Blockable*, Priority old) override final
+	virtual void priorityChanged(Blockable*, typename Policy::Priority old) override final
 	{
 		for(uintptr_t i = 0; i < nWaiters; i++)
 			waiters[i].blocker->priorityChanged(waiters + i, old);
@@ -118,7 +118,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::select(T... t)
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = Profile::sync(&Scheduler<Args...>::doBlock<WaitableSet>, detypePtr(&set));
+	auto ret = syscall(&Scheduler<Args...>::doBlock<WaitableSet>, Registry<WaitableSet>::getRegisteredId(&set));
 
 	return reinterpret_cast<Blocker*>(ret);
 }
@@ -130,7 +130,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(u
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = Profile::sync(&Scheduler<Args...>::doTimedBlock<WaitableSet>, detypePtr(&set), timeout);
+	auto ret = syscall(&Scheduler<Args...>::doTimedBlock<WaitableSet>, Registry<WaitableSet>::getRegisteredId(&set), timeout);
 
 	return reinterpret_cast<Blocker*>(ret);
 }

@@ -45,11 +45,13 @@ protected:
 
 public:
 	inline void wait() {
-		Profile::sync(&Scheduler<Args...>::doBlock<Semaphore>, detypePtr(this));
+		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
+		syscall(&Scheduler<Args...>::doBlock<Semaphore>, id);
 	}
 
 	inline bool wait(uintptr_t timeout) {
-		return Profile::sync(&Scheduler<Args...>::doTimedBlock<Semaphore>, detypePtr(this), timeout);
+		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
+		return syscall(&Scheduler<Args...>::doTimedBlock<Semaphore>, id, timeout);
 	}
 };
 

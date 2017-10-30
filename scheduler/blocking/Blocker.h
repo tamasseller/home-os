@@ -62,7 +62,7 @@ class Scheduler<Args...>::Blocker
 	 * @NOTE This is a usual virtual method, only called through regular
      *       virtual method dispatching.
 	 */
-	virtual void priorityChanged(Blockable* blockable, Priority oldPrio) = 0;
+	virtual void priorityChanged(Blockable* blockable, typename PolicyBase::Priority oldPrio) = 0;
 
 	/**
 	 * Get a (possibly indirect) blocker that can be acquired.
@@ -184,8 +184,8 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doBlock(uintptr_t blockerPtr)
 {
-	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
-	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
+	ActualBlocker* blocker = Registry<ActualBlocker>::lookup(blockerPtr);
+	Task* currentTask = getCurrentTask();
 
     /*
      * Check if the blocker can be acquired synchronously:
@@ -225,8 +225,8 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doTimedBlock(uintptr_t blockerPtr, uintptr_t timeout)
 {
-	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
-	Task* currentTask = static_cast<Task*>(Profile::getCurrent());
+	ActualBlocker* blocker = Registry<ActualBlocker>::lookup(blockerPtr);
+	Task* currentTask = getCurrentTask();
 
 	/*
 	 * Check if the blocker can be acquired synchronously:
@@ -278,7 +278,7 @@ template<class... Args>
 template<class ActualBlocker>
 uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr)
 {
-	ActualBlocker* blocker = Registry<ActualBlocker>::check(blockerPtr);
+	ActualBlocker* blocker = Registry<ActualBlocker>::lookup(blockerPtr);
 
 	/*
 	 * Call release with zero argument signifying a synchronous call.

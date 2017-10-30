@@ -75,7 +75,6 @@ struct SchedulerOptions {
 
 		template<class Object> using Registry = ObjectRegistry<Object, registryEnabled>;
 		using PolicyBase = PolicyTemplate<Task, Blockable>;
-		using Priority = typename PolicyBase::Priority;
 
 		static struct State {
 			Policy policy;
@@ -97,20 +96,20 @@ struct SchedulerOptions {
 		template<class> static uintptr_t doTimedBlock(uintptr_t blocker, uintptr_t time);
 		template<class> static uintptr_t doRelease(uintptr_t blocker);
 
+		template<class M, class... T> static uintptr_t syscall(M, T...);
+		template<class M, class... T> static inline uintptr_t conditionalSyscall(M, T... );
+
 		/*
 		 * Internal helpers
 		 */
 		static inline void assert(bool, const char*);
 
-		template<class T>
-		static inline uintptr_t detypePtr(T* x);
-
-		template<class T>
-		static inline T* entypePtr(uintptr_t  x);
-
 		template<bool pendOld, bool suspend = true> static inline void switchToNext();
-		template<class ... T> static inline uintptr_t conditionalSyscall(T ... ops);
-		static inline bool firstPreemptsSecond(const Task* first, const Task *second);
+
+		template<class...> class SyscallMap;
+		static inline void* syscallMapper(uintptr_t);
+
+		static inline Task* getCurrentTask();
 
 	public:
 		inline static TickType getTick();
@@ -136,8 +135,8 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 
 #include "blocking/Policy.h"
 #include "blocking/Blocker.h"
-#include "blocking/SharedBlocker.h"
 #include "blocking/AsyncBlocker.h"
+#include "blocking/SharedBlocker.h"
 #include "blocking/SemaphoreLikeBlocker.h"
 #include "blocking/Sleeper.h"
 #include "blocking/SleepList.h"
@@ -145,6 +144,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "blocking/WaitableSet.h"
 
 #include "syscall/Helpers.h"
+#include "syscall/Syscall.h"
 #include "syscall/ObjectRegistry.h"
 
 #include "frontend/Mutex.h"
@@ -164,6 +164,7 @@ inline void Scheduler<Args...>::start(T... t) {
 	state.isRunning = true;
 	Profile::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);
+	Profile::setSyscallMapper(&syscallMapper);
 	Profile::startFirst(firstTask);
 }
 

@@ -81,9 +81,9 @@ struct DirectSvc {
 		return ret;
 	}
 
-	inline static void dispatch(register void* (*mapper)(void*))
+	inline static void dispatch(register void* (*mapper)(uintptr_t))
 	{
-		void** psp;
+		uintptr_t* psp;
 		asm volatile ("mrs %[psp], psp" : [psp] "=r" (psp) : : );
 
 		void* handler = mapper(psp[4]); // Lookup r12

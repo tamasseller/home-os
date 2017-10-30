@@ -38,6 +38,7 @@ public:
 	}
 
 	Task* popNext() {
+		// For some odd reason the explicit nullcheck is required (gcc 6.3.0).
 		if(Storage* element = tasks.popLowest())
 			return static_cast<Task*>(element);
 
@@ -45,6 +46,7 @@ public:
 	}
 
 	Task* peekNext() {
+		// For some odd reason the explicit nullcheck is required (gcc 6.3.0).
 		if(Storage* element = tasks.lowest())
 			return static_cast<Task*>(element);
 

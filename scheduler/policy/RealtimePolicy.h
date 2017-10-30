@@ -56,9 +56,7 @@ struct RealtimePolicy {
 			if(!findCurrentLevel(level))
 				return nullptr;
 
-			Storage* element = tasks[level].popFront();
-			// assert(element);
-			Task* task = static_cast<Task*>(element);
+			Task* task = static_cast<Task*>(tasks[level].popFront());
 
 			if(!tasks[level].front())
 				cache &= ~mask(level);
@@ -72,11 +70,7 @@ struct RealtimePolicy {
 			if(!findCurrentLevel(level))
 				return nullptr;
 
-			Storage* element = tasks[level].front();
-
-			// assert(element);
-
-			return static_cast<Task*>(element);
+			return static_cast<Task*>(tasks[level].front());
 		}
 
 		void priorityChanged(Task* task, Priority old)

@@ -29,8 +29,6 @@ class Scheduler<Args...>::EventList: AtomicList
 
 public:
 	inline void issue(Event* event) {
-		auto element = static_cast<typename AtomicList::Element*>(event);
-
 		/*
 		 * The scheduling needs to be blocked while the event is added,
 		 * because if the task gets preempted between the argument setting
@@ -47,7 +45,7 @@ public:
 
 		criticality.increment();
 
-		AtomicList::push(element, Combiner());
+		AtomicList::push(event, Combiner());
 
 		uintptr_t result = criticality.decrement();
 

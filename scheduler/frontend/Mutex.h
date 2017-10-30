@@ -19,8 +19,8 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	friend Scheduler<Args...>;
 	static constexpr uintptr_t blockedReturnValue = 0;
 
-	static bool comparePriority(const Blockable& a, const Blockable& b) {
-		return firstPreemptsSecond(static_cast<const Task*>(&a), static_cast<const Task*>(&b));
+	typename Policy::Priority &accessPriority() {
+		return *static_cast<typename Policy::Priority*>(this);
 	}
 
 	Task *owner;
@@ -50,9 +50,9 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 		 * Raise the priority of the owner to avoid priority inversion.
 		 * The original priority will be restored once the mutex is unlocked.
 		 */
-		if(firstPreemptsSecond(task, owner)) {
-			Priority oldPrio = *owner;
-			*static_cast<typename Policy::Priority*>(owner) = *task;
+		if(task->getPriority() < owner->getPriority()) {
+			auto oldPrio = owner->getPriority();
+			owner->accessPriority() = task->getPriority();
 
 			if(owner->blockedBy)
 				owner->blockedBy->priorityChanged(owner, oldPrio);
@@ -72,7 +72,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 			 * raises the priority of the _currentTask_ through the
 			 * ownership relation.
 			 */
-			*static_cast<typename Policy::Priority*>(this) = *task;
+			accessPriority() = task->getPriority();
 		} else {
 			relockCounter++;
 		}
@@ -81,7 +81,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	}
 
 	virtual bool release(uintptr_t arg) override {
-		Task* currentTask = static_cast<Task*>(Profile::getCurrent());
+		Task* currentTask = getCurrentTask();
 
 		assert(currentTask == owner, "Mutex unlock from non-owner task");
 		assert(!arg, "Asynchronous mutex unlock");
@@ -94,7 +94,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 			 * is sure to not be handled by the policy currently, so the
 			 * priority can be set directly.
 			 */
-			*static_cast<typename Policy::Priority*>(currentTask) = *this;
+			currentTask->accessPriority() = this->accessPriority();
 
 			/*
 			 * We know that the sleeper obtained here is actually a task,
@@ -110,7 +110,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 
 				state.policy.addRunnable(waken);
 
-				return firstPreemptsSecond(waken, currentTask);
+				return waken->getPriority() < currentTask->getPriority();
 			} else {
 				owner = nullptr;
 			}
@@ -127,11 +127,11 @@ public:
 	}
 
 	inline void lock() {
-		Profile::sync(&Scheduler<Args...>::doBlock<Mutex>, detypePtr(this));
+		syscall(&Scheduler<Args...>::doBlock<Mutex>, Registry<Mutex>::getRegisteredId(this));
 	}
 
 	inline void unlock() {
-		Profile::sync(&Scheduler<Args...>::doRelease<Mutex>, detypePtr(this));
+		syscall(&Scheduler<Args...>::doRelease<Mutex>, Registry<Mutex>::getRegisteredId(this));
 	}
 
 	inline ~Mutex() {

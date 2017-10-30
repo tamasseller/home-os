@@ -13,8 +13,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
 		assert(arg == 1, "Tick overload, preemption event could not have been dispatched for a full tick cycle!");
 
-		while(Sleeper* sleeper = state.sleepList.getWakeable()) {
-			Task* task = static_cast<Task*>(sleeper);
+		while(Task* task = state.sleepList.getWakeable()) {
 			if(task->blockedBy) {
 				task->blockedBy->remove(task, nullptr);
 				task->blockedBy = nullptr;
@@ -27,7 +26,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 
 				Task* currentTask = static_cast<Task*>(platformTask);
 
-				if(firstPreemptsSecond(currentTask, newTask))
+				if(currentTask->getPriority() < newTask->getPriority())
 					return;
 
 				state.policy.addRunnable(currentTask);
