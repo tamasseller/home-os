@@ -67,8 +67,8 @@ namespace {
 			CommonTestUtils::registerIrq(nullptr);
 		}
 
-		sem.notify();
-		sem.notify();
+		sem.notifyFromInterrupt();
+		sem.notifyFromInterrupt();
 	}
 }
 

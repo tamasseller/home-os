@@ -50,10 +50,6 @@ public:
 
 		return pet::TestRunner::runAllTests(&output) == 0;
 	}
-
-	static void registerIrq(void (*irq)()) {
-
-	}
 };
 
 template<void (*testProgressReport)(int), void (testStartedReport)(), void (registerIrq)(void (*)())>

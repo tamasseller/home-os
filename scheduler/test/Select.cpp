@@ -19,9 +19,9 @@ namespace asd {
 		void run() {
 			for(int i = 0; i < UINT16_MAX/3; i++) {
 				if(OsRr::select(&sPendForward, &sPendReverse) == &sPendForward)
-					sSendForward.notify();
+					sSendForward.notifyFromTask();
 				else
-					sSendReverse.notify();
+					sSendReverse.notifyFromTask();
 
 				counter++;
 			}

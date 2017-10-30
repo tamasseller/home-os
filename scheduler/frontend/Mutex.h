@@ -131,7 +131,7 @@ public:
 	}
 
 	inline void unlock() {
-		syscall(&Scheduler<Args...>::doRelease<Mutex>, Registry<Mutex>::getRegisteredId(this));
+		syscall(&Scheduler<Args...>::doRelease<Mutex>, Registry<Mutex>::getRegisteredId(this), (uintptr_t)0);
 	}
 
 	inline ~Mutex() {

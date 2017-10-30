@@ -18,7 +18,7 @@ namespace {
 			for(int i = 0; i < UINT16_MAX/nTasks; i++) {
 				sem.wait();
 				data.update();
-				sem.notify();
+				sem.notifyFromTask();
 			}
 		}
 	} t[nTasks];

@@ -26,7 +26,7 @@ namespace {
 		int counter = 0;
 		void run() {
 			for(int i = 0; i < 10000; i++) {
-				sem.notify();
+				sem.notifyFromTask();
 				counter++;
 			}
 		}

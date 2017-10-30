@@ -131,18 +131,15 @@ class Scheduler<Args...>::Blocker
 	 *
 	 * This method can be called from two different contexts:
 	 *
-	 *  1. From a synchronous release call, then _n_ is zero.
+	 *  1. From a synchronous release call, then _n_ is one.
 	 *  2. From a cumulated asynchronous event handler, then
 	 *     _n_ is the number of triggers.
 	 *
 	 * @return The method should return true if another task is unblocked
 	 *         and there is possibility that the current task needs to be
-	 *         switched out. For the first case (described above) the
-	 *         a true return value means that the switching is mandatory,
-	 *         in the second case it is double checked that the current
-	 *         tasks is not the highest priority before switching.
+	 *         switched out.
 	 *
-	 *@NOTE This is a dual use method, called in the de-virtualized form
+	 * @NOTE This is a dual use method, called in the de-virtualized form
      *       most of the time. The _WaitableSet_ is an exception.
 	 */
 	virtual bool release(uintptr_t n) = 0;
@@ -276,15 +273,17 @@ uintptr_t Scheduler<Args...>::doTimedBlock(uintptr_t blockerPtr, uintptr_t timeo
  */
 template<class... Args>
 template<class ActualBlocker>
-uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr)
+uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr, uintptr_t arg)
 {
 	ActualBlocker* blocker = Registry<ActualBlocker>::lookup(blockerPtr);
+    Task* currentTask = getCurrentTask();
 
-	/*
-	 * Call release with zero argument signifying a synchronous call.
-	 */
-	if(blocker->ActualBlocker::release(0))
-		switchToNext<true>();
+    if(blocker->ActualBlocker::release(arg)) {
+        if (Task *newTask = state.policy.peekNext()) {
+            if (!currentTask || (newTask->getPriority() < currentTask->getPriority()))
+                switchToNext<true>();
+        }
+    }
 
 	return 0;
 }

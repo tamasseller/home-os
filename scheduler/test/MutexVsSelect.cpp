@@ -55,9 +55,9 @@ namespace {
 			*tp++ = 'e';
 			OsRrPrio::sleep(20);
 			*tp++ = 'g';
-			sem.notify();
+			sem.notifyFromTask();
 			*tp++ = 'l';
-			sem.notify();
+			sem.notifyFromTask();
 			*tp++ = 'n';
 		}
 	} t4;

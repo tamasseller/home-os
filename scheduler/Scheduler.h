@@ -94,7 +94,7 @@ struct SchedulerOptions {
 		template<class> static uintptr_t doUnregisterObject(uintptr_t object);
 		template<class> static uintptr_t doBlock(uintptr_t blocker);
 		template<class> static uintptr_t doTimedBlock(uintptr_t blocker, uintptr_t time);
-		template<class> static uintptr_t doRelease(uintptr_t blocker);
+		template<class> static uintptr_t doRelease(uintptr_t blocker, uintptr_t arg);
 
 		template<class M, class... T> static uintptr_t syscall(M, T...);
 		template<class M, class... T> static inline uintptr_t conditionalSyscall(M, T... );

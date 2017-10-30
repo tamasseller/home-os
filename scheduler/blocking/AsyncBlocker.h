@@ -10,20 +10,12 @@
 
 #include "Scheduler.h"
 
-template<class ... Args>
+template<class... Args>
 template<class ActualBlocker>
 class Scheduler<Args...>::AsyncBlocker: protected Event {
 	static void doNotify(Event* event, uintptr_t arg) {
 		ActualBlocker* blocker = static_cast<ActualBlocker*>(event);
-		Registry<ActualBlocker>::check(blocker);
-		Task* currentTask = getCurrentTask();
-
-		if(blocker->ActualBlocker::release(arg)) {
-			if (Task *newTask = state.policy.peekNext()) {
-				if (!currentTask || (newTask->getPriority() < currentTask->getPriority()))
-					switchToNext<true>();
-			}
-		}
+		Scheduler<Args...>::doRelease<ActualBlocker>(reinterpret_cast<uintptr_t>(blocker), arg);
 	}
 
 protected:
@@ -32,9 +24,13 @@ protected:
 	}
 
 public:
-	inline void notify() {
+	inline void notifyFromInterrupt() {
 		state.eventList.issue(this);
 	}
+
+    inline void notifyFromTask() {
+        syscall(&Scheduler<Args...>::doRelease<ActualBlocker>, Registry<ActualBlocker>::getRegisteredId(static_cast<ActualBlocker*>(this)), (uintptr_t)1);
+    }
 
 };
 

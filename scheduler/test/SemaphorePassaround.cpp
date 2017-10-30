@@ -25,7 +25,7 @@ namespace SemaphorePassaround {
 					sPend.wait();
 
 				data.update();
-				sSend.notify();
+				sSend.notifyFromTask();
 				counter++;
 			}
 		}

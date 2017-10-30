@@ -21,7 +21,7 @@ namespace {
 		void run() {
 			CommonTestUtils::busyWork(CommonTestUtils::getIterations(10));
 			done = true;
-			sem.notify();
+			sem.notifyFromTask();
 		}
 
 		bool checkDone() {
@@ -44,7 +44,7 @@ namespace {
 				error = true;
 
 			done = true;
-			sem.notify();
+			sem.notifyFromTask();
 		}
 
 		bool checkDone() {

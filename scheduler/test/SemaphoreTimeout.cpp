@@ -29,7 +29,7 @@ namespace {
 				}
 
 				counter++;
-				sem.notify();
+				sem.notifyFromTask();
 			}
 		}
 	} t1, t2;
@@ -39,7 +39,7 @@ namespace {
 		void run() {
 			for(int i = 0; i < 500; i++) {
 				while(!sem.wait(1));
-				sem.notify();
+				sem.notifyFromTask();
 				counter++;
 			}
 		}
@@ -51,7 +51,7 @@ namespace {
 			for(int i = 0; i < 500; i++) {
 				while(!sem.wait(0));
 				OsRr::sleep(1);
-				sem.notify();
+				sem.notifyFromTask();
 				counter++;
 			}
 		}
