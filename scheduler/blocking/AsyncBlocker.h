@@ -25,6 +25,7 @@ protected:
 
 public:
 	inline void notifyFromInterrupt() {
+        Registry<ActualBlocker>::check(static_cast<ActualBlocker*>(this));
 		state.eventList.issue(this);
 	}
 
