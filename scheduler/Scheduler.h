@@ -41,6 +41,9 @@ struct SchedulerOptions {
 		PET_EXTRACT_TEMPLATE(PolicyTemplate, SchedulingPolicy, RoundRobinPolicy, Options);
 
 	public:
+		/*
+		 * Public, front-end types
+		 */
 		using TickType = typename Profile::TickType;
 
 		template<class Data> class Atomic;
@@ -50,8 +53,12 @@ struct SchedulerOptions {
 		class SharedAtomicList;
 		class BinarySemaphore;
 		class CountingSemaphore;
+
 	private:
 
+		/*
+		 * Internal types.
+		 */
 		class Blockable;
 		class Blocker;
 		class SharedBlocker;
@@ -61,8 +68,8 @@ struct SchedulerOptions {
 		class WaitableSet;
 
 		class Policy;
-		class Sleeper;
-		class SleepList;
+		template<ScalabilityHint, class = void> class SleeperBase;
+		template<ScalabilityHint, class = void> class SleepListBase;
 
 		class Event;
 		class EventList;
@@ -70,9 +77,17 @@ struct SchedulerOptions {
 
 		template<class, bool> class ObjectRegistry;
 
+		/*
+		 * Helper type and template aliases.
+		 */
 		template<class Object> using Registry = ObjectRegistry<Object, registryEnabled>;
 		using PolicyBase = PolicyTemplate<Task, Blockable>;
+		using Sleeper = class SleeperBase<sleeperStorageOption>;
+		using SleepList = class SleepListBase<sleeperStorageOption>;
 
+		/*
+		 * The globally visible internal state wrapped in a single struct.
+		 */
 		static struct State {
 			Policy policy;
 			bool isRunning;   // TODO check if can be merged
@@ -82,6 +97,9 @@ struct SchedulerOptions {
 			PreemptionEvent preemptionEvent;
 		} state;
 
+		/*
+		 * Definitions of system calls.
+		 */
 		static void onTick();
 		static uintptr_t doStartTask(uintptr_t task);
 		static uintptr_t doExit();
@@ -139,8 +157,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "blocking/AsyncBlocker.h"
 #include "blocking/SharedBlocker.h"
 #include "blocking/SemaphoreLikeBlocker.h"
-#include "blocking/Sleeper.h"
-#include "blocking/SleepList.h"
+#include "blocking/Sleeping.h"
 #include "blocking/Blockable.h"
 #include "blocking/WaitableSet.h"
 

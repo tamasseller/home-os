@@ -11,7 +11,34 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::SleepList {
+template<class Dummy>
+class Scheduler<Args...>::SleeperBase<SchedulerOptions::ScalabilityHint::Few, Dummy> {
+	using Sleeper = typename Scheduler<Args...>::Sleeper;
+	static constexpr Sleeper *invalid() {return (Sleeper *)0xffffffff;}
+
+	friend pet::DoubleList<Sleeper>;
+	Sleeper *prev = invalid(), *next;
+
+public:
+	uintptr_t deadline;
+
+	inline bool isSleeping() {
+		return prev != invalid();
+	}
+
+	inline void invalidate() {
+		prev = invalid();
+	}
+};
+
+template<class... Args>
+template<class Dummy>
+class Scheduler<Args...>::SleepListBase<SchedulerOptions::ScalabilityHint::Few, Dummy> {
+	using Sleeper = typename Scheduler<Args...>::Sleeper;
+	using SleepList = typename Scheduler<Args...>::SleepList;
+	using Task = typename Scheduler<Args...>::Task;
+	using Profile = typename Scheduler<Args...>::Profile;
+
 	static inline bool compareDeadline(const Sleeper& a, const Sleeper& b) {
 		return a.deadline < b.deadline;
 	}

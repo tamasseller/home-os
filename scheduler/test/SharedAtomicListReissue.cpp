@@ -37,7 +37,7 @@ namespace {
 				list.push(&e2, combiner);
 				list.push(&e3, combiner);
 
-				OsRr::sleep(1);
+				OsRr::yield();
 
 				uintptr_t arg;
 				auto it = list.read();
