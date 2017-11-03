@@ -10,13 +10,15 @@
 using OsRr = Scheduler<
         SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
         SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>,
-        SchedulerOptions::EnableAssert<true>
+        SchedulerOptions::EnableAssert<true>,
+        SchedulerOptions::NumberOfSleepers<SchedulerOptions::ScalabilityHint::Many>
 >;
 
 using OsRrPrio = Scheduler<
         SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
         SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>,
-        SchedulerOptions::EnableAssert<true>
+        SchedulerOptions::EnableAssert<true>,
+        SchedulerOptions::EnableRegistry<false>
 >;
 
 using OsRt4 = Scheduler<

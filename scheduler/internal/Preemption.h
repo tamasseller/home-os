@@ -13,13 +13,8 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
 		assert(arg == 1, "Tick overload, preemption event could not have been dispatched for a full tick cycle!");
 
-		while(Task* task = state.sleepList.getWakeable()) {
-			if(task->blockedBy) {
-				task->blockedBy->remove(task, nullptr);
-				task->blockedBy = nullptr;
-			}
-			state.policy.addRunnable(task);
-		}
+		while(Sleeper* sleeper = state.sleepList.getWakeable())
+			sleeper->wake();
 
 		if(Task* newTask = state.policy.peekNext()) {
 			if(typename Profile::Task* platformTask = Profile::getCurrent()) {

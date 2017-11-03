@@ -25,9 +25,6 @@ API
 Internals
 ---------
 
- - Enable non-task sleepers by .
- - Investigate possibilities of implementing an efficient heap tree.
- - If heap tree is possible, add option for using it instead of sorted lists.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement mutex deadlock detection option.
  - Implement event tracing callback interface.

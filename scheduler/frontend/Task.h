@@ -38,6 +38,17 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			return *static_cast<const typename Policy::Priority*>(this);
 		}
 
+		static void wakeVirtual(Sleeper* sleeper)
+		{
+			Task* self = static_cast<Task*>(sleeper);
+
+			if(self->blockedBy) {
+				self->blockedBy->remove(self, nullptr);
+				self->blockedBy = nullptr;
+			}
+
+			state.policy.addRunnable(self);
+		}
 
 	public:
 		template<class... StartArgs>
@@ -56,7 +67,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			conditionalSyscall<SYSCALL(doStartTask)>(task);
 		}
 
-		inline Task(): Blockable(&Task::getTaskVirtual) {}
+		inline Task(): Sleeper(&Task::wakeVirtual), Blockable(&Task::getTaskVirtual) {}
 
 	protected:
 

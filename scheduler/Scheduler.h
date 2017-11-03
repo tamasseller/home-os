@@ -9,8 +9,11 @@
 #define SCHEDULER_H_
 
 #include <stdint.h>
+
 #include "data/OrderedDoubleList.h"
 #include "data/LinkedList.h"
+#include "data/BinaryHeap.h"
+
 #include "meta/Configuration.h"
 
 #include "policy/RoundRobinPolicy.h"
