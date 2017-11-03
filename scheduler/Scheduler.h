@@ -21,28 +21,24 @@
  */
 
 struct SchedulerOptions {
-	template<bool Arg>
-	struct EnableAssert: pet::ConfigValue<bool, EnableAssert, Arg> {};
 
-	template<bool Arg>
-	struct EnableRegistry: pet::ConfigValue<bool, EnableRegistry, Arg> {};
+	enum class ScalabilityHint {
+		Many, Few
+	};
 
-	template<class Arg>
-	struct HardwareProfile: pet::ConfigType<HardwareProfile, Arg> {};
-
-	template<template<class...> class Arg>
-	struct SchedulingPolicy: pet::ConfigTemplate<SchedulingPolicy, Arg> {};
+	PET_CONFIG_VALUE(EnableAssert, bool);
+	PET_CONFIG_VALUE(EnableRegistry, bool);
+	PET_CONFIG_VALUE(NumberOfSleepers, ScalabilityHint);
+	PET_CONFIG_TYPE(HardwareProfile);
+	PET_CONFIG_TEMPLATE(SchedulingPolicy);
 
 	template<class... Options>
 	class Configurable {
-		static constexpr bool assertEnabled = EnableAssert<false>::template extract<Options...>::value;
-		static constexpr bool registryEnabled = EnableRegistry<assertEnabled>::template extract<Options...>::value;
-
-		using Profile = typename HardwareProfile<void>::extract<Options...>::type;
-
-		template<class... X>
-		using PolicyTemplate = typename SchedulingPolicy<RoundRobinPolicy>::extract<Options...>::template typeTemplate<X...>;
-
+		PET_EXTRACT_VALUE(assertEnabled, EnableAssert, false, Options);
+		PET_EXTRACT_VALUE(registryEnabled, EnableAssert, assertEnabled, Options);
+		PET_EXTRACT_VALUE(sleeperStorageOption, NumberOfSleepers, ScalabilityHint::Few, Options);
+		PET_EXTRACT_TYPE(Profile, HardwareProfile, void, Options);
+		PET_EXTRACT_TEMPLATE(PolicyTemplate, SchedulingPolicy, RoundRobinPolicy, Options);
 
 	public:
 		using TickType = typename Profile::TickType;
