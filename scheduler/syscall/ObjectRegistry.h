@@ -12,6 +12,15 @@
 
 #include "LimitedCTree.h"
 
+template<class... Args>
+template<class... Types>
+struct Scheduler<Args...>::RegistryRootHub: Registry<Types>::Root... {
+	template<class Type>
+	typename Registry<Type>::Root* rootFor() {
+		return static_cast<typename Registry<Type>::Root*>(this);
+	}
+};
+
 /**
  * Per-type registry of arbitrary objects.
  *
@@ -34,30 +43,33 @@ class Scheduler<Args...>::ObjectRegistry<Object, true>
 		};
 
 	private:
-		template<class> friend uintptr_t Scheduler<Args...>::doRegisterObject(uintptr_t objectPtr);
-		template<class> friend uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr);
+		friend class Scheduler<Args...>;
 
-		static LimitedCTree tree;
+		struct Root: LimitedCTree {};
 
 		static inline int compare(const LimitedCTree::DualNode* x, const LimitedCTree::DualNode* y) {
 			return (int)(x - y);
 		}
 
 		static bool add(Object* object) {
-			return tree.add<&ObjectRegistry::compare>(object);
+			LimitedCTree* tree = Scheduler<Args...>::state.template rootFor<Object>();
+			return tree->add<&ObjectRegistry::compare>(object);
 		}
 
 		static bool remove(Object* object) {
-			if(!tree.contains<&ObjectRegistry::compare>(object))
+			LimitedCTree* tree = Scheduler<Args...>::state.template rootFor<Object>();
+
+			if(!tree->contains<&ObjectRegistry::compare>(object))
 				return false;
 
-			tree.remove(object);
+			tree->remove(object);
 			return true;
 		}
 
 	public:
 		static inline void check(Object* object) {
-			bool ok = tree.contains<&ObjectRegistry::compare>(object);
+			LimitedCTree* tree = Scheduler<Args...>::state.template rootFor<Object>();
+			bool ok = tree->contains<&ObjectRegistry::compare>(object);
 			Scheduler<Args...>::assert(ok, "Invalid object pointer as syscall argument");
 		}
 
@@ -86,6 +98,7 @@ class Scheduler<Args...>::ObjectRegistry<Object, false>
 {
 public:
 	class ObjectBase {};
+	struct Root {};
 
 	static inline void registerObject(Object* object) {}
 	static inline void unregisterObject(Object* object) {}
@@ -99,11 +112,6 @@ public:
 		return reinterpret_cast<Object*>(objectPtr);
 	}
 };
-
-
-template<class... Args>
-template<class T>
-LimitedCTree Scheduler<Args...>::ObjectRegistry<T, true>::tree;
 
 template<class... Args>
 template<class Object>
@@ -119,7 +127,7 @@ template<class Object>
 uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr)
 {
 	bool ok = Registry<Object>::remove(reinterpret_cast<Object*>(objectPtr));
-	assert(ok, "Non-registered object unregistered");
+	assert(ok || !state.isRunning, "Non-registered object unregistered");
 	return ok;
 }
 

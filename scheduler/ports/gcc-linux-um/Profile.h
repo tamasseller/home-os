@@ -52,6 +52,7 @@ private:
 	static Task* volatile currentTask;
 	static Task* volatile oldTask;
 	static bool suspended, suspend;
+	static const char* returnValue;
 	static ucontext_t final;
 	static uintptr_t idleStack[1024];
 	static ucontext_t idle;
@@ -66,8 +67,8 @@ private:
 public:
 	static void init(uintptr_t tickUs);
 	template<class ... T> static inline uintptr_t sync(T ... ops);
-	static void startFirst(Task* task);
-	static void finishLast();
+	static const char* startFirst(Task* task);
+	static void finishLast(const char* errorMessage);
 	static void initialize(Task* task, void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg);
 
 	static inline void async(void (*handler)()) {

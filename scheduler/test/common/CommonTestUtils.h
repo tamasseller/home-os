@@ -25,6 +25,8 @@
 
 #include "SharedData.h"
 
+#include "algorithm/Str.h"
+
 class CommonTestUtils {
 	static uint64_t iterationsPerMs;
 	static void busyWorker(uint64_t iterations);
@@ -54,8 +56,12 @@ public:
 	}
 
 	template<class Os=OsRr>
-	static void start() {
-		Os::start(startParam);
+	static void start(const char* expectedError = nullptr) {
+		const char* result = Os::start(startParam);
+		if(expectedError)
+			CHECK(pet::Str::cmp(result, expectedError) == 0);
+		else
+			CHECK(result == nullptr);
 	}
 };
 

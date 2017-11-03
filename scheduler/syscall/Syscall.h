@@ -57,6 +57,7 @@ template<class... Args>
 struct Scheduler<Args...>::SyscallMap: detail::SyscallDb<
     SYSCALL(doStartTask),
     SYSCALL(doExit),
+    SYSCALL(doAbort),
     SYSCALL(doYield),
     SYSCALL(doSleep),
 

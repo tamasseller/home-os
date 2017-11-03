@@ -78,7 +78,9 @@ struct SchedulerOptions {
 		class EventList;
 		class PreemptionEvent;
 
+		class ErrorStrings;
 		template<class, bool> class ObjectRegistry;
+		template<class...> class RegistryRootHub;
 
 		/*
 		 * Helper type and template aliases.
@@ -91,10 +93,10 @@ struct SchedulerOptions {
 		/*
 		 * The globally visible internal state wrapped in a single struct.
 		 */
-		static struct State {
+		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet> {
 			Policy policy;
-			bool isRunning;   // TODO check if can be merged
-			uintptr_t nTasks; // TODO check if can be merged
+			bool isRunning = false;
+			uintptr_t nTasks = 0;
 			EventList eventList;
 			SleepList sleepList;
 			PreemptionEvent preemptionEvent;
@@ -107,6 +109,7 @@ struct SchedulerOptions {
 		static uintptr_t doStartTask(uintptr_t task);
 		static uintptr_t doExit();
 		static uintptr_t doYield();
+		static uintptr_t doAbort(uintptr_t errorMessage);
 		static uintptr_t doSleep(uintptr_t time);
 		template<class> static uintptr_t doRegisterObject(uintptr_t object);
 		template<class> static uintptr_t doUnregisterObject(uintptr_t object);
@@ -132,11 +135,12 @@ struct SchedulerOptions {
 	public:
 		inline static TickType getTick();
 
-		template<class... T> inline static void start(T... t);
+		template<class... T> inline static const char* start(T... t);
 
 		inline static void yield();
 		inline static void sleep(uintptr_t time);
 		inline static void exit();
+		inline static void abort(const char*);
 		template<class... T> inline static Blocker* select(T... t);
 		template<class... T> inline static Blocker* selectTimeout(uintptr_t timout, T... t);
 	};
@@ -152,6 +156,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Preemption.h"
 
 #include "syscall/Helpers.h"
+#include "syscall/ErrorStrings.h"
 #include "syscall/Syscall.h"
 #include "syscall/ObjectRegistry.h"
 
@@ -176,18 +181,35 @@ typename Scheduler<Args...>::State Scheduler<Args...>::state;
 
 template<class... Args>
 template<class... T>
-inline void Scheduler<Args...>::start(T... t) {
+inline const char* Scheduler<Args...>::start(T... t) {
 	Task* firstTask = state.policy.popNext();
 	state.isRunning = true;
 	Profile::setTickHandler(&Scheduler<Args...>::onTick);
 	Profile::init(t...);
 	Profile::setSyscallMapper(&syscallMapper);
-	Profile::startFirst(firstTask);
+	return Profile::startFirst(firstTask);
 }
 
 template<class... Args>
 inline typename Scheduler<Args...>::Profile::TickType Scheduler<Args...>::getTick() {
 	return Profile::getTick();
+}
+
+template<class... Args>
+inline void Scheduler<Args...>::abort(const char* errorMessage) {
+	assert(state.isRunning, "Abort called on non running scheduler");
+	syscall<SYSCALL(doAbort)>(reinterpret_cast<uintptr_t>(errorMessage));
+}
+
+template<class... Args>
+inline uintptr_t Scheduler<Args...>::doAbort(uintptr_t errorMessage) {
+	/*
+	 * Reset global state before exit.
+	 */
+	state.~State();
+	new(&state) State();
+	Profile::finishLast(reinterpret_cast<const char*>(errorMessage));
+	return errorMessage; // Never reached.
 }
 
 #endif /* SCHEDULER_H_ */

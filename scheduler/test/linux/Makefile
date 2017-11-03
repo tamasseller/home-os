@@ -35,11 +35,14 @@ SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
 SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
+ifeq ('x','')
+endif
 
 # General task management.
 
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
+#SOURCES += $(ROOT)/test/Abort.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
 
 
@@ -47,8 +50,8 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
-ifeq ('x','')
-endif
+
+
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp

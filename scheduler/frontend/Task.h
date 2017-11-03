@@ -125,12 +125,10 @@ uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 template<class... Args>
 uintptr_t Scheduler<Args...>::doExit()
 {
-	if(--state.nTasks) {
+	if(--state.nTasks)
 		switchToNext<false>();
-	} else {
-		state.isRunning = false;
-		Profile::finishLast();
-	}
+	else
+		doAbort(0);
 
 	return true;
 }
