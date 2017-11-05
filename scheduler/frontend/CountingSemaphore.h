@@ -41,6 +41,7 @@ class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<Countin
 
 public:
 	inline void init(uintptr_t count) {
+		resetObject(this);
 		counter = count;
 		Registry<CountingSemaphore>::registerObject(this);
 	}

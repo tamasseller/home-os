@@ -51,7 +51,6 @@ void ProfileCortexM0::finishLast(const char* ret)
 		__attribute__((naked))
 		static void restoreMasterState(const char* ret) {
 			asm volatile (
-				"cpsid i			\n" // On the Cortex-M0 system interrupts can not be masked selectively.
 				"movs r0, %0		\n"
 				"movs r1, #0		\n"
 				"msr control, r1	\n"
@@ -66,7 +65,10 @@ void ProfileCortexM0::finishLast(const char* ret)
 		}
 	};
 
+	asm("cpsid i" ::: "memory"); // On the Cortex-M0 system interrupts can not be masked selectively.
+
 	CortexCommon::Scb::Syst::disable();
+	CortexCommon::Scb::Icsr::clearPendSV();
 
 	const void **psp;
 	asm volatile ("mrs %0, psp\n"  : "=r" (psp));

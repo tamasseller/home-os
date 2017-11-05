@@ -1,14 +1,6 @@
-Fix
----
-
- - Linux abort test
-
 API
 ---
 
- - Move assert error strings into separate file.
- - Create forced scheduler exit for error handling.
- - Ensure correct finalization for forced exit.
  - Implement ReaderWriterLock (possibly with upgrade option).
  - Implement std::future+std::promise like, non-shared blocker.
  - Implement driver-oriented io queue and job objects for 

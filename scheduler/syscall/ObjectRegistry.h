@@ -70,7 +70,7 @@ class Scheduler<Args...>::ObjectRegistry<Object, true>
 		static inline void check(Object* object) {
 			LimitedCTree* tree = Scheduler<Args...>::state.template rootFor<Object>();
 			bool ok = tree->contains<&ObjectRegistry::compare>(object);
-			Scheduler<Args...>::assert(ok, "Invalid object pointer as syscall argument");
+			Scheduler<Args...>::assert(ok, Scheduler<Args...>::ErrorStrings::invalidSyscallArgument);
 		}
 
 		static inline Object* lookup(uintptr_t objectPtr) {
@@ -118,7 +118,7 @@ template<class Object>
 uintptr_t Scheduler<Args...>::doRegisterObject(uintptr_t objectPtr)
 {
 	bool ok = Registry<Object>::add(reinterpret_cast<Object*>(objectPtr));
-	assert(ok, "Object registered multiple times");
+	assert(ok, Scheduler<Args...>::ErrorStrings::objectAlreadyRegistered);
 	return ok;
 }
 
@@ -126,9 +126,7 @@ template<class... Args>
 template<class Object>
 uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr)
 {
-	bool ok = Registry<Object>::remove(reinterpret_cast<Object*>(objectPtr));
-	assert(ok || !state.isRunning, "Non-registered object unregistered");
-	return ok;
+	return Registry<Object>::remove(reinterpret_cast<Object*>(objectPtr));
 }
 
 #endif /* OBJECTREGISTRY_H_ */

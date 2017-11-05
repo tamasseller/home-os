@@ -48,6 +48,7 @@ struct SchedulerOptions {
 		 * Public, front-end types
 		 */
 		using TickType = typename Profile::TickType;
+		class ErrorStrings;
 
 		template<class Data> class Atomic;
 
@@ -79,10 +80,10 @@ struct SchedulerOptions {
 		class PreemptionEvent;
 
 		template<bool, class=void> class AssertSwitch;
-		class ErrorStrings;
 		template<class, bool> class ObjectRegistry;
 		template<class...> class RegistryRootHub;
 		struct SyscallMap;
+
 
 		/*
 		 * Helper type and template aliases.
@@ -111,6 +112,8 @@ struct SchedulerOptions {
 		template<class Syscall, class... T> static inline uintptr_t conditionalSyscall(T... );
 
 		static inline void assert(bool, const char*);
+
+		template<class T> static inline void resetObject(T*);
 
 		/**
 		 * Task switching helper

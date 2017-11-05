@@ -23,8 +23,8 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 		return *static_cast<typename Policy::Priority*>(this);
 	}
 
-	Task *owner;
-	uintptr_t relockCounter;
+	Task *owner = nullptr;
+	uintptr_t relockCounter = 0;
 
 	/*
 	 * These two methods are never called during normal operation, so
@@ -32,7 +32,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	 */
 
 	virtual void remove(Blockable*, Blocker*) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of a Mutex");
+		assert(false, ErrorStrings::mutexBlockerUsage);
 	}
 
 	/*
@@ -83,8 +83,8 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	virtual bool release(uintptr_t arg) override {
 		Task* currentTask = getCurrentTask();
 
-		assert(currentTask == owner, "Mutex unlock from non-owner task");
-		assert(!arg, "Asynchronous mutex unlock");
+		assert(currentTask == owner, ErrorStrings::mutexNonOwnerUnlock);
+		assert(!arg, ErrorStrings::mutexAsyncUnlock);
 
 		if(relockCounter)
 			relockCounter--;
@@ -119,10 +119,11 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 		return false;
 	}
 
+	void* operator new(size_t, void* r) {return r;}
+
 public:
 	inline void init() {
-		owner = nullptr;
-		relockCounter = 0;
+		resetObject(this);
 		Registry<Mutex>::registerObject(this);
 	}
 

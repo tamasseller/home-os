@@ -18,6 +18,26 @@ inline typename Scheduler<Args...>::Task* Scheduler<Args...>::getCurrentTask() {
 	return nullptr;
 }
 
+namespace detail {
+	template<class T>
+	class ObjectInitializer: T {
+		constexpr static inline void* operator new(size_t, ObjectInitializer* r) { return r; }
+	public:
+		static inline void reset(T* object) {
+			ObjectInitializer* wrapped = reinterpret_cast<ObjectInitializer*>(object);
+			wrapped->~ObjectInitializer<T>();
+			new(wrapped) ObjectInitializer;
+		}
+	};
+}
+
+template<class... Args>
+template<class T>
+inline void Scheduler<Args...>::resetObject(T* object) {
+	detail::ObjectInitializer<T>::reset(object);
+}
+
+
 template<class... Args>
 template<bool pendOld, bool suspend>
 inline void Scheduler<Args...>::switchToNext()

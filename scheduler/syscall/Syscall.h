@@ -87,7 +87,7 @@ struct Scheduler<Args...>::SyscallMap: detail::SyscallDb<
 template<class... Args>
 inline void* Scheduler<Args...>::syscallMapper(uintptr_t p)
 {
-    assert(p < SyscallMap::nCalls, "Unknown system call dispatched");
+    assert(p < SyscallMap::nCalls, ErrorStrings::invalidSyscall);
 	return SyscallMap::targets[p];
 }
 

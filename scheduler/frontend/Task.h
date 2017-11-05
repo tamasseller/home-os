@@ -50,6 +50,8 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			state.policy.addRunnable(self);
 		}
 
+		void* operator new(size_t, void* r) {return r;}
+
 	public:
 		template<class... StartArgs>
 		inline void start(
@@ -59,6 +61,8 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 				void* arg,
 				StartArgs... startArgs)
 		{
+			resetObject(this);
+
 			Profile::initialize(this, entry, &Scheduler<Args...>::exit, stack, stackSize, arg);
 			Policy::initialize(this, startArgs...);
 
@@ -115,7 +119,7 @@ uintptr_t Scheduler<Args...>::doYield()
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 {
-	assert(time <= INTPTR_MAX, "Delay time too big!");
+	assert(time <= INTPTR_MAX, ErrorStrings::taskDelayTooBig);
 	state.sleepList.delay(getCurrentTask(), time);
 	switchToNext<false>();
 

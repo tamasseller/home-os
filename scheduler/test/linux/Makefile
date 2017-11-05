@@ -41,6 +41,7 @@ endif
 
 # General task management.
 
+SOURCES += $(ROOT)/test/Error.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Abort.cpp

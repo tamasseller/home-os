@@ -9,40 +9,39 @@
 
 using Os=OsRr;
 
-namespace asd {
-	Os::Mutex m;
-	uint32_t counter, limit;
+namespace {
+	Os::Mutex abortMutex;
+	uint32_t abortCounter, limit;
 
 	struct Task: public TestTask<Task> {
 		void run() {
 			while(true) {
-				m.lock();
+				abortMutex.lock();
 
-				if(++counter == limit)
+				if(++abortCounter == limit)
 					Os::abort("Done");
 
-				m.unlock();
+				abortMutex.unlock();
 			}
 		}
-	} t[4];
+	} abortTasks[4];
 }
 
 
 TEST(Abort)
 {
-	using namespace asd;
-	counter = 0;
+	abortCounter = 0;
 
-	for(int i = 0; i < 4; i++) {
+	for(int i = 0; i < 16; i++) {
 		limit = (i+1) * 256;
 
-		m.init();
+		abortMutex.init();
 
-		for(size_t j = 0; j < sizeof(t)/sizeof(t[0]); j++)
-			t[j].start();
+		for(size_t j = 0; j < sizeof(abortTasks)/sizeof(abortTasks[0]); j++)
+			abortTasks[j].start();
 
 		CommonTestUtils::start("Done");
-		CHECK(counter == limit);
+		CHECK(abortCounter == limit);
 		StackPool::clear();
 	}
 }

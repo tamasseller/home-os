@@ -11,7 +11,7 @@
 template<class... Args>
 class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
-		assert(arg == 1, "Tick overload, preemption event could not have been dispatched for a full tick cycle!");
+		assert(arg == 1, ErrorStrings::interruptOverload);
 
 		while(Sleeper* sleeper = state.sleepList.getWakeable())
 			sleeper->wake();

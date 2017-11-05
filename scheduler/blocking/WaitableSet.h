@@ -55,7 +55,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 
 	virtual void remove(Blockable* blockable, Blocker* blocker) override final
 	{
-		assert(blockable == waiters[0].task, "WTF internal error");
+		assert(blockable == waiters[0].task, ErrorStrings::unknownError);
 
 		for(uintptr_t i = 0; i < nWaiters; i++)
 			waiters[i].blocker->remove(waiters + i, this);
@@ -95,12 +95,12 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 	 */
 
 	virtual uintptr_t acquire(Task*) override final {
-		assert(false, "Internal error, this method should never have been called.");
+		assert(false, ErrorStrings::unreachableReached);
 		return 0;
 	}
 
 	virtual bool release(uintptr_t arg) override final {
-		assert(false, "Internal error, this method should never have been called.");
+		assert(false, ErrorStrings::unreachableReached);
 		return false;
 	}
 

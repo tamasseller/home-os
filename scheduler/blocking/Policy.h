@@ -19,25 +19,25 @@ class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	 */
 
 	virtual void remove(Blockable*, Blocker*) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of the Policy wrapper");
+		assert(false, ErrorStrings::policyBlockerUsage);
 	}
 
 	virtual Blocker* getTakeable(Task*) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of the Policy wrapper");
+		assert(false, ErrorStrings::policyBlockerUsage);
 		return nullptr;
 	}
 
 	virtual void block(Blockable*) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of the Policy wrapper");
+		assert(false, ErrorStrings::policyBlockerUsage);
 	}
 
 	virtual uintptr_t acquire(Task*) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of the Policy wrapper");
+		assert(false, ErrorStrings::policyBlockerUsage);
 		return 0;
 	}
 
 	virtual bool release(uintptr_t arg) override final {
-		assert(false, "Only priority change can be handled through the Blocker interface of the Policy wrapper");
+		assert(false, ErrorStrings::policyBlockerUsage);
 		return false;
 	}
 
@@ -47,7 +47,7 @@ class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	 */
 
 	virtual void priorityChanged(Blockable* b, typename PolicyBase::Priority old) override final {
-		assert(b->getTask() == b, "Only tasks can be handled by the policy container");
+		assert(b->getTask() == b, ErrorStrings::policyNonTask);
 		PolicyBase::priorityChanged(static_cast<Task*>(b), old);
 	}
 

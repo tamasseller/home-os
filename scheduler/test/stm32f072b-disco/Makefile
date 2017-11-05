@@ -38,6 +38,7 @@ SOURCES += $(ROOT)/test/Select.cpp
 
 # General task management.
 
+SOURCES += $(ROOT)/test/Error.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Abort.cpp
@@ -48,7 +49,6 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
-
 
 # Testing utilities.
 

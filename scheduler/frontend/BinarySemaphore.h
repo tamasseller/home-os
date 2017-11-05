@@ -38,6 +38,7 @@ class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySem
 
 public:
 	inline void init(bool open) {
+		resetObject(this);
 		this->open = open;
 		Registry<BinarySemaphore>::registerObject(this);
 	}

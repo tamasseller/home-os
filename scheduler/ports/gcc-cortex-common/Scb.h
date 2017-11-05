@@ -14,6 +14,7 @@ struct Scb {
 	class Icsr {
 		static constexpr auto reg = 0xe000ed04;
 		static constexpr uint32_t PendSvSet = 1u << 28;
+		static constexpr uint32_t PendSvClr = 1u << 27;
 		static constexpr uint32_t VectactiveMask = 0x1f;
 		static constexpr uint32_t VectactivePendSv = 14;
 
@@ -24,6 +25,10 @@ struct Scb {
 
 		static inline void triggerPendSV() {
 			*((uintptr_t*)reg) = PendSvSet;
+		}
+
+		static inline void clearPendSV() {
+			*((uintptr_t*)reg) = PendSvClr;
 		}
 	};
 
