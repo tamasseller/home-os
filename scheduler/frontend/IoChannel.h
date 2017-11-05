@@ -18,6 +18,7 @@ class Scheduler<Args...>::IoChannel {
 	virtual void disableProcess() = 0;
 
 public:
+	// TODO subclass event to enable indirect use from interrupts.
 	class Job: Timeout {
 		friend Scheduler<Args...>;
 		friend pet::DoubleList<Job>;
@@ -74,6 +75,8 @@ protected:
 	}
 
 public:
+	// TODO guard by routing through syscall.
+	// TODO make event based from interrupt variant.
 	void submit(Job* job)
 	{
 		disableProcess();
@@ -84,6 +87,8 @@ public:
 		enableProcess();
 	}
 
+	// TODO guard by routing through syscall.
+	// TODO make event based from interrupt variant.
 	void submitTimeout(Job* job, uintptr_t time)
 	{
 		submit(job);
@@ -91,6 +96,8 @@ public:
 		job->start(time);
 	}
 
+	// TODO guard by routing through syscall.
+	// TODO make event based from interrupt variant.
 	void cancel(Job* job)
 	{
 		job->cancel();

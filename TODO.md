@@ -1,24 +1,16 @@
 API
 ---
 
- - Implement ReaderWriterLock (possibly with upgrade option).
- - Implement std::future+std::promise like, non-shared blocker.
- - Implement driver-oriented io queue and job objects for 
-   interrupt-driven processing, that runs in scheduler context
-   to cheaply implement mutual exclusion and also handles:
+ - Implement IoRequest over IoChannel::Job.
+ - Fix IoChannel locking:
+   - handle submission and cancellation through scheduler 
+     context to implement mutual exclusion
+   - also enable handling of submissions through event 
+     based indirection for from-interrupt use.
+   - porbably should probably mix in Timeout and use a single
+     event for submission and sleeper registration.
 
-   - Enabling and disabling the related interrupt (to acheive full
-     mutual exclusion) the exact details of which are provided by
-     the user (via subclassing).
-   - Synchronization of enabling/disabling with queue operations.
-   - Adding an - optionally prioritized - work item from a task
-     or another interrupt which may trigger enabling the process.
-   - Canceling a work item (ie. on timeout) and disabling the 
-     interrupt, if needed.
-   - Popping a work item (used from the process interrupt)
-   - Two kinds of work items:
-     - future-promise based for tasks,
-     - arbitrary callback based for interrupts.
+ - Implement ReaderWriterLock (possibly with upgrade option).
  
 Internals
 ---------
