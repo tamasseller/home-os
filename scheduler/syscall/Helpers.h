@@ -40,10 +40,22 @@ inline void Scheduler<Args...>::switchToNext()
  */
 
 template<class... Args>
-inline void Scheduler<Args...>::assert(bool cond, const char* msg) {
-	if(assertEnabled && !cond) {
-		Profile::fatalError(msg);
+template<class Dummy> struct Scheduler<Args...>::AssertSwitch<true, Dummy> {
+	static inline void assert(bool cond, const char* msg) {
+		if(!cond)
+			Scheduler<Args...>::Profile::finishLast(msg);
 	}
+};
+
+template<class... Args>
+template<class Dummy> struct Scheduler<Args...>::AssertSwitch<false, Dummy> {
+	static inline void assert(bool cond, const char* msg) {}
+};
+
+template<class... Args>
+inline void Scheduler<Args...>::assert(bool cond, const char* msg)
+{
+	AssertSwitch<assertEnabled>::assert(cond, msg);
 }
 
 /*

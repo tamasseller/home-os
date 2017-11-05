@@ -1,4 +1,4 @@
-OUTPUT = test
+OUTPUT = os-test
 
 ROOT = ../..
 PET = $(ROOT)/../pet
@@ -36,13 +36,14 @@ SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
 ifeq ('x','')
+
 endif
 
 # General task management.
 
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
-#SOURCES += $(ROOT)/test/Abort.cpp
+SOURCES += $(ROOT)/test/Abort.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
 
 
@@ -111,8 +112,6 @@ CXXFLAGS += -rdynamic								# Allows meaningful backrtaces
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
 
 LD = $(CXX) 
-
-LIBS += pthread rt gcc_eh
 
 include ../toolchains/Compiler.host.mk
 include ../ultimate-makefile/Makefile.ultimate

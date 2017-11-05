@@ -61,8 +61,6 @@ private:
 	static Task* volatile oldTask;
 	static void* suspendedPc;
 
-	static inline void sysWrite0(const char* msg);
-
 	static inline void* &irqEntryStackedPc() {
 		void **psp;
 		asm volatile ("mrs %0, psp\n"  : "=r" (psp));
@@ -103,8 +101,8 @@ public:
 		tickHandler = handler;
 	}
 
-	static void startFirst(Task* task);
-	static void finishLast();
+	static const char* startFirst(Task* task);
+	static void finishLast(const char*);
 
 	static inline void initialize(Task*, void (*)(void*), void (*)(), void*, uint32_t, void*);
 	static inline void switchToAsync(Task* task)
@@ -159,12 +157,6 @@ public:
 		suspendedPc = irqEntryStackedPc();
 		irqEntryStackedPc() = (void*)&Idler::sleep;
 	}
-
-	static inline void fatalError(const char* msg) {
-		sysWrite0("Fatal error: ");
-		sysWrite0(msg);
-		sysWrite0("!\n");
-	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -194,19 +186,6 @@ inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
 		);
 
 	return ret;
-}
-inline void ProfileCortexM0::sysWrite0(const char* msg)
-{
-	/*
-	 * SYS_WRITE0 (0x04)
-	 *
-	 * 		Writes a null-terminated string to the debug channel.
-	 * 		On entry, R1 contains a pointer to the first byte of the string.
-	 */
-
-	register uintptr_t opCode asm("r0") = 4;
-	register uintptr_t str asm("r1") = (uintptr_t)msg;
- 	asm volatile("bkpt #0xab" : "=r"(opCode), "=r"(str) : "r" (opCode), "r" (str) : "memory");
 }
 
 inline void ProfileCortexM0::initialize(Task* task, void (*entry)(void*), void (*exit)(),

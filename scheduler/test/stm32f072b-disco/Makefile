@@ -40,6 +40,7 @@ SOURCES += $(ROOT)/test/Select.cpp
 
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/Abort.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
 
 

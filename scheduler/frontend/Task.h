@@ -85,7 +85,6 @@ inline void Scheduler<Args...>::yield() {
 template<class... Args>
 inline void Scheduler<Args...>::sleep(uintptr_t time)
 {
-	assert(time <= INTPTR_MAX, "Delay time too big!");
 	syscall<SYSCALL(doSleep)>(time);
 }
 
@@ -116,6 +115,7 @@ uintptr_t Scheduler<Args...>::doYield()
 template<class... Args>
 uintptr_t Scheduler<Args...>::doSleep(uintptr_t time)
 {
+	assert(time <= INTPTR_MAX, "Delay time too big!");
 	state.sleepList.delay(getCurrentTask(), time);
 	switchToNext<false>();
 
@@ -130,7 +130,7 @@ uintptr_t Scheduler<Args...>::doExit()
 	else
 		doAbort(0);
 
-	return true;
+	return 0;
 }
 
 #endif /* TASK_H_ */

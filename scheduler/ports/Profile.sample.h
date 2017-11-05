@@ -154,11 +154,8 @@ class ProfileSample {
 	 * Start the first task.
 	 *
 	 * Switch to the first task, whose platform specific state is pointed to by _task_.
-	 *
-	 * NOTE: This method is called only as the last action in syscall handlers, so
-	 *       that it is allowed to omit returning in the regular way.
 	 */
-	static void startFirst(Task* task);
+	static const char* startFirst(Task* task);
 
 	/**
 	 * Quit the scheduler.
@@ -166,7 +163,7 @@ class ProfileSample {
 	 * Calling this method is the last action of the scheduler core upon exiting.
 	 * It is required to restore the state that startFirst observed.
 	 */
-	static void finishLast();
+	static void finishLast(const char*);
 
 	/**
 	 * Suspend the task execution temporarily.
@@ -184,7 +181,6 @@ class ProfileSample {
 	static void async(void (*handler)());
 
 	static void init(/* platform dependent */);
-	static void fatalError(const char* msg);
 };
 
 

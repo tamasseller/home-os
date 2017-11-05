@@ -20,9 +20,10 @@ void (* volatile ProfileCortexM0::asyncCallHandler)();
 void* (* volatile ProfileCortexM0::syncCallMapper)(uintptr_t);
 
 __attribute__((naked))
-void ProfileCortexM0::startFirst(Task* task)
+const char* ProfileCortexM0::startFirst(Task* task)
 {
 	currentTask = task;
+
 	asm volatile (
 		"cpsid i			\n" // Only the systick, SVC and PendSV interrupts are needed to be disabled,
 								// but on the Cortex-M0 the system interrupts can not be masked selectively.
@@ -44,25 +45,32 @@ void ProfileCortexM0::startFirst(Task* task)
 	);
 }
 
-void ProfileCortexM0::finishLast()
+void ProfileCortexM0::finishLast(const char* ret)
 {
 	struct ReturnTaskStub {
 		__attribute__((naked))
-		static void restoreMasterState() {
+		static void restoreMasterState(const char* ret) {
 			asm volatile (
 				"cpsid i			\n" // On the Cortex-M0 system interrupts can not be masked selectively.
-				"movs r0, #0		\n"
-				"msr control, r0	\n"
+				"movs r0, %0		\n"
+				"movs r1, #0		\n"
+				"msr control, r1	\n"
 				"isb				\n"
 				"pop {r4-r7}		\n"
 				"mov r8, r4			\n"
 				"mov r9, r5			\n"
 				"mov r10, r6		\n"
 				"mov r11, r7		\n"
-				"pop {r4-r7, pc}	\n" : : :
+				"pop {r4-r7, pc}	\n" : : "r" (ret) : "r0"
 			);
 		}
 	};
+
+	CortexCommon::Scb::Syst::disable();
+
+	const void **psp;
+	asm volatile ("mrs %0, psp\n"  : "=r" (psp));
+	psp[0] = reinterpret_cast<const void*>(ret);
 
 	irqEntryStackedPc() = (void*)&ReturnTaskStub::restoreMasterState;
 	currentTask = nullptr;

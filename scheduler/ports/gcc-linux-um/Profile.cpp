@@ -22,17 +22,32 @@ uintptr_t ProfileLinuxUm::idleStack[1024];
 bool ProfileLinuxUm::suspend;
 bool ProfileLinuxUm::suspended;
 
+void ProfileLinuxUm::enableSignals() {
+	sigset_t set;
+	sigemptyset (&set);
+	sigaddset(&set, SIGUSR1);
+	sigaddset(&set, SIGALRM);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+}
+
+void ProfileLinuxUm::disableSignals() {
+	sigset_t set;
+	sigemptyset (&set);
+	sigaddset(&set, SIGUSR1);
+	sigaddset(&set, SIGALRM);
+	sigprocmask(SIG_BLOCK, &set, NULL);
+}
+
 void ProfileLinuxUm::init(uintptr_t tickUs)
 {
-    sigset_t set;
-    sigfillset(&set);
-    sigprocmask(SIG_SETMASK, &set, NULL);
+	disableSignals();
 
     getcontext(&idle);
     idle.uc_link = 0;
     idle.uc_stack.ss_sp = idleStack;
     idle.uc_stack.ss_size = sizeof(idleStack);
     idle.uc_stack.ss_flags = 0;
+    sigemptyset(&idle.uc_sigmask);
     makecontext(&idle, (void (*)())idler, 0);
 
     struct sigaction sa;
@@ -53,11 +68,6 @@ void ProfileLinuxUm::init(uintptr_t tickUs)
     timer.it_interval.tv_sec = tickUs / 1000000;
     timer.it_interval.tv_usec = tickUs % 1000000;
     setitimer (ITIMER_REAL, &timer, NULL);
-
-    sigdelset(&set, SIGALRM);
-    sigdelset(&set, SIGUSR1);
-    sigdelset(&set, SIGINT);
-    sigprocmask(SIG_SETMASK, &set, NULL);
 }
 
 
@@ -124,25 +134,14 @@ void ProfileLinuxUm::dispatchSyscall(Task* self) {
 
 void ProfileLinuxUm::idler()
 {
-	sigset_t mask, oldMask;
-	sigfillset(&mask);
-
-	while(1) {
-		sigprocmask(SIG_UNBLOCK, &mask, &oldMask);
+	while(true) {
 		pause();
-		sigprocmask(SIG_SETMASK, &oldMask, 0);
 	}
 }
 
 const char* ProfileLinuxUm::startFirst(Task* task)
 {
 	currentTask = task;
-
-	sigset_t sig;
-	sigemptyset (&sig);
-	sigaddset(&sig, SIGUSR1);
-	sigaddset(&sig, SIGALRM);
-	sigprocmask(SIG_BLOCK, &sig, NULL);
 
 	swapcontext(&final, &task->savedContext);
 
@@ -155,12 +154,13 @@ const char* ProfileLinuxUm::startFirst(Task* task)
 
 	usleep(1000);
 
-	sigprocmask(SIG_UNBLOCK, &sig, NULL);
+	//enableSignals();
 	return returnValue;
 }
 
 void ProfileLinuxUm::finishLast(const char* errorMessage) {
 	ProfileLinuxUm::returnValue = errorMessage;
+	currentTask = nullptr;
 	setcontext(&final);
 }
 
@@ -172,6 +172,7 @@ void ProfileLinuxUm::initialize(Task* task, void (*entry)(void*), void (*exit)()
     task->exitContext.uc_stack.ss_sp = task->exitStack;
     task->exitContext.uc_stack.ss_size = sizeof(Task::exitStack);
     task->exitContext.uc_stack.ss_flags = 0;
+    sigemptyset(&task->exitContext.uc_sigmask);
     makecontext(&task->exitContext, exit, 0);
 
     bzero(&task->savedContext, sizeof(task->savedContext));
@@ -180,5 +181,6 @@ void ProfileLinuxUm::initialize(Task* task, void (*entry)(void*), void (*exit)()
     task->savedContext.uc_stack.ss_sp = stack;
     task->savedContext.uc_stack.ss_size = stackSize;
     task->savedContext.uc_stack.ss_flags = 0;
+    sigemptyset(&task->savedContext.uc_sigmask);
     makecontext(&task->savedContext, (void (*)())entry, 1, arg);
 }

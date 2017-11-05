@@ -9,7 +9,7 @@
 
 using Os=OsRr;
 
-namespace asd{
+namespace asd {
 	Os::Mutex m;
 	uint32_t counter, limit;
 
@@ -34,11 +34,11 @@ TEST(Abort)
 	counter = 0;
 
 	for(int i = 0; i < 4; i++) {
-		limit = (i+1) * 65536;
+		limit = (i+1) * 256;
 
 		m.init();
 
-		for(int j = 0; j < 4; j++)
+		for(size_t j = 0; j < sizeof(t)/sizeof(t[0]); j++)
 			t[j].start();
 
 		CommonTestUtils::start("Done");
@@ -46,5 +46,3 @@ TEST(Abort)
 		StackPool::clear();
 	}
 }
-
-

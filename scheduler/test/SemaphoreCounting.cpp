@@ -26,13 +26,13 @@ namespace {
 	int irqCounter = 0;
 
 	void irq() {
-		if(irqCounter++ == 100) {
+		sem.notifyFromInterrupt();
+		sem.notifyFromInterrupt();
+		sem.notifyFromInterrupt();
+
+		if(++irqCounter == 100) {
 			CommonTestUtils::registerIrq(nullptr);
 		}
-
-		sem.notifyFromInterrupt();
-		sem.notifyFromInterrupt();
-		sem.notifyFromInterrupt();
 	}
 }
 

@@ -78,9 +78,11 @@ struct SchedulerOptions {
 		class EventList;
 		class PreemptionEvent;
 
+		template<bool, class=void> class AssertSwitch;
 		class ErrorStrings;
 		template<class, bool> class ObjectRegistry;
 		template<class...> class RegistryRootHub;
+		struct SyscallMap;
 
 		/*
 		 * Helper type and template aliases.
@@ -89,18 +91,6 @@ struct SchedulerOptions {
 		using PolicyBase = PolicyTemplate<Task, Blockable>;
 		using Sleeper = class SleeperBase<sleeperStorageOption>;
 		using SleepList = class SleepListBase<sleeperStorageOption>;
-
-		/*
-		 * The globally visible internal state wrapped in a single struct.
-		 */
-		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet> {
-			Policy policy;
-			bool isRunning = false;
-			uintptr_t nTasks = 0;
-			EventList eventList;
-			SleepList sleepList;
-			PreemptionEvent preemptionEvent;
-		} state;
 
 		/*
 		 * Definitions of system calls.
@@ -120,28 +110,76 @@ struct SchedulerOptions {
 		template<class Syscall, class... T> static uintptr_t syscall(T...);
 		template<class Syscall, class... T> static inline uintptr_t conditionalSyscall(T... );
 
-		/*
-		 * Internal helpers
-		 */
 		static inline void assert(bool, const char*);
 
+		/**
+		 * Task switching helper
+		 */
 		template<bool pendOld, bool suspend = true> static inline void switchToNext();
 
-		struct SyscallMap;
+		/**
+		 * Callback for platform implementation that returns the system call
+		 * method to be called according to the parameter passed (generated
+		 * by _syscall_ helper method via the _SyscallMap_).
+		 */
 		static inline void* syscallMapper(uintptr_t);
 
+		/**
+		 * Internal helper to get the currently executing task or null if suspended.
+		 */
 		static inline Task* getCurrentTask();
 
+		/**
+		 * The globally visible internal state wrapped in a single struct.
+		 */
+		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet> {
+			inline void* operator new(size_t, void* x) { return x; }
+			Policy policy;
+			bool isRunning = false;
+			uintptr_t nTasks = 0;
+			EventList eventList;
+			SleepList sleepList;
+			PreemptionEvent preemptionEvent;
+		} state;
 	public:
+		/**
+		 * Get current low resolution time.
+		 */
 		inline static TickType getTick();
 
+		/**
+		 * Start scheduler with platform dependent parameters.
+		 */
 		template<class... T> inline static const char* start(T... t);
 
-		inline static void yield();
-		inline static void sleep(uintptr_t time);
-		inline static void exit();
+		/**
+		 * Abort scheduler and return to starting point with value (from task).
+		 */
 		inline static void abort(const char*);
+
+		/**
+		 * Give up task execution momentarily.
+		 */
+		inline static void yield();
+
+		/**
+		 * Give up task execution for some minimal time.
+		 */
+		inline static void sleep(uintptr_t time);
+
+		/**
+		 * Give up task execution permanently, exit task.
+		 */
+		inline static void exit();
+
+		/**
+		 * Wait for any of the targets.
+		 */
 		template<class... T> inline static Blocker* select(T... t);
+
+		/**
+		 * Wait for any of the targets with timeout.
+		 */
 		template<class... T> inline static Blocker* selectTimeout(uintptr_t timout, T... t);
 	};
 };
@@ -182,12 +220,31 @@ typename Scheduler<Args...>::State Scheduler<Args...>::state;
 template<class... Args>
 template<class... T>
 inline const char* Scheduler<Args...>::start(T... t) {
+	/*
+	 * Initialize internal state.
+	 */
 	Task* firstTask = state.policy.popNext();
 	state.isRunning = true;
+
+	/*
+	 * Initialize platform.
+	 */
 	Profile::setTickHandler(&Scheduler<Args...>::onTick);
-	Profile::init(t...);
 	Profile::setSyscallMapper(&syscallMapper);
-	return Profile::startFirst(firstTask);
+	Profile::init(t...);
+
+	/*
+	 * Start scheduling.
+	 */
+	const char* ret = Profile::startFirst(firstTask);
+
+	/*
+	 * Reset state to initial values.
+	 */
+	state.~State();
+	new(&state) State();
+
+	return ret;
 }
 
 template<class... Args>
@@ -197,19 +254,13 @@ inline typename Scheduler<Args...>::Profile::TickType Scheduler<Args...>::getTic
 
 template<class... Args>
 inline void Scheduler<Args...>::abort(const char* errorMessage) {
-	assert(state.isRunning, "Abort called on non running scheduler");
 	syscall<SYSCALL(doAbort)>(reinterpret_cast<uintptr_t>(errorMessage));
 }
 
 template<class... Args>
 inline uintptr_t Scheduler<Args...>::doAbort(uintptr_t errorMessage) {
-	/*
-	 * Reset global state before exit.
-	 */
-	state.~State();
-	new(&state) State();
 	Profile::finishLast(reinterpret_cast<const char*>(errorMessage));
-	return errorMessage; // Never reached.
+	return errorMessage;
 }
 
 #endif /* SCHEDULER_H_ */

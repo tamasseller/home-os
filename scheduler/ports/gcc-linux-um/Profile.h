@@ -40,6 +40,8 @@ public:
 	};
 
 private:
+	static void enableSignals();
+	static void disableSignals();
 	static void sigUsr1Handler(int sig);
 	static void sigAlrmHandler(int);
 	static void *defaultSyncCallMapper(void*);

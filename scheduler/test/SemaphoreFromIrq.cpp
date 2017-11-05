@@ -63,12 +63,12 @@ namespace {
 	int irqCounter = 0;
 
 	void irq() {
-		if(irqCounter++ == 400) {
+		sem.notifyFromInterrupt();
+		sem.notifyFromInterrupt();
+
+		if(++irqCounter == 400) {
 			CommonTestUtils::registerIrq(nullptr);
 		}
-
-		sem.notifyFromInterrupt();
-		sem.notifyFromInterrupt();
 	}
 }
 

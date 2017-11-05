@@ -38,7 +38,11 @@ struct Scb {
 
 		static void init(uint32_t ticks) {
 			*((uintptr_t*)load) = ticks-1;
-			*((uintptr_t*)ctrl) |=  SourceHclk | EnableIrq | EnableTimer;
+			*((uintptr_t*)ctrl) |= SourceHclk | EnableIrq | EnableTimer;
+		}
+
+		static void disable() {
+			*((uintptr_t*)ctrl) &= ~(EnableIrq | EnableTimer);
 		}
 	};
 

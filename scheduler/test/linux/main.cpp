@@ -49,14 +49,18 @@ int main()
 	sigfillset(&sa.sa_mask);
 	sigaction(SIGUSR2, &sa, NULL);
 
+	sigset_t set;
+	sigemptyset (&set);
+	sigaddset(&set, SIGUSR2);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+
     auto parentPid = getpid();
 
     if(fork() == 0) { // child process
-    	while(1) {
+    	do {
     		usleep(1000);
-    		kill(parentPid, SIGUSR2);
-    	}
+    	} while(kill(parentPid, SIGUSR2) == 0);
     }
     else
-    	TestSuite<&testProgressReport, &testStartedReport, &registerIrqPtr>::runTests(1000);
+    	return TestSuite<&testProgressReport, &testStartedReport, &registerIrqPtr>::runTests(1000);
 }
