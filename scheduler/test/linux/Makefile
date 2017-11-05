@@ -36,7 +36,6 @@ SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
 ifeq ('x','')
-
 endif
 
 # General task management.
@@ -90,7 +89,6 @@ CXXFLAGS += -Werror
 CXXFLAGS += -Wconversion
 CXXFLAGS += -Wuseless-cast
 CXXFLAGS += -Wcast-align
-CXXFLAGS += -fsanitize=undefined
 CXXFLAGS += -fsanitize=shift
 CXXFLAGS += -fsanitize=integer-divide-by-zero
 CXXFLAGS += -fsanitize=unreachable
@@ -108,6 +106,7 @@ CXXFLAGS += -fsanitize=returns-nonnull-attribute
 CXXFLAGS += -fsanitize=bool
 CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
+CXXFLAGS += -fsanitize=undefined					 
 
 CXXFLAGS += -rdynamic								# Allows meaningful backrtaces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code

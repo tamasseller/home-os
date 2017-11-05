@@ -14,9 +14,9 @@ struct Scheduler<Args...>::ErrorStrings {
 	static constexpr const char* unreachableReached = "Internal error, this method should never have been called.";
 	static constexpr const char* interruptOverload = "Tick overload, preemption event could not have been dispatched for a full tick cycle!";
 
+	static constexpr const char* objectAlreadyRegistered = "Object registered multiple times";
 	static constexpr const char* invalidSyscall = "Unknown system call dispatched";
 	static constexpr const char* invalidSyscallArgument = "Invalid object pointer as syscall argument";
-	static constexpr const char* objectAlreadyRegistered = "Object registered multiple times";
 
 	static constexpr const char* policyBlockerUsage = "Only priority change can be handled through the Blocker interface of the Policy wrapper";
 	static constexpr const char* policyNonTask = "Only tasks can be handled by the policy container";

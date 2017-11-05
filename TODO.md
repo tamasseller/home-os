@@ -23,6 +23,8 @@ API
 Internals
 ---------
 
+ - Handle mutexes in WaitableSet or disallow somehow.
+ - Separte Blocker::remove into 'cancel' and 'timeout' calls.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement mutex deadlock detection option.
  - Implement event tracing callback interface.

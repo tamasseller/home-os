@@ -10,6 +10,7 @@
 ProfileCortexM0::Task* volatile ProfileCortexM0::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::oldTask;
 void* ProfileCortexM0::suspendedPc;
+void* ProfileCortexM0::mspAtStart;
 
 volatile bool ProfileCortexM0::exclusiveMonitor = false;
 
@@ -33,15 +34,19 @@ const char* ProfileCortexM0::startFirst(Task* task)
 		"mov r6, r10		\n" // sp is saved implicitly by keeping it in MSP, and using
 		"mov r7, r11		\n" // PSP for the threads (interrupts will restore MSP on exit).
 		"push {r4-r7}		\n"
+		"mrs r3, msp		\n"
+		"str r3, [%1]		\n" // %1 points to mspAtStart.
 		"msr psp, %0		\n" // %0 points to the start of the exception frame.
-		"movs r0, #2		\n" // Switch tasks.
-		"msr control, r0	\n"
+		"movs r3, #2		\n" // Switch stacks.
+		"msr control, r3	\n"
 		"isb				\n"
 		"pop {r0-r5}		\n" // In the frame there are r0-r3, r12, lr, pc
 		"mov lr, r5			\n" // Here r0-r3 and lr is loaded, r12 is ignored.
 		"cpsie i			\n"
 		"pop {pc}			\n"
-			: : "r" ((uint32_t*)task->sp + 4) /* Adjust sp to point to the exception frame*/:
+			: : "r" ((uint32_t*)task->sp + 4),/* Adjust sp to point to the exception frame*/
+				"r" (&mspAtStart)
+			: "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "lr", "sp", "pc", "memory"
 	);
 }
 
@@ -51,16 +56,19 @@ void ProfileCortexM0::finishLast(const char* ret)
 		__attribute__((naked))
 		static void restoreMasterState(const char* ret) {
 			asm volatile (
-				"movs r0, %0		\n"
-				"movs r1, #0		\n"
-				"msr control, r1	\n"
+				"ldr r3, [%0]		\n" // %1 points to the start of the exception frame.
+				"msr msp, r3		\n"
+				"movs r3, #0		\n"
+				"msr control, r3	\n"
 				"isb				\n"
 				"pop {r4-r7}		\n"
 				"mov r8, r4			\n"
 				"mov r9, r5			\n"
 				"mov r10, r6		\n"
 				"mov r11, r7		\n"
-				"pop {r4-r7, pc}	\n" : : "r" (ret) : "r0"
+				"pop {r4-r7, pc}	\n"
+					: : "r" (&mspAtStart)
+					: "r0", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "lr", "sp", "pc", "memory"
 			);
 		}
 	};
@@ -76,6 +84,8 @@ void ProfileCortexM0::finishLast(const char* ret)
 
 	irqEntryStackedPc() = (void*)&ReturnTaskStub::restoreMasterState;
 	currentTask = nullptr;
+
+	asm("bx %0" :: "r" (0xFFFFFFFD): "memory");
 }
 
 void SVC_Handler() {

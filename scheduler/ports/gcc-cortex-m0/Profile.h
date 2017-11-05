@@ -60,6 +60,7 @@ private:
 	static Task* volatile currentTask;
 	static Task* volatile oldTask;
 	static void* suspendedPc;
+	static void* mspAtStart;
 
 	static inline void* &irqEntryStackedPc() {
 		void **psp;

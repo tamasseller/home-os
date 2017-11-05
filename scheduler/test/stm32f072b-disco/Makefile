@@ -8,6 +8,8 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-m0
 INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-common
 
+ifeq ('x','')
+endif
 
 # Atomic list related tests.
 
