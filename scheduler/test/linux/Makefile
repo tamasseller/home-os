@@ -7,6 +7,8 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
 
+ifeq ('x','')
+endif
 
 # Atomic list related tests.
 
@@ -35,8 +37,6 @@ SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
 SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
 
-ifeq ('x','')
-endif
 
 # General task management.
 
@@ -51,6 +51,13 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
+
+
+# Io management related tests.
+
+SOURCES += $(ROOT)/test/Timeout.cpp
+SOURCES += $(ROOT)/test/IoChannel.cpp
+SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
 
 
 # Testing utilities.

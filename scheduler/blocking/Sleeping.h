@@ -58,6 +58,12 @@ public:
 		list.add(elem);
 	}
 
+	inline void update(Sleeper* elem, uintptr_t delay)
+	{
+		list.remove(elem);
+		delay(elem, delay);
+	}
+
 	inline void remove(Sleeper* elem)
 	{
 		list.remove(elem);
@@ -125,6 +131,12 @@ public:
 	{
 		elem->deadline = Profile::getTick() + delay;
 		heap.insert(elem);
+	}
+
+	inline void update(Sleeper* elem, uintptr_t delay)
+	{
+		elem->deadline = Profile::getTick() + delay;
+		heap.update(elem);
 	}
 
 	inline void remove(Sleeper* elem)

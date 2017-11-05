@@ -52,6 +52,14 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
+
+# Io management related tests.
+
+SOURCES += $(ROOT)/test/Timeout.cpp
+SOURCES += $(ROOT)/test/IoChannel.cpp
+SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
+
+
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp

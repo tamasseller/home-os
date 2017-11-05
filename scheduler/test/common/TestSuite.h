@@ -30,7 +30,7 @@ class TestSuite {
 	} calibrator;
 
 public:
-	static bool runTests(uintptr_t tickFreq) {
+	static int runTests(uintptr_t tickFreq) {
 		CommonTestUtils::startParam = tickFreq;
 
 		calibrator.start();
@@ -43,7 +43,7 @@ public:
 
 		CommonTestUtils::registerIrq = registerIrqPtr;
 
-		return pet::TestRunner::runAllTests(&output) == 0;
+		return pet::TestRunner::runAllTests(&output);
 	}
 };
 

@@ -24,7 +24,11 @@ void (*interruptRoutine)();
 
 void TIM1_BRK_UP_TRG_COM_IRQHandler() {
 	TIM_ClearFlag(TIM1, TIM_FLAG_Update);
-	interruptRoutine();
+
+	void (*handler)() = interruptRoutine;
+
+	if(handler)
+		handler();
 }
 
 void initHw() {
@@ -110,7 +114,7 @@ int main()
 {
 	initHw();
 
-	if(TestSuite<&blinkLeds, &setFirstLed, &reqisterIrq>::runTests(48000))
+	if(TestSuite<&blinkLeds, &setFirstLed, &reqisterIrq>::runTests(48000) == 0)
 		okBlink();
 	else
 		errorBlink();

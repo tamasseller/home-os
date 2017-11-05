@@ -21,8 +21,10 @@ void (* volatile actualHandler)();
 
 void handlerTrampoline(int)
 {
-	if(actualHandler)
-		actualHandler();
+	void (*handler)() = actualHandler;
+
+	if(handler)
+		handler();
 }
 
 void testProgressReport(int)

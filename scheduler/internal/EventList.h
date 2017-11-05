@@ -13,7 +13,7 @@
 template<class... Args>
 class Scheduler<Args...>::EventList: SharedAtomicList
 {
-	struct Combiner {
+	struct DefaultCombiner {
 		inline bool operator()(uintptr_t old, uintptr_t& result) const {
 			result = old+1;
 			return true;
@@ -28,7 +28,8 @@ class Scheduler<Args...>::EventList: SharedAtomicList
 	Atomic<uintptr_t> criticality;
 
 public:
-	inline void issue(Event* event) {
+	template<class Combiner = DefaultCombiner>
+	inline void issue(Event* event, Combiner&& combiner = Combiner()) {
 		/*
 		 * The scheduling needs to be blocked while the event is added,
 		 * because if the task gets preempted between the argument setting
@@ -45,7 +46,7 @@ public:
 
 		criticality.increment();
 
-		SharedAtomicList::push(event, Combiner());
+		SharedAtomicList::push(event, combiner);
 
 		uintptr_t result = criticality.decrement();
 

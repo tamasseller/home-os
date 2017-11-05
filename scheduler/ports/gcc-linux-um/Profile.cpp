@@ -68,6 +68,8 @@ void ProfileLinuxUm::init(uintptr_t tickUs)
     timer.it_interval.tv_sec = tickUs / 1000000;
     timer.it_interval.tv_usec = tickUs % 1000000;
     setitimer (ITIMER_REAL, &timer, NULL);
+
+    tick = 0;
 }
 
 
@@ -166,6 +168,8 @@ void ProfileLinuxUm::finishLast(const char* errorMessage) {
 
 void ProfileLinuxUm::initialize(Task* task, void (*entry)(void*), void (*exit)(), void* stack, uintptr_t stackSize, void* arg)
 {
+	task->syscall = nullptr;
+
 	bzero(&task->exitContext, sizeof(task->exitContext));
     getcontext(&task->exitContext);
     task->exitContext.uc_link = 0;

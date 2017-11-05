@@ -57,16 +57,17 @@ struct SchedulerOptions {
 		class SharedAtomicList;
 		class BinarySemaphore;
 		class CountingSemaphore;
+		class IoRequest;
+		class IoChannel;
 
 	private:
-
+		template<class> friend class OsInternalTester;
 		/*
 		 * Internal types.
 		 */
 		class Blockable;
 		class Blocker;
 		class SharedBlocker;
-		class UniqueBlocker;
 		template<class> class AsyncBlocker;
 		template<class> class SemaphoreLikeBlocker;
 		class WaitableSet;
@@ -76,6 +77,7 @@ struct SchedulerOptions {
 		template<ScalabilityHint, class = void> class SleepListBase;
 
 		class Event;
+		class Timeout;
 		class EventList;
 		class PreemptionEvent;
 
@@ -193,6 +195,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Atomic.h"
 #include "internal/SharedAtomicList.h"
 #include "internal/Event.h"
+#include "internal/Timeout.h"
 #include "internal/EventList.h"
 #include "internal/Preemption.h"
 
@@ -214,6 +217,8 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "frontend/Task.h"
 #include "frontend/BinarySemaphore.h"
 #include "frontend/CountingSemaphore.h"
+//#include "frontend/IoRequest.h"
+#include "frontend/IoChannel.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 

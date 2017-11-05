@@ -27,7 +27,7 @@ struct Scheduler<Args...>::ErrorStrings {
 
 	static constexpr const char* taskDelayTooBig = "Delay time too big!";
 
-	static constexpr const char* uniqueBlockerReuse = "Trying to reuse an already occupied UniqueBlocker";
+	static constexpr const char* ioRequestReuse = "Attempt to reuse an already occupied io request object";
 };
 
 #endif /* ERRORSTRINGS_H_ */

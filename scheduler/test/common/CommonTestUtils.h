@@ -65,5 +65,9 @@ public:
 	}
 };
 
+template<class Os> struct OsInternalTester: Os {
+	using typename Os::Timeout;
+	using typename Os::Sleeper;
+};
 
 #endif /* COMMONTESTUTILS_H_ */
