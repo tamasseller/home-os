@@ -25,6 +25,15 @@ class Scheduler<Args...>::EventList: SharedAtomicList
 		state.eventList.dispatch();
 	}
 
+	inline void dispatch()
+	{
+		uintptr_t arg;
+		for(auto reader = SharedAtomicList::read(); auto* element = reader.pop(arg);) {
+			Event* event = static_cast<Event*>(element);
+			event->callback(event, arg);
+		}
+	}
+
 	Atomic<uintptr_t> criticality;
 
 public:
@@ -60,15 +69,6 @@ public:
 
 		if(result == 1)
 			Profile::async(&EventList::dispatchTrampoline);
-	}
-
-	inline void dispatch()
-	{
-		uintptr_t arg;
-		for(auto reader = SharedAtomicList::read(); auto* element = reader.pop(arg);) {
-			Event* event = static_cast<Event*>(element);
-			event->callback(event, arg);
-		}
 	}
 };
 

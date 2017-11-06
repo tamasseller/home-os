@@ -27,10 +27,9 @@ namespace {
 		struct Job: Os::IoChannel::Job {
 			int success;
 
-			static void writeResult(Os::IoChannel::Job* item, bool result) {
+			static void writeResult(Os::IoChannel::Job* item, Os::IoChannel::Job::Result result) {
 				Job* job = static_cast<Job*>(item);
-
-				job->success = result ? 1 : 0;
+				job->success = (int)result;
 			}
 
 		public:
@@ -50,28 +49,40 @@ namespace {
 	struct Base {
 		Process::Job jobs[5];
 
-		void postJobs() {
+		bool postJobs()
+		{
+			bool ret = true;
+
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
 				jobs[i].success = -1;
-				process.submitTimeout(jobs + i, 100);
+
+				if(!process.submitTimeout(jobs + i, 100))
+					ret = false;
 			}
+
+			return ret;
 		}
 
-		int checkJobs() {
+		int checkJobs()
+		{
+			int ret;
+
 			while(true) {
 				bool done = true;
-				int ret = 0;
+				ret = 0;
 
 				for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
 					if(jobs[i].success == -1)
 						done = false;
-					else if(jobs[i].success == 1)
+					else if(jobs[i].success == (int)Os::IoChannel::Job::Result::Done)
 						ret++;
 				}
 
 				if(done)
-					return ret;
+					break;
 			}
+
+			return ret;
 		}
 	};
 }
@@ -82,7 +93,12 @@ TEST(IoChannelTimeout) {
 		void run() {
 			counter = 0;
 			for(int i=sizeof(jobs)/sizeof(jobs[0]); i>=0; i--) {
-				postJobs();
+
+				if(!postJobs()) {
+					error = true;
+					return;
+				}
+
 				counter = i;
 
 				if(checkJobs() != i) {
@@ -103,7 +119,11 @@ TEST(IoChannelTimeoutPostpone) {
 		bool error = false;
 		void run() {
 			counter = 0;
-			postJobs();
+
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
 
 			Os::sleep(50);
 
@@ -111,9 +131,10 @@ TEST(IoChannelTimeoutPostpone) {
 				if(jobs[i].success != -1)
 					error = true;
 
-			postJobs();
-
-			Os::sleep(50);
+			if(postJobs()) {
+				error = true;
+				return;
+			}
 
 			counter = 5;
 
@@ -127,24 +148,55 @@ TEST(IoChannelTimeoutPostpone) {
 	CHECK(!task.error);
 }
 
-TEST(IoChannelTimeoutTimout) {
+TEST(IoChannelTimeoutDoTimout) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
 			counter = 0;
-			postJobs();
 
-			Os::sleep(50);
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
+
+			Os::sleep(110);
+
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+				if(jobs[i].success != (int)Os::IoChannel::Job::Result::TimedOut)
+					error = true;
+		}
+	} task;
+
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+
+TEST(IoChannelTimeoutCancel) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			counter = 0;
+
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
+
+			Os::sleep(40);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
 				process.cancel(jobs + i);
+
+			Os::sleep(10);
 
 			counter = 5;
 
 			Os::sleep(50);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-				if(jobs[i].success != -1)
+				if(jobs[i].success != (int)Os::IoChannel::Job::Result::Canceled)
 					error = true;
 		}
 	} task;

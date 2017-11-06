@@ -18,42 +18,113 @@ class Scheduler<Args...>::IoChannel {
 	virtual void disableProcess() = 0;
 
 public:
-	// TODO subclass event to enable indirect use from interrupts.
-	class Job: Timeout {
+	class Job: Sleeper, Event {
+	public:
+
+		enum class Result: uintptr_t{
+			Done, Canceled, TimedOut
+		};
+
+	private:
 		friend Scheduler<Args...>;
 		friend pet::DoubleList<Job>;
 
 		Job *next, *prev;
 		IoChannel * volatile channel = nullptr;
-		void (* const finished)(Job*, bool);
+		void (* const finished)(Job*, Result);
 
-		static void timedOut(Sleeper* sleeper) {
-			Job* job = static_cast<Job*>(sleeper);
+		static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
+		static constexpr intptr_t cancelValue = (intptr_t) -2;
+		static constexpr intptr_t doneValue = (intptr_t) -3;
 
-			if(IoChannel *channel = job->channel) {
+		static void handleRequest(Event* event, uintptr_t uarg)
+		{
+			Job* self = static_cast<Job*>(event);
+			IoChannel *channel = self->channel;
+			intptr_t arg = (intptr_t)uarg;
+
+			bool hasTimeout = arg > 0;
+			bool isSubmit = hasTimeout || arg == submitNoTimeoutValue;
+
+			if(isSubmit) {
+
+				// assert(channel, "Internal error, invalid I/O operation state");
+
 				channel->disableProcess();
-
-				bool ret = channel->requests.remove(job);
-
-				if(ret)
-					job->channel = nullptr;
-
+				channel->requests.addBack(self);
 				channel->enableProcess();
 
-				if(ret)
-					job->finished(job, false);
+				if(hasTimeout) {
+					// assert(!self->isSleeping(), "Internal error, invalid I/O operation state");
+					state.sleepList.delay(self, arg);
+				}
+			} else {
+				bool isCancel = hasTimeout || arg == cancelValue;
+				bool isDone = hasTimeout || arg == doneValue;
+
+				// assert(isDone || isCancel, "Internal error, invalid I/O operation argument");
+
+				if(self->isSleeping())
+					state.sleepList.remove(self);
+
+				if(isCancel) {
+
+					// assert(channel, "Internal error, invalid I/O operation state");
+
+					channel->disableProcess();
+
+					bool ok = channel->requests.remove(self);
+					//assert(ok, "Internal error, invalid I/O operation state");
+
+					self->channel = nullptr;
+
+					if(channel->requests.front())
+						channel->enableProcess();
+
+					self->finished(self, Result::Canceled);
+				} else
+					self->finished(self, Result::Done);
+
 			}
 		}
 
-		static inline void nop(Job* job, bool succesful) {}
+		static void timedOut(Sleeper* sleeper) {
+			Job* self = static_cast<Job*>(sleeper);
+
+			if(IoChannel *channel = self->channel) {
+				channel->disableProcess(); // TODO think more about this race condition.
+
+				channel->requests.remove(self);
+				self->channel = nullptr;
+
+				if(channel->requests.front())
+					channel->enableProcess();
+
+				self->finished(self, Result::TimedOut);
+			}
+		}
+
+		static inline void nop(Job* job, Result result) {}
+
 	public:
 
-		inline Job(void (* const finished)(Job*, bool) = &Job::nop): Timeout(&Job::timedOut), finished(finished) {}
+		inline Job(void (*finished)(Job*, Result) = &Job::nop):
+			Sleeper(&Job::timedOut),
+			Event(&Job::handleRequest),
+			finished(finished) {}
 	};
 
 private:
 
 	pet::DoubleList<Job> requests;
+
+	template<uintptr_t value>
+	struct OverwriteCombiner {
+		inline bool operator()(uintptr_t old, uintptr_t& result) const {
+			result = value;
+			return true;
+		}
+	};
 
 protected:
 
@@ -63,52 +134,48 @@ protected:
 
 	void jobDone() {
 		Job* job = requests.popFront();
-		job->finished(job, true);
 
 		if(!requests.front())
 			disableProcess();
 
 		job->channel = nullptr;
 
-		if(job->isSleeping())
-			job->cancel();
+		state.eventList.issue(job, OverwriteCombiner<Job::doneValue>());
 	}
 
 public:
-	// TODO guard by routing through syscall.
-	// TODO make event based from interrupt variant.
-	void submit(Job* job)
-	{
-		disableProcess();
 
-		requests.addBack(job);
+	bool submit(Job* job)
+	{
+		if(job->channel)
+			return false;
+
 		job->channel = this;
-
-		enableProcess();
+		state.eventList.issue(job, OverwriteCombiner<Job::submitNoTimeoutValue>());
+		return true;
 	}
 
-	// TODO guard by routing through syscall.
-	// TODO make event based from interrupt variant.
-	void submitTimeout(Job* job, uintptr_t time)
+	bool submitTimeout(Job* job, uintptr_t time)
 	{
-		submit(job);
+		if(job->channel || !time || time >= (uintptr_t)INTPTR_MAX)
+			return false;
 
-		job->start(time);
+		job->channel = this;
+		state.eventList.issue(job, [time](uintptr_t, uintptr_t& result) {
+			result = time;
+			return true;
+		});
+
+		return true;
 	}
 
-	// TODO guard by routing through syscall.
-	// TODO make event based from interrupt variant.
-	void cancel(Job* job)
+	bool cancel(Job* job)
 	{
-		job->cancel();
+		if(!job->channel)
+			return false;
 
-		disableProcess();
-
-		if(requests.remove(job))
-			job->channel = nullptr;
-
-		if(!requests.front())
-			disableProcess();
+		state.eventList.issue(job, OverwriteCombiner<Job::cancelValue>());
+		return true;
 	}
 };
 

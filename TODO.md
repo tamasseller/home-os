@@ -2,14 +2,6 @@ API
 ---
 
  - Implement IoRequest over IoChannel::Job.
- - Fix IoChannel locking:
-   - handle submission and cancellation through scheduler 
-     context to implement mutual exclusion
-   - also enable handling of submissions through event 
-     based indirection for from-interrupt use.
-   - porbably should probably mix in Timeout and use a single
-     event for submission and sleeper registration.
-
  - Implement ReaderWriterLock (possibly with upgrade option).
  
 Internals
