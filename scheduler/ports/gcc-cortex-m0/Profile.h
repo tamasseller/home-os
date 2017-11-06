@@ -158,6 +158,10 @@ public:
 		suspendedPc = irqEntryStackedPc();
 		irqEntryStackedPc() = (void*)&Idler::sleep;
 	}
+
+	static inline void memoryFence() {
+		asm("":::"memory");
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////

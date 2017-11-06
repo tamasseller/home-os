@@ -181,6 +181,8 @@ class ProfileSample {
 	static void async(void (*handler)());
 
 	static void init(/* platform dependent */);
+
+	static inline void memoryFence();
 };
 
 

@@ -121,8 +121,8 @@ public:
 		suspend = true;
 	}
 
-	static inline void fatalError(const char* msg) {
-		std::cerr << "Fatal error: " << msg << "!" << std::endl;
+	static inline void memoryFence() {
+		asm("":::"memory");
 	}
 };
 

@@ -44,6 +44,16 @@ struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 			return true;
 		});
 	}
+
+	bool compareAndSwap(Data expected, Data update) {
+		return expected == (*this)([expected, update](Data old, Data& result){
+			if(old == expected) {
+				result = update;
+				return true;
+			}
+			return false;
+		});
+	}
 };
 
 #endif /* INTERNAL_ATOMIC_H_ */

@@ -41,7 +41,7 @@ namespace {
 
 		current->x = counter++;
 
-		process.jobDone();
+		process.jobDone(current);
 	}
 }
 

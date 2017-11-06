@@ -19,6 +19,7 @@ public:
 
 	inline Atomic(const Value& value) {
 		data = value;
+		clrex();
 	}
 
 	inline operator Value() {
@@ -32,8 +33,10 @@ public:
 		do {
 			old = ldrex(&this->data);
 
-			if(!op(old, result, args...))
+			if(!op(old, result, args...)) {
 				clrex();
+				break;
+			}
 
 		} while(!strex(&this->data, result));
 

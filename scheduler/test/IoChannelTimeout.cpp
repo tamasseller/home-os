@@ -42,7 +42,7 @@ namespace {
 	void Process::processWorkerIsr() {
 		if(counter) {
 			counter--;
-			process.jobDone();
+			process.jobDone(process.currentJob());
 		}
 	}
 
