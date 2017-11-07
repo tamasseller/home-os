@@ -11,6 +11,7 @@ INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-common
 ifeq ('x','')
 endif
 
+
 # Atomic list related tests.
 
 SOURCES += $(ROOT)/test/LimitedCTree.cpp
@@ -22,28 +23,29 @@ SOURCES += $(ROOT)/test/SharedAtomicListReissue.cpp
 
 SOURCES += $(ROOT)/test/MutexMany.cpp
 SOURCES += $(ROOT)/test/MutexSingle.cpp
+SOURCES += $(ROOT)/test/MutexDeadlock.cpp
+SOURCES += $(ROOT)/test/MutexVsSelect.cpp
 SOURCES += $(ROOT)/test/MutexSingleBusy.cpp
 SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
-SOURCES += $(ROOT)/test/MutexVsSelect.cpp
 
 
 # Semaphore tests.
 
-SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
-SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
-SOURCES += $(ROOT)/test/SemaphorePrio.cpp
-SOURCES += $(ROOT)/test/SemaphoreLock.cpp
-SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
-SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
+SOURCES += $(ROOT)/test/SemaphoreLock.cpp
+SOURCES += $(ROOT)/test/SemaphorePrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
+SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
+SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
+SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
 
 
 # General task management.
 
-SOURCES += $(ROOT)/test/Error.cpp
-SOURCES += $(ROOT)/test/Yield.cpp
-SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Abort.cpp
+SOURCES += $(ROOT)/test/Error.cpp
+SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
 
 
@@ -51,6 +53,13 @@ SOURCES += $(ROOT)/test/TaskStart.cpp
 
 SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
+
+
+# Io management related tests.
+
+SOURCES += $(ROOT)/test/Timeout.cpp
+SOURCES += $(ROOT)/test/IoChannel.cpp
+SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
 
 
 # Io management related tests.

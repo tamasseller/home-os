@@ -13,10 +13,10 @@ endif
 
 # Atomic list related tests.
 
-SOURCES += $(ROOT)/test/TestLimitedCTreeHostOnly.cpp
 SOURCES += $(ROOT)/test/LimitedCTree.cpp
 SOURCES += $(ROOT)/test/SharedAtomicListSimple.cpp
 SOURCES += $(ROOT)/test/SharedAtomicListReissue.cpp
+SOURCES += $(ROOT)/test/TestLimitedCTreeHostOnly.cpp
 
 
 # Mutex related tests.
@@ -31,21 +31,21 @@ SOURCES += $(ROOT)/test/MutexPriorityInversion.cpp
 
 # Semaphore tests.
 
-SOURCES += $(ROOT)/test/SemaphoreLock.cpp
-SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
-SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
-SOURCES += $(ROOT)/test/SemaphorePrio.cpp
-SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
-SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
 SOURCES += $(ROOT)/test/Select.cpp
+SOURCES += $(ROOT)/test/SemaphoreLock.cpp
+SOURCES += $(ROOT)/test/SemaphorePrio.cpp
+SOURCES += $(ROOT)/test/SemaphoreFromIrq.cpp
+SOURCES += $(ROOT)/test/SemaphoreTimeout.cpp
+SOURCES += $(ROOT)/test/SemaphoreCounting.cpp
+SOURCES += $(ROOT)/test/SemaphorePassaround.cpp
 
 
 # General task management.
 
-SOURCES += $(ROOT)/test/Error.cpp
-SOURCES += $(ROOT)/test/Yield.cpp
-SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Abort.cpp
+SOURCES += $(ROOT)/test/Error.cpp
+SOURCES += $(ROOT)/test/Sleep.cpp
+SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
 
 
@@ -60,6 +60,7 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 SOURCES += $(ROOT)/test/Timeout.cpp
 SOURCES += $(ROOT)/test/IoChannel.cpp
 SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
+
 
 # Testing utilities.
 

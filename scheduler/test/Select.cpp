@@ -7,8 +7,10 @@
 
 #include "common/CommonTestUtils.h"
 
+using Os = OsRr;
+
 namespace {
-	typedef typename OsRr::BinarySemaphore Semaphore;
+	typedef typename Os::BinarySemaphore Semaphore;
 	static Semaphore s12, s23, s31;
 	static Semaphore s13, s32, s21;
 
@@ -18,10 +20,13 @@ namespace {
 		int counter = 0;
 		void run() {
 			for(int i = 0; i < UINT16_MAX/3; i++) {
-				if(OsRr::select(&sPendForward, &sPendReverse) == &sPendForward)
+				auto ret = Os::select(&sPendForward, &sPendReverse);
+				if(ret == &sPendForward)
 					sSendForward.notifyFromTask();
-				else
+				else if(ret == &sPendReverse)
 					sSendReverse.notifyFromTask();
+				else
+					Os::abort("Internal error detected during testing");
 
 				counter++;
 			}
@@ -38,19 +43,19 @@ namespace {
 		t2(s12, s23, s32, s21),
 		t3(s23, s31, s13, s32);
 
-	OsRr::BinarySemaphore semTo;
+	Os::BinarySemaphore semTo;
 	bool error = false;
 	struct TaskTo: TestTask<TaskTo> {
 		void run() {
 
-			if(OsRr::selectTimeout(0, &semTo) != &semTo)
+			if(Os::selectTimeout(0, &semTo) != &semTo)
 				error = true;
 
-			if(OsRr::selectTimeout(0, &semTo) != nullptr)
+			if(Os::selectTimeout(0, &semTo) != nullptr)
 				error = true;
 
 			for(int i=0; i<10; i++)
-				if(OsRr::selectTimeout(10, &semTo) != nullptr)
+				if(Os::selectTimeout(10, &semTo) != nullptr)
 					error = true;
 		}
 	} tTo;

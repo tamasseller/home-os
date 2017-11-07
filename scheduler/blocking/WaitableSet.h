@@ -53,15 +53,19 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 		return reinterpret_cast<uintptr_t>(blocker);
 	}
 
-	virtual void remove(Blockable* blockable, Blocker* blocker) override final
+	virtual void canceled(Blockable* blockable, Blocker* blocker) override final
 	{
 		assert(blockable == waiters[0].task, ErrorStrings::unknownError);
 
 		for(uintptr_t i = 0; i < nWaiters; i++)
-			waiters[i].blocker->remove(waiters + i, this);
+			waiters[i].blocker->canceled(waiters + i, this);
 
-		if(!blocker)
-			Profile::injectReturnValue(static_cast<Task*>(blockable), reinterpret_cast<uintptr_t>(blocker));
+		Profile::injectReturnValue(static_cast<Task*>(blockable), reinterpret_cast<uintptr_t>(blocker));
+	}
+
+	virtual void timedOut(Blockable* blockable) override final
+	{
+		this->WaitableSet::canceled(blockable, nullptr);
 	}
 
 	virtual void priorityChanged(Blockable*, typename Policy::Priority old) override final

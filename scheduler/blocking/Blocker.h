@@ -29,26 +29,30 @@ class Scheduler<Args...>::Blocker
 	friend Scheduler<Args...>;
 
 	/**
-	 * Remove a blocked element.
+	 * Remove a blocked element, due to cancellation.
 	 *
-	 * There are two distinct scenarios that can lead to calling this:
-	 *
-	 *  1. If the second argument is null: a timeout occured and the tick
-	 *     handler called this method.
-	 *  2. If the second argument is not null: a regular release-type
-	 *     event triggers the release of the blocked task.
-	 *
-	 * In the first case the receiver should fill in the return value for
-	 * the task in question as specified for a timeout event.
-	 *
-	 * In the second case, the receiver should only remove the element
-	 * without any further processing, because there is another blocker,
-	 * that is responsible for handling the return value.
+	 * The receiver should only remove the element without any further
+	 * processing, because the caller is responsible for handling the
+	 * return value. This done like this to enable overwriting the
+	 * default behavior of the individual blockers in a multi-wait
+	 * scenario, regarding the value returned.
 	 *
 	 * @NOTE This is a usual virtual method, only called through regular
 	 *       virtual method dispatching.
 	 */
-	virtual void remove(Blockable* blockable, Blocker* blocker) = 0;
+	virtual void canceled(Blockable* blockable, Blocker* blocker) = 0;
+
+	/**
+	 * Remove a blocked element, due to timeout.
+	 *
+	 * If a timeout occurs this method gets called, the receiver shall
+	 * fill in the return value for the task in question as specified
+	 * for a timeout event and remove it from the waiters queue.
+	 *
+	 * @NOTE This is a usual virtual method, only called through regular
+	 *       virtual method dispatching.
+	 */
+	virtual void timedOut(Blockable* blockable) = 0;
 
 	/**
 	 * Update the internal ordering.

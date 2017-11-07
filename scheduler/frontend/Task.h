@@ -43,7 +43,7 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 			Task* self = static_cast<Task*>(sleeper);
 
 			if(self->blockedBy) {
-				self->blockedBy->remove(self, nullptr);
+				self->blockedBy->timedOut(self);
 				self->blockedBy = nullptr;
 			}
 

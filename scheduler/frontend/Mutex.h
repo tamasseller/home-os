@@ -33,7 +33,11 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
 	 */
 
-	virtual void remove(Blockable*, Blocker*) override final {
+	virtual void canceled(Blockable*, Blocker*) override final {
+		assert(false, ErrorStrings::mutexBlockerUsage);
+	}
+
+	virtual void timedOut(Blockable*) override final {
 		assert(false, ErrorStrings::mutexBlockerUsage);
 	}
 

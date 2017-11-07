@@ -26,7 +26,7 @@ protected:
 			if(waken->isSleeping())
 				state.sleepList.remove(waken);
 
-			waken->blockedBy->remove(waken, this);
+			waken->blockedBy->canceled(waken, this);
 
 			state.policy.addRunnable(waken);
 
@@ -36,11 +36,13 @@ protected:
 		return false;
 	}
 
-	virtual void remove(Blockable* ba, Blocker* be) final override {
+	virtual void canceled(Blockable* ba, Blocker* be) final override {
 		this->waiters.remove(ba);
+	}
 
-		if(!be)
-			Profile::injectReturnValue(ba->getTask(), false);
+	virtual void timedOut(Blockable* ba) final override {
+		this->waiters.remove(ba);
+		Profile::injectReturnValue(ba->getTask(), Semaphore::timeoutReturnValue);
 	}
 
 public:
