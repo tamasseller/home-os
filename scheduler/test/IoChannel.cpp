@@ -11,7 +11,35 @@ using Os=OsRr;
 
 namespace {
 	class Process: public Os::IoChannel {
+	public:
+		inline virtual ~Process() {}
+
+		struct Job: Os::IoChannel::Job {
+			Job *next, *prev;
+			unsigned int x;
+		};
+
+		void reset() {
+			counter = 0;
+		}
+
+	private:
+
 		static void processWorkerIsr();
+
+		pet::DoubleList<Job> requests;
+
+		virtual bool addJob(Os::IoChannel::Job* job) {
+			return requests.addBack(static_cast<Job*>(job));
+		}
+
+		virtual bool removeJob(Os::IoChannel::Job* job) {
+			return requests.remove(static_cast<Job*>(job));
+		}
+
+		virtual bool hasJob() {
+			return requests.front() != nullptr;
+		}
 
 		virtual void enableProcess() {
 			CommonTestUtils::registerIrq(&Process::processWorkerIsr);
@@ -22,22 +50,12 @@ namespace {
 		}
 
 		static unsigned int counter;
-	public:
-		inline virtual ~Process() {}
-
-		struct Job: Os::IoChannel::Job {
-			unsigned int x;
-		};
-
-		void reset() {
-			counter = 0;
-		}
 	} process;
 
 	unsigned int Process::counter;
 
 	void Process::processWorkerIsr() {
-		Job* current = static_cast<Job*>(process.currentJob());
+		Job* current = process.requests.front();
 
 		current->x = counter++;
 

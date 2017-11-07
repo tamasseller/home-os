@@ -14,9 +14,6 @@ template<class... Args>
 class Scheduler<Args...>::IoChannel { // TODO add registration
 	friend Scheduler<Args...>;
 
-	virtual void enableProcess() = 0;
-	virtual void disableProcess() = 0;
-
 public:
 	class Job: Sleeper, Event {
 	public:
@@ -27,10 +24,6 @@ public:
 
 	private:
 		friend Scheduler<Args...>;
-		friend pet::DoubleList<Job>;
-
-		// XXX generalize
-		Job *next, *prev;
 
 		// TODO describe actors and their locking and actions.
 		Atomic<IoChannel *> channel = nullptr;
@@ -57,16 +50,16 @@ public:
 					continue;
 				}
 
-				bool ok = channel->requests.remove(self);
+				bool ok = channel->removeJob(self);
 				/*
 				 * This operation must not fail because the channel pointer
 				 * is acquired exclusively
 				 */
-				//assert(ok, "Internal error, invalid I/O operation state");
+				assert(ok, "Internal error, invalid I/O operation state");
 
 				self->channel = nullptr;
 
-				if(channel->requests.front())
+				if(channel->hasJob())
 					channel->enableProcess();
 
 				self->finished(self, Result::Canceled);
@@ -99,12 +92,12 @@ public:
 				 */
 				IoChannel *channel = self->channel;
 
-				// assert(channel, "Internal error, invalid I/O operation state");
+				assert(channel, "Internal error, invalid I/O operation state");
 
 				// TODO add channel pointer registration checking
 
 				channel->disableProcess();
-				channel->requests.addBack(self);
+				channel->addJob(self);
 				channel->enableProcess();
 
 				if(hasTimeout) {
@@ -117,7 +110,7 @@ public:
 				bool isCancel = hasTimeout || arg == cancelValue;
 				bool isDone = hasTimeout || arg == doneValue;
 
-				// assert(isDone || isCancel, "Internal error, invalid I/O operation argument");
+				assert(isDone || isCancel, "Internal error, invalid I/O operation argument");
 
 				if(self->isSleeping())
 					state.sleepList.remove(self);
@@ -150,8 +143,11 @@ public:
 
 private:
 
-	// XXX generalize
-	pet::DoubleList<Job> requests;
+	virtual void enableProcess() = 0;
+	virtual void disableProcess() = 0;
+	virtual bool hasJob() = 0;
+	virtual bool addJob(Job*) = 0;
+	virtual bool removeJob(Job*) = 0;
 
 	template<uintptr_t value>
 	struct OverwriteCombiner {
@@ -162,11 +158,6 @@ private:
 	};
 
 protected:
-	// XXX generalize
-	Job* currentJob() {
-		return requests.front();
-	}
-
 	void jobDone(Job* job) {
 		/*
 		 * TODO describe relevance in locking mechanism of removeSynchronized.
@@ -175,9 +166,9 @@ protected:
 
 		Profile::memoryFence();
 
-		requests.remove(job);
+		removeJob(job);
 
-		if(!requests.front())
+		if(!hasJob())
 			disableProcess();
 
 		state.eventList.issue(job, OverwriteCombiner<Job::doneValue>());

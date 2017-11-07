@@ -11,20 +11,11 @@ using Os=OsRr;
 
 namespace {
 	class Process: public Os::IoChannel {
-		static void processWorkerIsr();
-
-		virtual void enableProcess() {
-			CommonTestUtils::registerIrq(&Process::processWorkerIsr);
-		}
-
-		virtual void disableProcess() {
-			CommonTestUtils::registerIrq(nullptr);
-		}
-
 	public:
 		inline virtual ~Process() {}
 
 		struct Job: Os::IoChannel::Job {
+			Job *next, *prev;
 			int success;
 
 			static void writeResult(Os::IoChannel::Job* item, Os::IoChannel::Job::Result result) {
@@ -35,6 +26,32 @@ namespace {
 		public:
 			inline Job(): Os::IoChannel::Job(&Job::writeResult), success(-1) {}
 		};
+
+	private:
+		static void processWorkerIsr();
+
+		pet::DoubleList<Job> requests;
+
+		virtual bool addJob(Os::IoChannel::Job* job) {
+			return requests.addBack(static_cast<Job*>(job));
+		}
+
+		virtual bool removeJob(Os::IoChannel::Job* job) {
+			return requests.remove(static_cast<Job*>(job));
+		}
+
+		virtual bool hasJob() {
+			return requests.front() != nullptr;
+		}
+
+		virtual void enableProcess() {
+			CommonTestUtils::registerIrq(&Process::processWorkerIsr);
+		}
+
+		virtual void disableProcess() {
+			CommonTestUtils::registerIrq(nullptr);
+		}
+
 	} process;
 
 	volatile unsigned int counter;
@@ -42,7 +59,7 @@ namespace {
 	void Process::processWorkerIsr() {
 		if(counter) {
 			counter--;
-			process.jobDone(process.currentJob());
+			process.jobDone(process.requests.front());
 		}
 	}
 

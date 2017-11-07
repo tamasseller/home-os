@@ -19,6 +19,8 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	friend Scheduler<Args...>;
 	static constexpr uintptr_t blockedReturnValue = 0;
 
+	template<bool, class=void> class DeadlockDetectionSwitch;
+
 	typename Policy::Priority &accessPriority() {
 		return *static_cast<typename Policy::Priority*>(this);
 	}
@@ -27,7 +29,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	uintptr_t relockCounter = 0;
 
 	/*
-	 * These two methods are never called during normal operation, so
+	 * This method is never called during normal operation, so
 	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
 	 */
 
@@ -40,8 +42,16 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 	 * LCOV_EXCL_STOP is placed here.
 	 */
 
-	virtual Blocker* getTakeable(Task* task) override final {
+	virtual Blocker* getTakeable(Task* task) override final
+	{
+		assert(!DeadlockDetectionSwitch<deadlockDetectionEnabled>::detectDeadlock(this, task),
+				ErrorStrings::mutexDeadlock);
+
 		return (!owner || owner == task) ? this : nullptr;
+	}
+
+	virtual Task* getOwner() override final {
+		return owner;
 	}
 
 	virtual void block(Blockable* b) override final {
@@ -139,5 +149,37 @@ public:
 		Registry<Mutex>::unregisterObject(this);
 	}
 };
+
+template<class... Args>
+template<class Dummy>
+struct Scheduler<Args...>::Mutex::DeadlockDetectionSwitch<false, Dummy> {
+	static bool detectDeadlock(Blocker* blocker, Task* task) {
+		return false;
+	}
+};
+
+template<class... Args>
+template<class Dummy>
+struct Scheduler<Args...>::Mutex::DeadlockDetectionSwitch<true, Dummy> {
+	static bool detectDeadlock(Blocker* blocker, Task* checkedTask)
+	{
+		if(blocker->getOwner() == checkedTask)
+			return false;
+
+		while(blocker) {
+			if(Task* otherTask = blocker->getOwner()) {
+				if(otherTask == checkedTask)
+					return true;
+
+				blocker = otherTask->blockedBy;
+			} else {
+				break;
+			}
+		}
+
+		return false;
+	}
+};
+
 
 #endif /* MUTEX_H_ */

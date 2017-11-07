@@ -24,6 +24,7 @@ struct Scheduler<Args...>::ErrorStrings {
 	static constexpr const char* mutexBlockerUsage = "Only priority change can be handled through the Blocker interface of a Mutex";
 	static constexpr const char* mutexNonOwnerUnlock = "Mutex unlock from non-owner task";
 	static constexpr const char* mutexAsyncUnlock = "Asynchronous mutex unlock";
+	static constexpr const char* mutexDeadlock = "Blocking dependency loop detected while acquiring lock";
 
 	static constexpr const char* taskDelayTooBig = "Delay time too big!";
 

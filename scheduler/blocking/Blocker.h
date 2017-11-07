@@ -145,6 +145,18 @@ class Scheduler<Args...>::Blocker
 	virtual bool release(uintptr_t n) = 0;
 
 	/**
+	 * Return the owner if it is applicable to this blocker and exists.
+	 *
+	 * For example, a mutex has an explicit owner when locked, in this
+	 * case it returns the owner who has the lock. Synchronization
+	 * objects that have no concept of owner shall return null.
+	 *
+	 * @NOTE This method is used through virtual calls by the deadlock
+	 *       detection mechanism (when it is enabled).
+	 */
+	virtual Task* getOwner() {return nullptr;}
+
+	/**
 	 * Return value for timed out request.
 	 *
 	 * This value gets returned when timed blocking request fail to

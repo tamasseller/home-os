@@ -62,6 +62,7 @@ inline void Scheduler<Args...>::switchToNext()
 template<class... Args>
 template<class Dummy> struct Scheduler<Args...>::AssertSwitch<true, Dummy> {
 	static inline void assert(bool cond, const char* msg) {
+		// TODO determine context somehow and call abort from task.
 		if(!cond)
 			Scheduler<Args...>::Profile::finishLast(msg);
 	}
