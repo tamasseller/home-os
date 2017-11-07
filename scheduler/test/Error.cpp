@@ -27,6 +27,7 @@ TEST(Error, InvalidSyscallArgumentAsync)
 {
 	struct Task: public TestTask<Task> {
 		static void frobnicator() {
+			CommonTestUtils::registerIrq(nullptr);
 			reinterpret_cast<Os::CountingSemaphore*>(0xbadf00d0)->notifyFromInterrupt();
 		}
 

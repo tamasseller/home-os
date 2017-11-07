@@ -249,6 +249,12 @@ inline const char* Scheduler<Args...>::start(T... t) {
 	const char* ret = Profile::startFirst(firstTask);
 
 	/*
+	 * Reset handlers to detect platform tear-down issues.
+	 */
+	Profile::setTickHandler(nullptr);
+	Profile::setSyscallMapper(nullptr);
+
+	/*
 	 * Reset state to initial values.
 	 */
 	state.~State();
