@@ -10,6 +10,7 @@ Internals
  - Handle mutexes in WaitableSet or disallow somehow.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement event tracing callback interface.
+ - Implement fair scheduling policy (needs hires timing)
  - Fortify teardown process clearing syscall and tick handlers.
 
 Backend
