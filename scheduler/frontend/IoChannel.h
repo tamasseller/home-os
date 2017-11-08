@@ -39,7 +39,7 @@ public:
 			// cancelation and timeout on channel field).
 			while(IoChannel *channel = self->channel) {
 
-				// TODO add channel pointer registration checking
+				Registry<IoChannel>::check(channel);
 
 				channel->disableProcess();
 
@@ -94,7 +94,7 @@ public:
 
 				assert(channel, "Internal error, invalid I/O operation state");
 
-				// TODO add channel pointer registration checking
+				Registry<IoChannel>::check(channel);
 
 				channel->disableProcess();
 				channel->addJob(self);
@@ -188,8 +188,6 @@ public:
 
 	bool submit(Job* job)
 	{
-		Registry<IoChannel>::check(this);
-
 		if(!takeJob(job))
 			return false;
 
@@ -199,8 +197,6 @@ public:
 
 	bool submitTimeout(Job* job, uintptr_t time)
 	{
-		Registry<IoChannel>::check(this);
-
 		if(!time || time >= (uintptr_t)INTPTR_MAX)
 			return false;
 
@@ -217,7 +213,6 @@ public:
 
 	void cancel(Job* job)
 	{
-		Registry<IoChannel>::check(this);
 		state.eventList.issue(job, OverwriteCombiner<Job::cancelValue>());
 	}
 
