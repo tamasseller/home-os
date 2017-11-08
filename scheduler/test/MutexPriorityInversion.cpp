@@ -17,7 +17,7 @@ namespace {
 	struct T0: public TestTask<T0, OsRt4> {
 		void run() {
 			*tp++ = 'a';
-			OsRt4::sleep(3);
+			OsRt4::sleep(30);
 			*tp++ = 'h';
 			m2.lock();
 			*tp++ = 'k';
@@ -28,7 +28,7 @@ namespace {
 	struct T1: public TestTask<T1, OsRt4> {
 		void run() {
 			*tp++ = 'b';
-			OsRt4::sleep(2);
+			OsRt4::sleep(20);
 			*tp++ = 'g';
 			m2.lock();
 			m1.lock();
@@ -43,9 +43,9 @@ namespace {
 		bool done = false;
 		void run() {
 			*tp++ = 'c';
-			OsRt4::sleep(1);
+			OsRt4::sleep(10);
 			*tp++ = 'f';
-			CommonTestUtils::busyWorkMs(80);
+			CommonTestUtils::busyWorkMs(50);
 			*tp++ = 'm';
 		}
 	} t2;
@@ -55,7 +55,7 @@ namespace {
 			*tp++ = 'd';
 			m1.lock();
 			*tp++ = 'e';
-			CommonTestUtils::busyWorkMs(10);
+			CommonTestUtils::busyWorkMs(40);
 			*tp++ = 'i';
 			m1.unlock();
 			*tp++ = 'n';

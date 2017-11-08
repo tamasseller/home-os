@@ -59,8 +59,9 @@ struct SchedulerOptions {
 		class SharedAtomicList;
 		class BinarySemaphore;
 		class CountingSemaphore;
-		class IoRequest;
+
 		class IoChannel;
+		template<class> class IoRequest;
 
 	private:
 		template<class> friend class OsInternalTester;
@@ -71,8 +72,11 @@ struct SchedulerOptions {
 		class Blocker;
 		class SharedBlocker;
 		template<class> class AsyncBlocker;
+		template<class> class WaitableBlocker;
 		template<class> class SemaphoreLikeBlocker;
 		class WaitableSet;
+
+		class IoRequestCommon;
 
 		class Policy;
 		template<ScalabilityHint, class = void> class SleeperBase;
@@ -139,7 +143,14 @@ struct SchedulerOptions {
 		/**
 		 * The globally visible internal state wrapped in a single struct.
 		 */
-		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet, IoChannel> {
+		static struct State: RegistryRootHub<
+				Mutex,
+				CountingSemaphore,
+				BinarySemaphore,
+				WaitableSet,
+				IoChannel,
+				IoRequestCommon
+			> {
 			inline void* operator new(size_t, void* x) { return x; }
 			Policy policy;
 			bool isRunning = false;
@@ -207,10 +218,13 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "syscall/ObjectRegistry.h"
 
 #include "blocking/Policy.h"
+
 #include "blocking/Blocker.h"
 #include "blocking/AsyncBlocker.h"
 #include "blocking/SharedBlocker.h"
+#include "blocking/WaitableBlocker.h"
 #include "blocking/SemaphoreLikeBlocker.h"
+
 #include "blocking/Sleeping.h"
 #include "blocking/Blockable.h"
 #include "blocking/WaitableSet.h"
@@ -219,7 +233,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "frontend/Task.h"
 #include "frontend/BinarySemaphore.h"
 #include "frontend/CountingSemaphore.h"
-//#include "frontend/IoRequest.h"
+#include "frontend/IoRequest.h"
 #include "frontend/IoChannel.h"
 
 ///////////////////////////////////////////////////////////////////////////////

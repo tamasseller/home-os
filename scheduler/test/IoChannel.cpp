@@ -1,92 +1,163 @@
 /*
- * Io.cpp
+ * IoChannelTimeout.cpp
  *
  *  Created on: 2017.11.05.
  *      Author: tooma
  */
 
 #include "common/CommonTestUtils.h"
+#include "common/DummyProcess.h"
 
 using Os=OsRr;
-
-namespace {
-	class Process: public Os::IoChannel {
-	public:
-		inline virtual ~Process() {}
-
-		struct Job: Os::IoChannel::Job {
-			Job *next, *prev;
-			unsigned int x;
-		};
-
-		void reset() {
-			counter = 0;
-		}
-
-	private:
-
-		static void processWorkerIsr();
-
-		pet::DoubleList<Job> requests;
-
-		virtual bool addJob(Os::IoChannel::Job* job) {
-			return requests.addBack(static_cast<Job*>(job));
-		}
-
-		virtual bool removeJob(Os::IoChannel::Job* job) {
-			return requests.remove(static_cast<Job*>(job));
-		}
-
-		virtual bool hasJob() {
-			return requests.front() != nullptr;
-		}
-
-		virtual void enableProcess() {
-			CommonTestUtils::registerIrq(&Process::processWorkerIsr);
-		}
-
-		virtual void disableProcess() {
-			CommonTestUtils::registerIrq(nullptr);
-		}
-
-		static unsigned int counter;
-	} process;
-
-	unsigned int Process::counter;
-
-	void Process::processWorkerIsr() {
-		Job* current = process.requests.front();
-
-		current->x = counter++;
-
-		process.jobDone(current);
-	}
-}
+using Base = DummyProcessJobsBase<Os>;
+static auto &process = DummyProcess<Os>::instance;
 
 TEST(IoChannel) {
-	struct Task: public TestTask<Task> {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
 		void run() {
-			Process::Job jobs[5];
+			process.counter = 0;
 
-			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-				jobs[i].x = -1;
-				process.submit(jobs + i);
+			if(!postJobsNoTimeout()) {
+				error = true;
+				return;
 			}
 
-			while(true) {
-				bool done = true;
-				for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-					if(jobs[i].x != i)
-						done = false;
+			Os::sleep(50);
+			process.counter = 5;
 
-				if(done)
-					break;
+			if(checkJobs() != 5) {
+				error = true;
+				return;
 			}
 		}
 	} task;
 
 	process.init();
-	process.reset();
 	task.start();
 	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+TEST(IoChannelTimeout) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			process.counter = 0;
+			for(int i=sizeof(jobs)/sizeof(jobs[0]); i>=0; i--) {
+
+				if(!postJobs()) {
+					error = true;
+					return;
+				}
+
+				process.counter = i;
+
+				if(checkJobs() != i) {
+					error = true;
+					return;
+				}
+			}
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+TEST(IoChannelTimeoutPostpone) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			process.counter = 0;
+
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
+
+			Os::sleep(50);
+
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+				if(jobs[i].success != -1)
+					error = true;
+
+			if(postJobs()) {
+				error = true;
+				return;
+			}
+
+			process.counter = 5;
+
+			if(checkJobs() != 5)
+				error = true;
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+TEST(IoChannelTimeoutDoTimout) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			process.counter = 0;
+
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
+
+			Os::sleep(110);
+
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+				if(jobs[i].success != (int)Os::IoChannel::Job::Result::TimedOut)
+					error = true;
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+
+TEST(IoChannelTimeoutCancel) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			process.counter = 0;
+
+			if(!postJobs()) {
+				error = true;
+				return;
+			}
+
+			Os::sleep(40);
+
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+				process.cancel(jobs + i);
+
+			Os::sleep(10);
+
+			process.counter = 5;
+
+			Os::sleep(50);
+
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+				if(jobs[i].success != (int)Os::IoChannel::Job::Result::Canceled)
+					error = true;
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
 }

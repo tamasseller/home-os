@@ -81,6 +81,17 @@ public:
 	inline Task *getTask() {
 		return getTaskVirtual(this);
 	}
+
+	void wake(Blocker* blocker) {
+		Task* waken = getTask();
+
+		if(waken->isSleeping())
+			state.sleepList.remove(waken);
+
+		waken->blockedBy->canceled(waken, blocker);
+
+		state.policy.addRunnable(waken);
+	}
 };
 
 #endif /* BLOCKABLE_H_ */

@@ -59,14 +59,7 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
 SOURCES += $(ROOT)/test/Timeout.cpp
 SOURCES += $(ROOT)/test/IoChannel.cpp
-SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
-
-
-# Io management related tests.
-
-SOURCES += $(ROOT)/test/Timeout.cpp
-SOURCES += $(ROOT)/test/IoChannel.cpp
-SOURCES += $(ROOT)/test/IoChannelTimeout.cpp
+SOURCES += $(ROOT)/test/IoRequest.cpp
 
 
 # Testing utilities.

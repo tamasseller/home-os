@@ -1,14 +1,13 @@
 API
 ---
 
- - Implement IoRequest over IoChannel::Job.
  - Implement ReaderWriterLock (possibly with upgrade option).
  - Implement work continuation and re-blocking thingy around blocking calls.
+ - Namespacing
  
 Internals
 ---------
 
- - Handle mutexes in WaitableSet or disallow somehow.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement event tracing callback interface.
  - Implement fair scheduling policy (needs hires timing)
@@ -25,6 +24,7 @@ Backend
 Documentation
 -------------
 
+ - Header banners.
  - Overview:
    - Preemption levels (task, syscall, user interrupt)
    - Event list based communication
@@ -44,6 +44,7 @@ Documentation
    - IoChannel.h
    - Task.h
    - Mutex.h
+     - Explanation Blocker private base (inhibit select)
    - BinarySemaphore.h
    - CountingSemaphore.h
    - Preemption.h

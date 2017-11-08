@@ -28,7 +28,7 @@ public:
 		// TODO describe actors and their locking and actions.
 		Atomic<IoChannel *> channel = nullptr;
 
-		void (* const finished)(Job*, Result);
+		void (* finished)(Job*, Result);
 
 		static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 		static constexpr intptr_t cancelValue = (intptr_t) -2;
