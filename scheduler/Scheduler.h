@@ -139,7 +139,7 @@ struct SchedulerOptions {
 		/**
 		 * The globally visible internal state wrapped in a single struct.
 		 */
-		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet> {
+		static struct State: RegistryRootHub<Mutex, CountingSemaphore, BinarySemaphore, WaitableSet, IoChannel> {
 			inline void* operator new(size_t, void* x) { return x; }
 			Policy policy;
 			bool isRunning = false;

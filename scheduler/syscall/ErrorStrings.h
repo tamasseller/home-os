@@ -28,6 +28,8 @@ struct Scheduler<Args...>::ErrorStrings {
 
 	static constexpr const char* taskDelayTooBig = "Delay time too big!";
 
+	static constexpr const char* ioChannelDelete = "Io channels can not be deleted with an active scheduler.";
+
 	static constexpr const char* ioRequestReuse = "Attempt to reuse an already occupied io request object";
 };
 

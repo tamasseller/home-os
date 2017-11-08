@@ -81,7 +81,10 @@ struct Scheduler<Args...>::SyscallMap: detail::SyscallDb<
     SYSCALL(doRegisterObject<WaitableSet>),
     SYSCALL(doUnregisterObject<WaitableSet>),
     SYSCALL(doBlock<WaitableSet>),
-    SYSCALL(doTimedBlock<WaitableSet>)
+    SYSCALL(doTimedBlock<WaitableSet>),
+
+    SYSCALL(doRegisterObject<IoChannel>),
+    SYSCALL(doUnregisterObject<IoChannel>)
 >{};
 
 template<class... Args>

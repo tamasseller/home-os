@@ -11,7 +11,7 @@
 #include "Scheduler.h"
 
 template<class... Args>
-class Scheduler<Args...>::IoChannel { // TODO add registration
+class Scheduler<Args...>::IoChannel: Registry<IoChannel>::ObjectBase { // TODO add registration
 	friend Scheduler<Args...>;
 
 public:
@@ -183,12 +183,12 @@ private:
 public:
 
 	void init() {
-		// TODO add registration
+		Registry<IoChannel>::registerObject(this);
 	}
 
 	bool submit(Job* job)
 	{
-		// TODO add this pointer registration checking
+		Registry<IoChannel>::check(this);
 
 		if(!takeJob(job))
 			return false;
@@ -199,7 +199,7 @@ public:
 
 	bool submitTimeout(Job* job, uintptr_t time)
 	{
-		// TODO add this pointer registration checking
+		Registry<IoChannel>::check(this);
 
 		if(!time || time >= (uintptr_t)INTPTR_MAX)
 			return false;
@@ -217,7 +217,7 @@ public:
 
 	void cancel(Job* job)
 	{
-		// TODO add this pointer registration checking
+		Registry<IoChannel>::check(this);
 		state.eventList.issue(job, OverwriteCombiner<Job::cancelValue>());
 	}
 
@@ -227,6 +227,8 @@ public:
 		 * can be jobs referencing it that can trigger execution in
 		 * various asynchronous contexts.
 		 */
+
+		assert(!state.isRunning, ErrorStrings::ioChannelDelete);
 	}
 };
 

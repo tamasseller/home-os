@@ -126,6 +126,7 @@ TEST(IoChannelTimeout) {
 		}
 	} task;
 
+	process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -160,6 +161,7 @@ TEST(IoChannelTimeoutPostpone) {
 		}
 	} task;
 
+	process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -184,6 +186,7 @@ TEST(IoChannelTimeoutDoTimout) {
 		}
 	} task;
 
+	process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -218,6 +221,7 @@ TEST(IoChannelTimeoutCancel) {
 		}
 	} task;
 
+	process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);

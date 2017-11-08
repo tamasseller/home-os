@@ -8,7 +8,6 @@ API
 Internals
 ---------
 
- - Add IoChannel registration and checking.
  - Handle mutexes in WaitableSet or disallow somehow.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement event tracing callback interface.

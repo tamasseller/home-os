@@ -85,6 +85,7 @@ TEST(IoChannel) {
 		}
 	} task;
 
+	process.init();
 	process.reset();
 	task.start();
 	CommonTestUtils::start();
