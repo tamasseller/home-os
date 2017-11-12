@@ -202,3 +202,63 @@ TEST(IoRequestIoTimeoutSelect) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+
+TEST(IoRequestMulti) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			Os::IoRequest<Process::MultiJob<3>> multiReq;
+			multiReq.init();
+			process.counter = 0;
+			process.submit(&multiReq);
+			process.counter = 3;
+
+			multiReq.wait();
+
+			for(int i=0; i<3; i++)
+				CHECK(multiReq.success[i] == (int)Process::Job::Result::Done);
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+
+TEST(IoRequestMultiSelect) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			Os::IoRequest<Process::MultiJob<3>> multiReq[2];
+
+			process.counter = 0;
+
+			for(auto &x: multiReq) {
+				x.init();
+				process.submit(&x);
+			}
+
+			process.counter = 6;
+
+			auto ret = Os::select(&multiReq[0], &multiReq[1]);
+
+			CHECK(ret);
+
+			if(ret == multiReq)
+				multiReq[1].wait();
+			else
+				multiReq[0].wait();
+
+			for(auto &x: multiReq)
+				for(int i=0; i<3; i++)
+					CHECK(x.success[i] == (int)Process::Job::Result::Done);
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}

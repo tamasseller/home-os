@@ -28,15 +28,15 @@ public:
 		// TODO describe actors and their locking and actions.
 		Atomic<IoChannel *> channel = nullptr;
 
-		void (* finished)(Job*, Result);
+		bool (* finished)(Job*, Result);
 
 		static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 		static constexpr intptr_t cancelValue = (intptr_t) -2;
 		static constexpr intptr_t doneValue = (intptr_t) -3;
 
 		static inline bool removeSynhronized(Job* self) {
-			// TODO describe locking hackery (race between process completion (and possible re-submission),
-			// cancelation and timeout on channel field).
+			// TODO describe locking hackery (race between process completion (and
+			// possible re-submission), cancelation and timeout on channel field).
 			while(IoChannel *channel = self->channel) {
 
 				Registry<IoChannel>::check(channel);
@@ -131,11 +131,11 @@ public:
 				self->finished(self, Result::TimedOut);
 		}
 
-		static inline void nop(Job* job, Result result) {}
+		static inline bool nop(Job* job, Result result) {return false;}
 
 	public:
 
-		inline Job(void (*finished)(Job*, Result) = &Job::nop):
+		inline Job(bool (*finished)(Job*, Result) = &Job::nop):
 			Sleeper(&Job::timedOut),
 			Event(&Job::handleRequest),
 			finished(finished) {}

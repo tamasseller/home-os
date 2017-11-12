@@ -53,12 +53,6 @@ inline void Scheduler<Args...>::switchToNext()
 		Profile::suspendExecution();
 }
 
-/*
- * Obviously the assert function should not go through the active
- * branch when the system is intact, so LCOV_EXCL_START is placed
- * to avoid confusing the test coverage analysis.
- */
-
 template<class... Args>
 template<class Dummy> struct Scheduler<Args...>::AssertSwitch<true, Dummy> {
 	static inline void assert(bool cond, const char* msg) {
@@ -79,8 +73,32 @@ inline void Scheduler<Args...>::assert(bool cond, const char* msg)
 	AssertSwitch<assertEnabled>::assert(cond, msg);
 }
 
-/*
- * LCOV_EXCL_STOP is placed here to balance the previous lcov directive.
- */
+template<class... Args>
+template<class ActualBlocker>
+inline uintptr_t Scheduler<Args...>::blockOn(ActualBlocker* blocker)
+{
+	auto id = Scheduler<Args...>::template Registry<ActualBlocker>::getRegisteredId(blocker);
+	uintptr_t ret;
+
+	do {
+		ret = syscall<SYSCALL(doBlock<ActualBlocker>)>(id);
+	} while(blocker->continuation(ret));
+
+	return ret;
+}
+
+template<class... Args>
+template<class ActualBlocker>
+inline uintptr_t Scheduler<Args...>:: timedBlockOn(ActualBlocker* blocker, uintptr_t timeout)
+{
+	auto id = Scheduler<Args...>::template Registry<ActualBlocker>::getRegisteredId(blocker);
+	uintptr_t ret;
+
+	do {
+		ret = syscall<SYSCALL(doTimedBlock<ActualBlocker>)>(id, timeout);
+	} while(blocker->continuation(ret));
+
+	return ret;
+}
 
 #endif /* HELPERS_H_ */

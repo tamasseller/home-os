@@ -2,7 +2,6 @@ API
 ---
 
  - Implement ReaderWriterLock (possibly with upgrade option).
- - Implement work continuation and re-blocking thingy around blocking calls.
  - Namespacing
  
 Internals

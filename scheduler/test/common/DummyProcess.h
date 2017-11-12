@@ -15,18 +15,50 @@ class DummyProcess: public Os::IoChannel {
 public:
 	inline virtual ~DummyProcess() {}
 
-	struct Job: Os::IoChannel::Job {
-		Job *next, *prev;
+	struct JobBase: Os::IoChannel::Job {
+		JobBase *next, *prev;
+
+		inline JobBase(bool (*f)(typename Os::IoChannel::Job*, typename Os::IoChannel::Job::Result)):
+				Os::IoChannel::Job(f) {}
+	};
+
+	struct Job: JobBase {
 		int success;
 
-		static void writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result) {
+		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result) {
 			Job* job = static_cast<Job*>(item);
 			job->success = (int)result;
+			return false;
 		}
 
 	public:
-		inline Job(): Os::IoChannel::Job(&Job::writeResult), success(-1) {}
+		inline Job(): JobBase(&Job::writeResult), success(-1) {}
 	};
+
+	template<size_t n>
+	struct MultiJob: JobBase {
+		volatile int idx = n;
+		int success[n];
+
+		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result) {
+			MultiJob* job = static_cast<MultiJob*>(item);
+			job->success[--job->idx] = (int)result;
+
+			if(job->idx) {
+				instance.submit(item);
+				return true;
+			}
+
+			return false;
+		}
+
+	public:
+		inline MultiJob(): JobBase(&MultiJob::writeResult) {
+			for(auto &x: success)
+				x = -1;
+		}
+	};
+
 
 	volatile unsigned int counter;
 
@@ -40,14 +72,14 @@ private:
 		}
 	}
 
-	pet::DoubleList<Job> requests;
+	pet::DoubleList<JobBase> requests;
 
 	virtual bool addJob(typename Os::IoChannel::Job* job) {
-		return requests.addBack(static_cast<Job*>(job));
+		return requests.addBack(static_cast<JobBase*>(job));
 	}
 
 	virtual bool removeJob(typename Os::IoChannel::Job* job) {
-		return requests.remove(static_cast<Job*>(job));
+		return requests.remove(static_cast<JobBase*>(job));
 	}
 
 	virtual bool hasJob() {

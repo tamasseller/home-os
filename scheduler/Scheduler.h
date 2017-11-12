@@ -121,7 +121,22 @@ struct SchedulerOptions {
 
 		static inline void assert(bool, const char*);
 
+		/**
+		 * Utility method, used for re-initialization of an object.
+		 */
 		template<class T> static inline void resetObject(T*);
+
+		/**
+		 * Utlity method, used for proper handling of
+		 * blocking and continuations.
+		 */
+		template<class Blocker> static inline uintptr_t blockOn(Blocker*);
+
+		/**
+		 * Utlity method, used for proper handling of
+		 * blocking with timeout and continuations.
+		 */
+		template<class Blocker> static inline uintptr_t timedBlockOn(Blocker*, uintptr_t time);
 
 		/**
 		 * Task switching helper
@@ -212,9 +227,9 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/EventList.h"
 #include "internal/Preemption.h"
 
+#include "syscall/Syscall.h"
 #include "syscall/Helpers.h"
 #include "syscall/ErrorStrings.h"
-#include "syscall/Syscall.h"
 #include "syscall/ObjectRegistry.h"
 
 #include "blocking/Policy.h"

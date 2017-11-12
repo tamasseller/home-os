@@ -58,11 +58,13 @@ int main()
 
     auto parentPid = getpid();
 
-    if(fork() == 0) { // child process
+    pid_t childPid = fork();
+    if(childPid == 0) { // child process
     	do {
     		usleep(1000);
     	} while(kill(parentPid, SIGUSR2) == 0);
-    }
-    else
+    } else {
     	return TestSuite<&testProgressReport, &testStartedReport, &registerIrqPtr>::runTests(1000);
+    	kill(childPid, SIGTERM);
+    }
 }

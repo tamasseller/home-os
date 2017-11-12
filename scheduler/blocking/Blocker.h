@@ -94,7 +94,7 @@ class Scheduler<Args...>::Blocker
 	 *
 	 * @NOTE This method is compile time polymorphic!
 	 */
-	static inline uintptr_t take(Blocker* blocker, Task* task) {
+	inline uintptr_t take(Blocker* blocker, Task* task) {
 		return blocker->acquire(task);
 	}
 
@@ -161,6 +161,11 @@ class Scheduler<Args...>::Blocker
 	virtual Task* getOwner() {return nullptr;}
 
 	/**
+	 * TODO document.
+	 */
+	virtual bool continuation(uintptr_t retval) {return false;}
+
+	/**
 	 * Return value for timed out request.
 	 *
 	 * This value gets returned when timed blocking request fail to
@@ -207,7 +212,7 @@ uintptr_t Scheduler<Args...>::doBlock(uintptr_t blockerPtr)
      *  - if not, then block the task on the blocker.
      */
 	if(Blocker* receiver = blocker->ActualBlocker::getTakeable(currentTask)) {
-		return ActualBlocker::take(receiver, currentTask);
+		return blocker->ActualBlocker::take(receiver, currentTask);
 	} else {
 		blocker->ActualBlocker::block(currentTask);
 		currentTask->blockedBy = blocker;
@@ -248,7 +253,7 @@ uintptr_t Scheduler<Args...>::doTimedBlock(uintptr_t blockerPtr, uintptr_t timeo
 	 *  - if not, then block the task on the blocker.
 	 */
 	if(Blocker* receiver = blocker->ActualBlocker::getTakeable(currentTask)) {
-		return ActualBlocker::take(receiver, currentTask);
+		return blocker->ActualBlocker::take(receiver, currentTask);
 	}
 
 	/*

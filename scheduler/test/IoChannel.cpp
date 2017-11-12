@@ -9,8 +9,9 @@
 #include "common/DummyProcess.h"
 
 using Os=OsRr;
+using Process = DummyProcess<Os>;
 using Base = DummyProcessJobsBase<Os>;
-static auto &process = DummyProcess<Os>::instance;
+static auto &process = Process::instance;
 
 TEST(IoChannel) {
 	struct Task: Base, public TestTask<Task> {
@@ -127,7 +128,6 @@ TEST(IoChannelTimeoutDoTimout) {
 	CHECK(!task.error);
 }
 
-
 TEST(IoChannelTimeoutCancel) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
@@ -161,3 +161,26 @@ TEST(IoChannelTimeoutCancel) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+
+TEST(IoChannelMulti) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			Process::MultiJob<3> multiJob;
+			process.counter = 0;
+			process.submit(&multiJob);
+			process.counter = 3;
+
+			while(multiJob.idx){}
+
+			for(int i=0; i<3; i++)
+				CHECK(multiJob.success[i] == (int)Process::Job::Result::Done);
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+

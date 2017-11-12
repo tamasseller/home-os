@@ -30,6 +30,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 
 	volatile const uintptr_t nWaiters;
 	Waiter* volatile const waiters;
+	uintptr_t retval;
 
 	template<class... T>
 	WaitableSet(Waiter (& waiters)[sizeof...(T)], T... blockers): nWaiters(sizeof...(T)), waiters(&waiters[0])
@@ -48,8 +49,8 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 		Registry<WaitableSet>::unregisterObject(this);
 	}
 
-	static inline uintptr_t take(Blocker* blocker, Task* task) {
-		blocker->acquire(task);
+	inline uintptr_t take(Blocker* blocker, Task* task) {
+		retval = blocker->acquire(task);
 		return reinterpret_cast<uintptr_t>(blocker);
 	}
 
@@ -93,6 +94,13 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 		}
 	}
 
+	virtual bool continuation(uintptr_t retval) {
+		if(retval)
+			return reinterpret_cast<Blocker*>(retval)->continuation(this->retval);
+
+		return false;
+	}
+
 	/*
 	 * These two methods are never called during normal operation, so
 	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
@@ -122,9 +130,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::select(T... t)
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = syscall<SYSCALL(doBlock<WaitableSet>)>(Registry<WaitableSet>::getRegisteredId(&set));
-
-	return reinterpret_cast<Blocker*>(ret);
+	return reinterpret_cast<Blocker*>(blockOn(&set));
 }
 
 template<class... Args>
@@ -134,9 +140,7 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(u
 	typename WaitableSet::Waiter waiters[sizeof...(t)];
 	WaitableSet set(waiters, t...);
 
-	auto ret = syscall<SYSCALL(doTimedBlock<WaitableSet>)>(Registry<WaitableSet>::getRegisteredId(&set), timeout);
-
-	return reinterpret_cast<Blocker*>(ret);
+	return reinterpret_cast<Blocker*>(timedBlockOn(&set, timeout));
 }
 
 #endif /* WAITABLESET_H_ */

@@ -15,13 +15,11 @@ template<class Semaphore>
 struct Scheduler<Args...>::WaitableBlocker
 {
 	inline void wait() {
-		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
-		syscall<SYSCALL(doBlock<Semaphore>)>(id);
+		Scheduler<Args...>::blockOn(static_cast<Semaphore*>(this));
 	}
 
 	inline bool wait(uintptr_t timeout) {
-		auto id = Scheduler<Args...>::template Registry<Semaphore>::getRegisteredId(static_cast<Semaphore*>(this));
-		return syscall<SYSCALL(doTimedBlock<Semaphore>)>(id, timeout);
+		return Scheduler<Args...>::timedBlockOn(static_cast<Semaphore*>(this), timeout);
 	}
 };
 

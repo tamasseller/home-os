@@ -22,6 +22,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	static constexpr uintptr_t blockedReturnValue = 1;
 
 	Blockable* blocked = nullptr;
+	typename IoChannel::Job::Result result;
 
 	virtual void priorityChanged(Blockable* b, typename Policy::Priority old) override {
 		/*
@@ -63,13 +64,19 @@ class Scheduler<Args...>::IoRequestCommon:
 	 * LCOV_EXCL_STOP is placed here.
 	 */
 
-	virtual Blocker* getTakeable(Task* task) {
+	virtual Blocker* getTakeable(Task* task) override {
 		// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
 		return static_cast<Blocker*>(this)->getTakeable(task);
 	}
 
+	virtual bool continuation(uintptr_t retval) override {
+		// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
+		return static_cast<Blocker*>(this)->continuation(retval);
+	}
+
 protected:
-	inline void resume() {
+	inline void resume(typename IoChannel::Job::Result result) {
+		this->result = result;
 		if(blocked) {
 			blocked->wake(this);
 			blocked = nullptr;
@@ -83,16 +90,20 @@ class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
 {
-	void (* hijackedMethod)(typename IoChannel::Job*, typename IoChannel::Job::Result);
+	bool (* hijackedMethod)(typename IoChannel::Job*, typename IoChannel::Job::Result);
 
-	static void activator(typename IoChannel::Job* job, typename IoChannel::Job::Result result) {
+	static bool activator(typename IoChannel::Job* job, typename IoChannel::Job::Result result) {
 		IoRequest* self = static_cast<IoRequest*>(job);
-		self->resume();
-		self->hijackedMethod(job, result);
+		self->resume(result);
+		return false;
 	}
 
-	virtual Blocker* getTakeable(Task*) {
+	virtual Blocker* getTakeable(Task*) override final {
 		return this->Job::channel ? nullptr : this;
+	}
+
+	virtual bool continuation(uintptr_t) override final {
+		return hijackedMethod(this, this->result);
 	}
 
 public:

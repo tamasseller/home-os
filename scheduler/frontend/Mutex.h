@@ -142,7 +142,7 @@ public:
 	}
 
 	inline void lock() {
-		syscall<SYSCALL(doBlock<Mutex>)>(Registry<Mutex>::getRegisteredId(this));
+		blockOn(this);
 	}
 
 	inline void unlock() {
