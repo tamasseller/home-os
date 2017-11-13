@@ -26,12 +26,16 @@
 #include "../gcc-cortex-common/Scb.h"
 #include "../gcc-cortex-common/Svc.h"
 
+void PendSV_Handler();
+void SVC_Handler();
+void SysTick_Handler();
+
 namespace home {
 
 class ProfileCortexM0 {
-	friend void PendSV_Handler();
-	friend void SVC_Handler();
-	friend void SysTick_Handler();
+	friend void ::PendSV_Handler();
+	friend void ::SVC_Handler();
+	friend void ::SysTick_Handler();
 
 	template<class Value> inline static bool storeExclusive(volatile Value*, Value);
 

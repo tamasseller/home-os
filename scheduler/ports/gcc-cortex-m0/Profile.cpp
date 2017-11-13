@@ -19,23 +19,21 @@
 
 #include "Profile.h"
 
-namespace home {
+home::ProfileCortexM0::Task* volatile home::ProfileCortexM0::currentTask;
+home::ProfileCortexM0::Task* volatile home::ProfileCortexM0::oldTask;
+void* home::ProfileCortexM0::suspendedPc;
+void* home::ProfileCortexM0::mspAtStart;
 
-ProfileCortexM0::Task* volatile ProfileCortexM0::currentTask;
-ProfileCortexM0::Task* volatile ProfileCortexM0::oldTask;
-void* ProfileCortexM0::suspendedPc;
-void* ProfileCortexM0::mspAtStart;
+volatile bool home::ProfileCortexM0::exclusiveMonitor = false;
 
-volatile bool ProfileCortexM0::exclusiveMonitor = false;
+volatile uint32_t home::ProfileCortexM0::tick = 0;
 
-volatile uint32_t ProfileCortexM0::tick = 0;
-
-void (*ProfileCortexM0::tickHandler)();
-void (* volatile ProfileCortexM0::asyncCallHandler)();
-void* (* volatile ProfileCortexM0::syncCallMapper)(uintptr_t);
+void (*home::ProfileCortexM0::tickHandler)();
+void (* volatile home::ProfileCortexM0::asyncCallHandler)();
+void* (* volatile home::ProfileCortexM0::syncCallMapper)(uintptr_t);
 
 __attribute__((naked))
-const char* ProfileCortexM0::startFirst(Task* task)
+const char* home::ProfileCortexM0::startFirst(Task* task)
 {
 	currentTask = task;
 
@@ -64,7 +62,7 @@ const char* ProfileCortexM0::startFirst(Task* task)
 	);
 }
 
-void ProfileCortexM0::finishLast(const char* ret)
+void home::ProfileCortexM0::finishLast(const char* ret)
 {
 	struct ReturnTaskStub {
 		__attribute__((naked))
@@ -103,13 +101,13 @@ void ProfileCortexM0::finishLast(const char* ret)
 }
 
 void SVC_Handler() {
-	CortexCommon::DirectSvc::dispatch(ProfileCortexM0::syncCallMapper);
+	home::CortexCommon::DirectSvc::dispatch(home::ProfileCortexM0::syncCallMapper);
 }
 
 void SysTick_Handler()
 {
-	ProfileCortexM0::tick++;
-	ProfileCortexM0::tickHandler();
+	home::ProfileCortexM0::tick++;
+	home::ProfileCortexM0::tickHandler();
 }
 
 __attribute__((naked))
@@ -176,11 +174,9 @@ void PendSV_Handler() {
 		"PendSV_async:			\n"
 		"	.word %c2			\n"
 			:
-			: "i" (&ProfileCortexM0::oldTask),
-			  "i" (&ProfileCortexM0::currentTask),
-			  "i" (&ProfileCortexM0::asyncCallHandler)
+			: "i" (&home::ProfileCortexM0::oldTask),
+			  "i" (&home::ProfileCortexM0::currentTask),
+			  "i" (&home::ProfileCortexM0::asyncCallHandler)
 			: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12"
 	);
-}
-
 }
