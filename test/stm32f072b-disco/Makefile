@@ -1,12 +1,13 @@
 OUTPUT = fw.elf
 
 ROOT = ../..
-PET = $(ROOT)/../pet
+PET = $(ROOT)/pet
 
 INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
-INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-m0
-INCLUDE_DIRS += $(ROOT)/ports/gcc-cortex-common
+INCLUDE_DIRS += $(ROOT)/scheduler
+INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-m0
+INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-common
 
 ifeq ('x','')
 endif
@@ -66,7 +67,7 @@ SOURCES += $(ROOT)/test/IoRequest.cpp
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/ports/gcc-cortex-m0/Profile.cpp
+SOURCES += $(ROOT)/scheduler/ports/gcc-cortex-m0/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp

@@ -1,11 +1,12 @@
 OUTPUT = os-test
 
 ROOT = ../..
-PET = $(ROOT)/../pet
+PET = $(ROOT)/pet
 
 INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/test
-INCLUDE_DIRS += $(ROOT)/ports/gcc-linux-um
+INCLUDE_DIRS += $(ROOT)/scheduler
+INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 
 ifeq ('x','')
 endif
@@ -66,7 +67,7 @@ SOURCES += $(ROOT)/test/IoRequest.cpp
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/ports/gcc-linux-um/Profile.cpp
+SOURCES += $(ROOT)/scheduler/ports/gcc-linux-um/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp
