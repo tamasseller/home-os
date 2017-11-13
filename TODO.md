@@ -23,7 +23,6 @@ Backend
 Documentation
 -------------
 
- - Header banners.
  - Overview:
    - Preemption levels (task, syscall, user interrupt)
    - Event list based communication
