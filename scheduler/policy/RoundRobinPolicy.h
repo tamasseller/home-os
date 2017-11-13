@@ -22,6 +22,8 @@
 
 #include "data/DoubleList.h"
 
+namespace home {
+
 template<class Task, class Storage>
 struct RoundRobinPolicy {
 	struct Priority{
@@ -55,5 +57,7 @@ struct RoundRobinPolicy {
 
 	inline static void initialize(Task* task) {}
 };
+
+}
 
 #endif /* ROUNDROBINPOLICY_H_ */

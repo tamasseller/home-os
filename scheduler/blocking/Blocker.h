@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 /**
  * Common interface for objects that can block a task.
  *
@@ -321,5 +323,6 @@ uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr, uintptr_t arg)
 	return 0;
 }
 
+}
 
 #endif /* BLOCKER_H_ */

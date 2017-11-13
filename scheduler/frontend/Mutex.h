@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 /**
  * Mutex front-end object.
  */
@@ -197,5 +199,6 @@ struct Scheduler<Args...>::Mutex::DeadlockDetectionSwitch<true, Dummy> {
 	}
 };
 
+}
 
 #endif /* MUTEX_H_ */

@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 template<class Dummy>
 class Scheduler<Args...>::SleeperBase<SchedulerOptions::ScalabilityHint::Few, Dummy> {
@@ -168,5 +170,7 @@ public:
 		return nullptr;
 	}
 };
+
+}
 
 #endif /* SLEEPLIST_H_ */

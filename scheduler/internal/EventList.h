@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::EventList: SharedAtomicList
 {
@@ -83,5 +85,7 @@ public:
 			Profile::async(&EventList::dispatchTrampoline);
 	}
 };
+
+}
 
 #endif /* EVENTLIST_H_ */

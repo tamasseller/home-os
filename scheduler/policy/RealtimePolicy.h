@@ -22,6 +22,8 @@
 
 #include "ubiquitous/Compiler.h"
 
+namespace home {
+
 template<uintptr_t priorityLevels>
 struct RealtimePolicy {
 	static constexpr uintptr_t maxLevels = sizeof(uintptr_t) * 8;
@@ -104,5 +106,6 @@ struct RealtimePolicy {
 
 };
 
+}
 
 #endif /* REALTIMEPOLICY_H_ */

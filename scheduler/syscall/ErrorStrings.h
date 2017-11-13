@@ -20,6 +20,8 @@
 #ifndef ERRORSTRINGS_H_
 #define ERRORSTRINGS_H_
 
+namespace home {
+
 template<class... Args>
 struct Scheduler<Args...>::ErrorStrings {
 	static constexpr const char* unknownError = "WTF internal error";
@@ -44,5 +46,7 @@ struct Scheduler<Args...>::ErrorStrings {
 
 	static constexpr const char* ioRequestReuse = "Attempt to reuse an already occupied io request object";
 };
+
+}
 
 #endif /* ERRORSTRINGS_H_ */

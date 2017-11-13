@@ -26,6 +26,8 @@
 #include "../gcc-cortex-common/Scb.h"
 #include "../gcc-cortex-common/Svc.h"
 
+namespace home {
+
 class ProfileCortexM0 {
 	friend void PendSV_Handler();
 	friend void SVC_Handler();
@@ -229,6 +231,8 @@ inline void ProfileCortexM0::initialize(Task* task, void (*entry)(void*), void (
 	*data-- = 0xbaadf00d;		// r6
 	*data-- = 0xbaadf00d;		// r5
 	*data-- = 0xbaadf00d;		// r4
+}
+
 }
 
 #endif /* PROFILE_H_ */

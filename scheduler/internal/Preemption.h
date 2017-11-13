@@ -20,6 +20,8 @@
 #ifndef PREEMPTION_H_
 #define PREEMPTION_H_
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::PreemptionEvent: public Event {
 	static inline void execute(Event* self, uintptr_t arg) {
@@ -52,6 +54,8 @@ template<class... Args>
 void Scheduler<Args...>::onTick()
 {
 	state.eventList.issue(&state.preemptionEvent);
+}
+
 }
 
 #endif /* PREEMPTION_H_ */

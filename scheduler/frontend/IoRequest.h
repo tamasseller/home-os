@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::IoRequestCommon:
 		public Blocker,
@@ -134,5 +136,6 @@ public:
 	}
 };
 
+}
 
 #endif /* IOREQUEST_H_ */

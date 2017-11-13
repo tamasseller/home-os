@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 inline typename Scheduler<Args...>::Task* Scheduler<Args...>::getCurrentTask() {
 	if(auto platformTask = Profile::getCurrent())
@@ -111,6 +113,8 @@ inline uintptr_t Scheduler<Args...>:: timedBlockOn(ActualBlocker* blocker, uintp
 	} while(blocker->continuation(ret));
 
 	return ret;
+}
+
 }
 
 #endif /* HELPERS_H_ */

@@ -2,7 +2,6 @@ API
 ---
 
  - Implement ReaderWriterLock (possibly with upgrade option).
- - Namespacing
  
 Internals
 ---------

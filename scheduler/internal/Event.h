@@ -20,6 +20,8 @@
 #ifndef EVENT_H_
 #define EVENT_H_
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::Event: SharedAtomicList::Element
 {
@@ -28,5 +30,7 @@ class Scheduler<Args...>::Event: SharedAtomicList::Element
 protected:
 	inline Event(void (* callback)(Event*, uintptr_t)): callback(callback) {}
 };
+
+}
 
 #endif /* EVENT_H_ */

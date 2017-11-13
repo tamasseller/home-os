@@ -28,6 +28,8 @@
 #include <algorithm>
 #include <iostream>
 
+using namespace home;
+
 namespace {
 	struct TestNode: LimitedCTree::DualNode {
 		const int c;

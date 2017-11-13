@@ -20,6 +20,8 @@
 #ifndef LIMITEDCTREE_H_
 #define LIMITEDCTREE_H_
 
+namespace home {
+
 /**
  * Limited concurrency, lock-free intrusive binary search tree
  * ===========================================================
@@ -515,5 +517,7 @@ public:
 		return false;
 	}
 };
+
+}
 
 #endif /* LIMITEDCTREE_H_ */

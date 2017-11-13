@@ -22,7 +22,7 @@
 
 #include "Profile.h"
 
-typedef ProfileLinuxUm PlatformHardwareProfile;
+typedef home::ProfileLinuxUm PlatformHardwareProfile;
 
 static constexpr uintptr_t testStackSize = 1024*1024u;
 static constexpr uintptr_t testStackCount = 10u;

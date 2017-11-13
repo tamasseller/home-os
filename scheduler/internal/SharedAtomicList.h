@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::SharedAtomicList
 {
@@ -121,5 +123,7 @@ public:
 		return prev;
 	}
 };
+
+}
 
 #endif /* ATOMICLIST_H_ */

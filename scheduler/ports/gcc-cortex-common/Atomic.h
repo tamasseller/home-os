@@ -20,6 +20,8 @@
 #ifndef ATOMIC_H_
 #define ATOMIC_H_
 
+namespace home {
+
 namespace CortexCommon {
 
 template<class Value, Value (*ldrex)(volatile Value*), bool (*strex)(volatile Value*, Value), void (*clrex)()>
@@ -55,6 +57,8 @@ public:
 		return old;
 	}
 };
+
+}
 
 }
 

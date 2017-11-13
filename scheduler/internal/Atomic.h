@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 template<class Data>
 struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
@@ -67,5 +69,7 @@ struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 		});
 	}
 };
+
+}
 
 #endif /* INTERNAL_ATOMIC_H_ */

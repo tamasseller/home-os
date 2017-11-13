@@ -32,6 +32,8 @@
 
 #include <iostream>
 
+namespace home {
+
 class ProfileLinuxUm {
 public:
 	template<class Data> class Atomic;
@@ -184,5 +186,6 @@ public:
 	}
 };
 
+}
 
 #endif /* PROFILE_H_ */

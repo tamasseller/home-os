@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 /**
  * Task front-end object.
  */
@@ -147,6 +149,8 @@ uintptr_t Scheduler<Args...>::doExit()
 		doAbort(0);
 
 	return 0;
+}
+
 }
 
 #endif /* TASK_H_ */

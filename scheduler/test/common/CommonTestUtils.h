@@ -27,6 +27,8 @@
 #include "Platform.h"
 #include "Scheduler.h"
 
+using namespace home;
+
 #include "policy/RoundRobinPrioPolicy.h"
 #include "policy/RealtimePolicy.h"
 
@@ -38,6 +40,7 @@
 #include "SharedData.h"
 
 #include "algorithm/Str.h"
+
 
 class CommonTestUtils {
 	static uint64_t iterationsPerMs;

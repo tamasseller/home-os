@@ -24,6 +24,8 @@
 
 #include "LimitedCTree.h"
 
+namespace home {
+
 template<class... Args>
 template<class... Types>
 struct Scheduler<Args...>::RegistryRootHub: Registry<Types>::Root... {
@@ -139,6 +141,8 @@ template<class Object>
 uintptr_t Scheduler<Args...>::doUnregisterObject(uintptr_t objectPtr)
 {
 	return Registry<Object>::remove(reinterpret_cast<Object*>(objectPtr));
+}
+
 }
 
 #endif /* OBJECTREGISTRY_H_ */

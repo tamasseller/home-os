@@ -19,6 +19,8 @@
 
 #include "Profile.h"
 
+namespace home {
+
 void (*ProfileLinuxUm::tickHandler)();
 void (* volatile ProfileLinuxUm::asyncCallHandler)();
 void* (* volatile ProfileLinuxUm::syncCallMapper)(uintptr_t);
@@ -199,4 +201,6 @@ void ProfileLinuxUm::initialize(Task* task, void (*entry)(void*), void (*exit)()
     task->savedContext.uc_stack.ss_flags = 0;
     sigemptyset(&task->savedContext.uc_sigmask);
     makecontext(&task->savedContext, (void (*)())entry, 1, arg);
+}
+
 }

@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 
@@ -96,5 +98,6 @@ public:
 	}
 };
 
+}
 
 #endif /* POLICY_H_ */

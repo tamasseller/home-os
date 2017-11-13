@@ -30,6 +30,7 @@
 
 #include "policy/RoundRobinPolicy.h"
 
+namespace home {
 
 /*
  * Scheduler root class.
@@ -232,6 +233,8 @@ struct SchedulerOptions {
 template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
+}
+
 #include "internal/Atomic.h"
 #include "internal/SharedAtomicList.h"
 #include "internal/Event.h"
@@ -264,6 +267,13 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "frontend/IoChannel.h"
 
 ///////////////////////////////////////////////////////////////////////////////
+
+/*
+ *
+ *          TODO move to separate file
+ *
+ */
+namespace home {
 
 template<class... Args>
 typename Scheduler<Args...>::State Scheduler<Args...>::state;
@@ -318,6 +328,8 @@ template<class... Args>
 inline uintptr_t Scheduler<Args...>::doAbort(uintptr_t errorMessage) {
 	Profile::finishLast(reinterpret_cast<const char*>(errorMessage));
 	return errorMessage;
+}
+
 }
 
 #endif /* SCHEDULER_H_ */

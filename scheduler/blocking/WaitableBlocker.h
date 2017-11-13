@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 template<class Semaphore>
 struct Scheduler<Args...>::WaitableBlocker
@@ -34,5 +36,7 @@ struct Scheduler<Args...>::WaitableBlocker
 		return Scheduler<Args...>::timedBlockOn(static_cast<Semaphore*>(this), timeout);
 	}
 };
+
+}
 
 #endif /* WAITABLEBLOCKER_H_ */

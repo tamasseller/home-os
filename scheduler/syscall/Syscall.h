@@ -20,6 +20,8 @@
 #ifndef SYSCALL_H_
 #define SYSCALL_H_
 
+namespace home {
+
 namespace detail {
 
 template<class C, C c>
@@ -128,6 +130,8 @@ inline uintptr_t Scheduler<Args...>::conditionalSyscall(T... ops)
 		return syscall<Syscall>(ops...);
 	else
 		return Syscall::target(ops...);
+}
+
 }
 
 #endif /* SYSCALL_H_ */

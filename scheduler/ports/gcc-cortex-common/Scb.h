@@ -20,6 +20,8 @@
 #ifndef SCB_H_
 #define SCB_H_
 
+namespace home {
+
 namespace CortexCommon {
 
 struct Scb {
@@ -90,6 +92,8 @@ struct Scb {
 		}
 	};
 };
+
+}
 
 }
 

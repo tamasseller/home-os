@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 template<class Semaphore>
 class Scheduler<Args...>::SemaphoreLikeBlocker:
@@ -53,5 +55,7 @@ protected:
 		Profile::injectReturnValue(ba->getTask(), Semaphore::timeoutReturnValue);
 	}
 };
+
+}
 
 #endif /* SEMAPHORELIKEBLOCKER_H_ */

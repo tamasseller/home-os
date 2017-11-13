@@ -22,6 +22,8 @@
 
 #include "data/DoubleList.h"
 
+namespace home {
+
 template<class Task, class Storage>
 class RoundRobinPrioPolicy {
 public:
@@ -74,5 +76,7 @@ public:
 		tasks.add(task);
 	}
 };
+
+}
 
 #endif /* ROUNDROBINPRIOPOLICY_H_ */

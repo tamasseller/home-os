@@ -19,6 +19,8 @@
 
 #include "Profile.h"
 
+namespace home {
+
 ProfileCortexM0::Task* volatile ProfileCortexM0::currentTask;
 ProfileCortexM0::Task* volatile ProfileCortexM0::oldTask;
 void* ProfileCortexM0::suspendedPc;
@@ -179,4 +181,6 @@ void PendSV_Handler() {
 			  "i" (&ProfileCortexM0::asyncCallHandler)
 			: "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12"
 	);
+}
+
 }

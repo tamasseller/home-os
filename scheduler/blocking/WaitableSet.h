@@ -20,6 +20,9 @@
 #ifndef WAITABLESET_H_
 #define WAITABLESET_H_
 
+#include "Scheduler.h"
+
+namespace home {
 
 template<class... Args>
 class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::ObjectBase
@@ -153,6 +156,8 @@ inline typename Scheduler<Args...>::Blocker* Scheduler<Args...>::selectTimeout(u
 	WaitableSet set(waiters, t...);
 
 	return reinterpret_cast<Blocker*>(timedBlockOn(&set, timeout));
+}
+
 }
 
 #endif /* WAITABLESET_H_ */

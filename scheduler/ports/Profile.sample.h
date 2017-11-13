@@ -20,6 +20,8 @@
 #ifndef PROFILE_SAMPLE_H_
 #define PROFILE_SAMPLE_H_
 
+namespace home {
+
 /**
  * Hardware profile documentation sample.
  *
@@ -197,6 +199,6 @@ class ProfileSample {
 	static inline void memoryFence();
 };
 
-
+}
 
 #endif /* PROFILE_SAMPLE_H_ */

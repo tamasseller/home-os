@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::BinarySemaphore: public SemaphoreLikeBlocker<BinarySemaphore>, Registry<BinarySemaphore>::ObjectBase
 {
@@ -59,5 +61,7 @@ public:
 		Registry<BinarySemaphore>::unregisterObject(this);
 	}
 };
+
+}
 
 #endif /* BINARYSEMAPHORE_H_ */

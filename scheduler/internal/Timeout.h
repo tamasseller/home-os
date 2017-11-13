@@ -20,6 +20,8 @@
 #ifndef TIMEOUT_H_
 #define TIMEOUT_H_
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::Timeout: Sleeper, Event {
 	friend Scheduler<Args...>;
@@ -59,5 +61,6 @@ public:
 	}
 };
 
+}
 
 #endif /* TIMEOUT_H_ */

@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 /**
  * An object that can stand for a task in a blocking queue.
  *
@@ -105,5 +107,7 @@ public:
 		state.policy.addRunnable(waken);
 	}
 };
+
+}
 
 #endif /* BLOCKABLE_H_ */

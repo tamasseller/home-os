@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::CountingSemaphore: public SemaphoreLikeBlocker<CountingSemaphore>, Registry<CountingSemaphore>::ObjectBase
 {
@@ -62,5 +64,7 @@ public:
 		Registry<CountingSemaphore>::unregisterObject(this);
 	}
 };
+
+}
 
 #endif /* COUNTINGSEMAPHORE_H_ */

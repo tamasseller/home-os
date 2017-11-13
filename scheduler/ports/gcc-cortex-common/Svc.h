@@ -20,6 +20,8 @@
 #ifndef SVC_H_
 #define SVC_H_
 
+namespace home {
+
 namespace CortexCommon {
 
 struct DirectSvc {
@@ -113,6 +115,8 @@ struct DirectSvc {
 		);
 	}
 };
+
+}
 
 }
 

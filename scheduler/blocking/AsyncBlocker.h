@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 template<class ActualBlocker>
 class Scheduler<Args...>::AsyncBlocker: protected Event {
@@ -46,5 +48,7 @@ public:
     }
 
 };
+
+}
 
 #endif /* ASYNCBLOCKER_H_ */

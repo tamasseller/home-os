@@ -23,6 +23,8 @@
 
 #include <utility>
 
+using namespace home;
+
 namespace {
 	struct TestNode: LimitedCTree::DualNode {
 		const int c;

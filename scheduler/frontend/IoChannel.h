@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 template<class... Args>
 class Scheduler<Args...>::IoChannel: Registry<IoChannel>::ObjectBase { // TODO add registration
 	friend Scheduler<Args...>;
@@ -238,5 +240,7 @@ public:
 		assert(!state.isRunning, ErrorStrings::ioChannelDelete);
 	}
 };
+
+}
 
 #endif /* IOCHANNEL_H_ */

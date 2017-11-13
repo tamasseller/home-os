@@ -22,6 +22,8 @@
 
 #include "Scheduler.h"
 
+namespace home {
+
 /**
  * Common base for shared blocker objects.
  *
@@ -69,5 +71,7 @@ protected:
 		waiters.add(b);
 	}
 };
+
+}
 
 #endif /* SHAREDBLOCKER_H_ */

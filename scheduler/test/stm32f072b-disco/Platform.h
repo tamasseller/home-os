@@ -22,7 +22,7 @@
 
 #include "Profile.h"
 
-typedef ProfileCortexM0 PlatformHardwareProfile;
+typedef home::ProfileCortexM0 PlatformHardwareProfile;
 
 static constexpr auto testStackSize = 1000u;
 static constexpr auto testStackCount = 6u;
