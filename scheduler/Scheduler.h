@@ -231,9 +231,18 @@ struct SchedulerOptions {
 };
 
 template<class... Args>
+typename SchedulerOptions::Configurable<Args...>::State SchedulerOptions::Configurable<Args...>::state;
+
+template<class... Args>
 using Scheduler = SchedulerOptions::Configurable<Args...>;
 
 }
+
+#include "syscall/Syscall.h"
+#include "syscall/Helpers.h"
+#include "syscall/ErrorStrings.h"
+#include "syscall/ObjectRegistry.h"
+
 
 #include "internal/Atomic.h"
 #include "internal/SharedAtomicList.h"
@@ -241,11 +250,7 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "internal/Timeout.h"
 #include "internal/EventList.h"
 #include "internal/Preemption.h"
-
-#include "syscall/Syscall.h"
-#include "syscall/Helpers.h"
-#include "syscall/ErrorStrings.h"
-#include "syscall/ObjectRegistry.h"
+#include "internal/Basic.h"
 
 #include "blocking/Policy.h"
 
@@ -265,71 +270,5 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "frontend/CountingSemaphore.h"
 #include "frontend/IoRequest.h"
 #include "frontend/IoChannel.h"
-
-///////////////////////////////////////////////////////////////////////////////
-
-/*
- *
- *          TODO move to separate file
- *
- */
-namespace home {
-
-template<class... Args>
-typename Scheduler<Args...>::State Scheduler<Args...>::state;
-
-template<class... Args>
-template<class... T>
-inline const char* Scheduler<Args...>::start(T... t) {
-	/*
-	 * Initialize internal state.
-	 */
-	Task* firstTask = state.policy.popNext();
-	state.isRunning = true;
-
-	/*
-	 * Initialize platform.
-	 */
-	Profile::setTickHandler(&Scheduler<Args...>::onTick);
-	Profile::setSyscallMapper(&syscallMapper);
-	Profile::init(t...);
-
-	/*
-	 * Start scheduling.
-	 */
-	const char* ret = Profile::startFirst(firstTask);
-
-	/*
-	 * Reset handlers to detect platform tear-down issues.
-	 */
-	Profile::setTickHandler(nullptr);
-	Profile::setSyscallMapper(nullptr);
-
-	/*
-	 * Reset state to initial values.
-	 */
-	state.~State();
-	new(&state) State();
-
-	return ret;
-}
-
-template<class... Args>
-inline typename Scheduler<Args...>::Profile::TickType Scheduler<Args...>::getTick() {
-	return Profile::getTick();
-}
-
-template<class... Args>
-inline void Scheduler<Args...>::abort(const char* errorMessage) {
-	syscall<SYSCALL(doAbort)>(reinterpret_cast<uintptr_t>(errorMessage));
-}
-
-template<class... Args>
-inline uintptr_t Scheduler<Args...>::doAbort(uintptr_t errorMessage) {
-	Profile::finishLast(reinterpret_cast<const char*>(errorMessage));
-	return errorMessage;
-}
-
-}
 
 #endif /* SCHEDULER_H_ */
