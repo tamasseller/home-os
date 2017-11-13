@@ -196,3 +196,40 @@ TEST(IoChannelMulti) {
 	CHECK(!task.error);
 }
 
+TEST(IoChannelErrors) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			process.counter = 0;
+
+			if(process.submitTimeout(&jobs[0], 0)) {
+				error = true;
+				return;
+			}
+
+			if(process.submitTimeout(&jobs[0], (uintptr_t)-1)) {
+				error = true;
+				return;
+			}
+
+			if(!process.submit(&jobs[0])) {
+				error = true;
+				return;
+			}
+
+			if(process.submit(&jobs[0])) {
+				error = true;
+				return;
+			}
+
+			process.counter = 1;
+
+			while(jobs[0].success != (int)Os::IoChannel::Job::Result::Done) {}
+		}
+	} task;
+
+	process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}

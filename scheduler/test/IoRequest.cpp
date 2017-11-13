@@ -274,3 +274,60 @@ TEST(IoRequestMultiSelect) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+
+
+TEST(IoRequestVsMutexPrioChange)
+{
+	OsRrPrio::Mutex m;
+
+	struct Tlow: public TestTask<Tlow, OsRrPrio>, DummyProcessJobsBase<OsRrPrio> {
+		bool error = false;
+		OsRrPrio::Mutex &m;
+		void run() {
+			m.lock();
+
+			DummyProcess<OsRrPrio>::instance.counter = 0;
+
+			if(!postReqsNoTimeout()) {
+				error = true;
+				return;
+			}
+
+			for(auto& x: reqs) {
+				x.wait(3);
+
+				DummyProcess<OsRrPrio>::instance.counter = 1;
+
+				Os::sleep(1);
+
+				if(x.success != (int)Os::IoChannel::Job::Result::Done) {
+					error = true;
+					return;
+				}
+			}
+
+			m.unlock();
+		}
+
+		Tlow(OsRrPrio::Mutex &m): m(m) {}
+	} tLow(m);
+
+	struct Thigh: public TestTask<Thigh, OsRrPrio> {
+		bool error = false;
+		OsRrPrio::Mutex &m;
+		void run() {
+			OsRrPrio::sleep(1);
+			m.lock();
+			m.unlock();
+		}
+
+		Thigh(OsRrPrio::Mutex &m): m(m) {}
+	} tHigh(m);
+
+	DummyProcess<OsRrPrio>::instance.init();
+	m.init();
+	tLow.start(1);
+	tHigh.start(0);
+	CommonTestUtils::start<OsRrPrio>();
+	CHECK(!tLow.error);
+}

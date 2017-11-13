@@ -96,7 +96,7 @@ inline uintptr_t Scheduler<Args...>::blockOn(ActualBlocker* blocker)
 
 	do {
 		ret = syscall<SYSCALL(doBlock<ActualBlocker>)>(id);
-	} while(blocker->continuation(ret));
+	} while(blocker->ActualBlocker::continuation(ret));
 
 	return ret;
 }
@@ -110,7 +110,7 @@ inline uintptr_t Scheduler<Args...>:: timedBlockOn(ActualBlocker* blocker, uintp
 
 	do {
 		ret = syscall<SYSCALL(doTimedBlock<ActualBlocker>)>(id, timeout);
-	} while(blocker->continuation(ret));
+	} while(blocker->ActualBlocker::continuation(ret));
 
 	return ret;
 }

@@ -72,10 +72,10 @@ public:
 		list.add(elem);
 	}
 
-	inline void update(Sleeper* elem, uintptr_t delay)
+	inline void update(Sleeper* elem, uintptr_t delayTime)
 	{
 		list.remove(elem);
-		delay(elem, delay);
+		delay(elem, delayTime);
 	}
 
 	inline void remove(Sleeper* elem)
