@@ -61,7 +61,6 @@ TEST(IoRequestAlreadyDone) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
-
 TEST(IoRequestWaitTimeout) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
@@ -237,7 +236,6 @@ TEST(IoRequestMulti) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
-
 
 TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {

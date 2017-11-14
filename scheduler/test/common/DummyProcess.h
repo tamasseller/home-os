@@ -30,14 +30,14 @@ public:
 	struct JobBase: Os::IoChannel::Job {
 		JobBase *next, *prev;
 
-		inline JobBase(bool (*f)(typename Os::IoChannel::Job*, typename Os::IoChannel::Job::Result)):
+		inline JobBase(bool (*f)(typename Os::IoChannel::Job*, typename Os::IoChannel::Job::Result, const typename Os::IoChannel::Job::Reactivator &)):
 				Os::IoChannel::Job(f) {}
 	};
 
 	struct Job: JobBase {
 		int success;
 
-		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result) {
+		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &) {
 			Job* job = static_cast<Job*>(item);
 			job->success = (int)result;
 			return false;
@@ -52,7 +52,7 @@ public:
 		volatile int idx = n;
 		int success[n];
 
-		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result) {
+		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &) {
 			MultiJob* job = static_cast<MultiJob*>(item);
 			job->success[--job->idx] = (int)result;
 
