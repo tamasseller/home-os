@@ -61,7 +61,6 @@ TEST(IoRequestAlreadyDone) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
-
 TEST(IoRequestWaitTimeout) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
@@ -238,7 +237,6 @@ TEST(IoRequestMulti) {
 	CHECK(!task.error);
 }
 
-
 TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
@@ -298,7 +296,7 @@ TEST(IoRequestVsMutexPrioChange)
 
 				DummyProcess<OsRrPrio>::instance.counter = 1;
 
-				Os::sleep(1);
+				Os::sleep(2);
 
 				if(x.success != (int)Os::IoChannel::Job::Result::Done) {
 					error = true;

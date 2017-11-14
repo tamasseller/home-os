@@ -33,8 +33,24 @@ public:
 	public:
 
 		enum class Result: uintptr_t{
-			Done, Canceled, TimedOut
+			NotYet, Done, Canceled, TimedOut
 		};
+
+	protected:
+        struct Reactivator {
+            virtual bool reactivate(Job*, IoChannel*) const = 0;
+            virtual bool reactivateTimeout(Job*, IoChannel*, uintptr_t) const = 0;
+        };
+
+        class DefaultReactivator: public Reactivator {
+            virtual bool reactivate(Job* job, IoChannel* channel) const override final {
+                return channel->submit(job);
+            }
+
+            virtual bool reactivateTimeout(Job* job, IoChannel* channel, uintptr_t timeout) const override final {
+                return channel->submitTimeout(job, timeout);
+            }
+        };
 
 	private:
 		friend Scheduler<Args...>;
@@ -42,7 +58,7 @@ public:
 		// TODO describe actors and their locking and actions.
 		Atomic<IoChannel *> channel = nullptr;
 
-		bool (* finished)(Job*, Result);
+		bool (* finished)(Job*, Result, const Reactivator&);
 
 		static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 		static constexpr intptr_t cancelValue = (intptr_t) -2;
@@ -76,7 +92,7 @@ public:
 				if(channel->hasJob())
 					channel->enableProcess();
 
-				self->finished(self, Result::Canceled);
+				self->finished(self, Result::Canceled, DefaultReactivator());
 				return ok;
 			}
 		}
@@ -131,9 +147,9 @@ public:
 
 				if(isCancel) {
 					if(removeSynhronized(self))
-						self->finished(self, Result::Canceled);
+						self->finished(self, Result::Canceled, DefaultReactivator());
 				} else
-					self->finished(self, Result::Done);
+					self->finished(self, Result::Done, DefaultReactivator());
 
 			}
 		}
@@ -142,14 +158,14 @@ public:
 			Job* self = static_cast<Job*>(sleeper);
 
 			if(removeSynhronized(self))
-				self->finished(self, Result::TimedOut);
+				self->finished(self, Result::TimedOut, DefaultReactivator());
 		}
 
 		static inline bool nop(Job* job, Result result) {return false;}
 
 	public:
 
-		inline Job(bool (*finished)(Job*, Result) = &Job::nop):
+		inline Job(bool (*finished)(Job*, Result, const Reactivator &) = &Job::nop):
 			Sleeper(&Job::timedOut),
 			Event(&Job::handleRequest),
 			finished(finished) {}
@@ -171,6 +187,10 @@ private:
 		}
 	};
 
+    inline bool takeJob(Job* job) {
+        return job->channel.compareAndSwap(nullptr, this);
+    }
+
 protected:
 	void jobDone(Job* job) {
 		/*
@@ -186,12 +206,6 @@ protected:
 			disableProcess();
 
 		state.eventList.issue(job, OverwriteCombiner<Job::doneValue>());
-	}
-
-private:
-
-	inline bool takeJob(Job* job) {
-		return job->channel.compareAndSwap(nullptr, this);
 	}
 
 public:

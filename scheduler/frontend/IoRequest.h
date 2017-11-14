@@ -36,7 +36,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	static constexpr uintptr_t blockedReturnValue = 1;
 
 	Blockable* blocked = nullptr;
-	typename IoChannel::Job::Result result;
+	typename IoChannel::Job::Result result = IoChannel::Job::Result::NotYet;
 
 	virtual void priorityChanged(Blockable* b, typename Policy::Priority old) override {
 		/*
@@ -78,10 +78,9 @@ class Scheduler<Args...>::IoRequestCommon:
 	 * LCOV_EXCL_STOP is placed here.
 	 */
 
-	virtual Blocker* getTakeable(Task* task) override {
-		// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
-		return static_cast<Blocker*>(this)->getTakeable(task);
-	}
+    virtual Blocker* getTakeable(Task*) override final {
+        return (this->result == IoChannel::Job::Result::NotYet) ? nullptr : this;
+    }
 
 	virtual bool continuation(uintptr_t retval) override {
 		// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
@@ -104,34 +103,45 @@ class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
 {
-	bool (* hijackedMethod)(typename IoChannel::Job*, typename IoChannel::Job::Result);
+    typedef bool (*Method)(typename IoChannel::Job*, typename IoChannel::Job::Result, const typename IoChannel::Job::Reactivator &);
+    Method hijackedMethod;
 
-	static bool activator(typename IoChannel::Job* job, typename IoChannel::Job::Result result) {
+    class HijackReactivator: public IoChannel::Job::Reactivator {
+        virtual bool reactivate(typename IoChannel::Job* job, IoChannel* channel) const override final {
+            return channel->submit(job);
+        }
+
+        virtual bool reactivateTimeout(typename IoChannel::Job* job, IoChannel* channel, uintptr_t timeout) const override final {
+            return channel->submitTimeout(job, timeout);
+        }
+    };
+
+	static bool activator(typename IoChannel::Job* job, typename IoChannel::Job::Result result, const typename IoChannel::Job::Reactivator &) {
 		IoRequest* self = static_cast<IoRequest*>(job);
 		self->resume(result);
 		return false;
 	}
 
-	virtual Blocker* getTakeable(Task*) override final {
-		return this->Job::channel ? nullptr : this;
-	}
-
 	virtual bool continuation(uintptr_t) override final {
-		return hijackedMethod(this, this->result);
+	    typename IoChannel::Job::Result result = this->result;
+	    this->result = IoChannel::Job::Result::NotYet;
+		return hijackedMethod(this, result, HijackReactivator());
 	}
 
 public:
-	IoRequest() {
-		hijackedMethod = this->Job::finished;
-		this->Job::finished = &IoRequest::activator;
+	inline IoRequest(typename IoChannel::Job* job) {
+		hijackedMethod = job->finished;
+		job->finished = &IoRequest::activator;
 	}
 
-	void init() {
+	inline IoRequest(): IoRequest(this) {}
+
+	inline void init() {
 		resetObject(this);
 		Registry<IoRequestCommon>::registerObject(this);
 	}
 
-	~IoRequest() {
+	inline ~IoRequest() {
 		Registry<IoRequestCommon>::unregisterObject(this);
 	}
 };

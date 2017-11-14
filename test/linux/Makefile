@@ -66,7 +66,7 @@ SOURCES += $(ROOT)/test/IoRequest.cpp
 
 # Networking related tests.
 
-SOURCES += $(ROOT)/test/NetBufferPool.cpp
+#SOURCES += $(ROOT)/test/NetBufferPool.cpp
 
 
 # Testing utilities.
@@ -133,4 +133,4 @@ include ../toolchains/Compiler.host.mk
 include ../ultimate-makefile/Makefile.ultimate
 
 enter:
-	CD_TO=$(ROOT)/.. make -C $(ROOT)/test/toolchains/ enter-the-matrix 
+	CD_TO=$(ROOT) make -C $(ROOT)/test/toolchains/ enter-the-matrix 

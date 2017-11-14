@@ -119,4 +119,4 @@ include ../toolchains/Compiler.arm.mk
 include ../ultimate-makefile/Makefile.ultimate
 
 enter:
-	CD_TO=$(ROOT)/.. make -C $(ROOT)/test/toolchains/ enter-the-matrix 
+	CD_TO=$(ROOT) make -C $(ROOT)/test/toolchains/ enter-the-matrix 
