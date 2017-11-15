@@ -1,9 +1,9 @@
 [submodule "pet"]
 	path = pet
 	url = http://github.com/tamasseller/pet
-[submodule "os/test/ultimate-makefile"]
+[submodule "test/ultimate-makefile"]
 	path = test/ultimate-makefile
 	url = http://github.com/tamasseller/ultimate-makefile
-[submodule "scheduler/test/toolchains"]
+[submodule "test/toolchains"]
 	path = test/toolchains
 	url = http://github.com/tamasseller/toolchains.git
