@@ -6,6 +6,9 @@ API
 Internals
 ---------
 
+ - Find de-virtualization opportunities in IoChannel.
+ - Add option for direct syscall address passing, if enabled should prohibit
+   instantiation of syscall table to enable omitting unused syscalls from binary.
  - Implement arbitrary base-class option (for add names to things and the like).
  - Implement event tracing callback interface.
  - Implement fair scheduling policy (needs hires timing)
@@ -14,6 +17,7 @@ Backend
 -------
 
  - Clean up linux context handling.
+ - Optimize cortex-m0 syscall (seemingly no need for four param syscall, use {r0-4} instead of {r12, r0-4})
  - Find some way to keep track of high-res task running time.
  - Port to cortex-m3 (with real exclusive access instructions).
  - Port to cortex-m4f (with non-lazy float context saving).

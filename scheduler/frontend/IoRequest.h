@@ -106,12 +106,20 @@ class Scheduler<Args...>::IoRequest:
     typedef bool (*Method)(typename IoChannel::Job*, typename IoChannel::Job::Result, const typename IoChannel::Job::Reactivator &);
     Method hijackedMethod;
 
+    static inline void hijack(typename IoChannel::Job* job) {
+    	IoRequest* self = static_cast<IoRequest*>(static_cast<Job*>(job));
+    	self->hijackedMethod = self->Job::finished;
+		self->Job::finished = &IoRequest::activator;
+    }
+
     class HijackReactivator: public IoChannel::Job::Reactivator {
         virtual bool reactivate(typename IoChannel::Job* job, IoChannel* channel) const override final {
+        	hijack(job);
             return channel->submit(job);
         }
 
         virtual bool reactivateTimeout(typename IoChannel::Job* job, IoChannel* channel, uintptr_t timeout) const override final {
+        	hijack(job);
             return channel->submitTimeout(job, timeout);
         }
     };
@@ -129,16 +137,15 @@ class Scheduler<Args...>::IoRequest:
 	}
 
 public:
-	inline IoRequest(typename IoChannel::Job* job) {
-		hijackedMethod = job->finished;
-		job->finished = &IoRequest::activator;
-	}
-
-	inline IoRequest(): IoRequest(this) {}
-
 	inline void init() {
 		resetObject(this);
 		Registry<IoRequestCommon>::registerObject(this);
+	}
+
+	template<class... C>
+	inline void prepare(C... c) {
+		this->Job::prepare(c...);
+		hijack(this);
 	}
 
 	inline ~IoRequest() {

@@ -43,6 +43,13 @@ TEST(IoChannel) {
 				error = true;
 				return;
 			}
+
+			for(int i = 0; i < 5; i++) {
+				if(jobs[i].count != 5 - i) {
+					error = true;
+					return;
+				}
+			}
 		}
 	} task;
 
@@ -180,6 +187,7 @@ TEST(IoChannelMulti) {
 		void run() {
 			Process::MultiJob<3> multiJob;
 			process.counter = 0;
+			multiJob.prepare();
 			process.submit(&multiJob);
 			process.counter = 3;
 
@@ -202,6 +210,7 @@ TEST(IoChannelErrors) {
 		void run() {
 			process.counter = 0;
 
+			jobs[0].prepare();
 			if(process.submitTimeout(&jobs[0], 0)) {
 				error = true;
 				return;

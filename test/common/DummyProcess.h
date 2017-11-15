@@ -27,15 +27,9 @@ class DummyProcess: public Os::IoChannel {
 public:
 	inline virtual ~DummyProcess() {}
 
-	struct JobBase: Os::IoChannel::Job {
-		JobBase *next, *prev;
-
-		inline JobBase(bool (*f)(typename Os::IoChannel::Job*, typename Os::IoChannel::Job::Result, const typename Os::IoChannel::Job::Reactivator &)):
-				Os::IoChannel::Job(f) {}
-	};
-
-	struct Job: JobBase {
-		int success;
+	struct Job: Os::IoChannel::Job {
+		volatile int success;
+		volatile int count;
 
 		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &) {
 			Job* job = static_cast<Job*>(item);
@@ -43,21 +37,27 @@ public:
 			return false;
 		}
 
+		inline void prepare() {
+			success = -1;
+			this->Os::IoChannel::Job::prepare(&Job::writeResult, reinterpret_cast<uintptr_t>(&count));
+		}
+
 	public:
-		inline Job(): JobBase(&Job::writeResult), success(-1) {}
+		inline Job(): success(-1), count(-1) {}
 	};
 
 	template<size_t n>
-	struct MultiJob: JobBase {
+	struct MultiJob: Os::IoChannel::Job {
 		volatile int idx = n;
-		int success[n];
+		volatile int success[n];
 
-		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &) {
+		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
 			MultiJob* job = static_cast<MultiJob*>(item);
 			job->success[--job->idx] = (int)result;
 
 			if(job->idx) {
-				instance.submit(item);
+				job->Os::IoChannel::Job::prepare(&MultiJob::writeResult);
+				react.reactivate(item, &instance);
 				return true;
 			}
 
@@ -65,12 +65,13 @@ public:
 		}
 
 	public:
-		inline MultiJob(): JobBase(&MultiJob::writeResult) {
+		inline void prepare() {
 			for(auto &x: success)
 				x = -1;
+
+			this->Os::IoChannel::Job::prepare(&MultiJob::writeResult);
 		}
 	};
-
 
 	volatile unsigned int counter;
 
@@ -79,19 +80,24 @@ public:
 private:
 	static inline void processWorkerIsr() {
 		if(instance.counter) {
-			instance.counter--;
-			instance.jobDone(instance.requests.front());
+			typename Os::IoChannel::Job* job = instance.requests.front();
+			int* param = reinterpret_cast<int*>(job->param);
+
+			if(param)
+				*param = instance.counter--;
+
+			instance.jobDone(job);
 		}
 	}
 
-	pet::DoubleList<JobBase> requests;
+	pet::DoubleList<typename Os::IoChannel::Job> requests;
 
 	virtual bool addJob(typename Os::IoChannel::Job* job) {
-		return requests.addBack(static_cast<JobBase*>(job));
+		return requests.addBack(job);
 	}
 
 	virtual bool removeJob(typename Os::IoChannel::Job* job) {
-		return requests.remove(static_cast<JobBase*>(job));
+		return requests.remove(job);
 	}
 
 	virtual bool hasJob() {
@@ -122,8 +128,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			jobs[i].success = -1;
-
+			jobs[i].prepare();
 			if(!DummyProcess<Os>::instance.submitTimeout(jobs + i, 100))
 				ret = false;
 		}
@@ -136,8 +141,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			jobs[i].success = -1;
-
+			jobs[i].prepare();
 			if(!DummyProcess<Os>::instance.submit(jobs + i))
 				ret = false;
 		}
@@ -148,14 +152,13 @@ struct DummyProcessJobsBase {
 	bool postReqsNoTimeout() {
 		for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 			reqs[i].init();
-			reqs[i].success = -1;
+			reqs[i].prepare();
 			if(!DummyProcess<Os>::instance.submit(reqs + i))
 				return false;
 		}
 
 		return true;
 	}
-
 
 	int checkJobs()
 	{

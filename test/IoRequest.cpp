@@ -61,6 +61,7 @@ TEST(IoRequestAlreadyDone) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+
 TEST(IoRequestWaitTimeout) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
@@ -180,6 +181,7 @@ TEST(IoRequestIoTimeoutSelect) {
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].init();
+				reqs[i].prepare();
 				reqs[i].success = -1;
 				if(!DummyProcess<Os>::instance.submitTimeout(reqs + i, 100 + 10 * i)) {
 					error = true;
@@ -195,6 +197,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			}
 
 			process.counter = 3;
+			static_cast<Req*>(s1)->prepare();
 			process.submit(static_cast<Req*>(s1));
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
@@ -220,6 +223,7 @@ TEST(IoRequestMulti) {
 		void run() {
 			Os::IoRequest<Process::MultiJob<3>> multiReq;
 			multiReq.init();
+			multiReq.prepare();
 			process.counter = 0;
 			process.submit(&multiReq);
 			process.counter = 3;
@@ -247,6 +251,7 @@ TEST(IoRequestMultiSelect) {
 
 			for(auto &x: multiReq) {
 				x.init();
+				x.prepare();
 				process.submit(&x);
 			}
 
@@ -273,7 +278,6 @@ TEST(IoRequestMultiSelect) {
 	CHECK(!task.error);
 }
 
-
 TEST(IoRequestVsMutexPrioChange)
 {
 	OsRrPrio::Mutex m;
@@ -290,6 +294,8 @@ TEST(IoRequestVsMutexPrioChange)
 				error = true;
 				return;
 			}
+
+			DummyProcess<OsRrPrio>::instance.counter = 1;
 
 			for(auto& x: reqs) {
 				x.wait(3);
@@ -329,3 +335,4 @@ TEST(IoRequestVsMutexPrioChange)
 	CommonTestUtils::start<OsRrPrio>();
 	CHECK(!tLow.error);
 }
+
