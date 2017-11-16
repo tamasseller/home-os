@@ -51,6 +51,8 @@ private:
 		return jobs.front() != nullptr;
 	}
 
+	inline bool submitPrepared(Job* job);
+	inline bool submitTimeoutPrepared(Job* job, uintptr_t time);
 
 protected:
 	pet::DoubleList<Job> jobs;
@@ -58,8 +60,12 @@ protected:
 	void jobDone(Job* job);
 
 public:
-	bool submit(Job* job);
-	bool submitTimeout(Job* job, uintptr_t time);
+	template<class ActualJob, class... C>
+	inline bool submit(ActualJob* job, C... c);
+
+	template<class ActualJob, class... C>
+	inline bool submitTimeout(ActualJob* job, uintptr_t time, C... c);
+
 	void cancel(Job* job);
 
 	void init();
@@ -94,17 +100,21 @@ inline void Scheduler<Args...>::IoChannel::init() {
 }
 
 template<class... Args>
-inline bool Scheduler<Args...>::IoChannel::submit(Job* job)
+template<class ActualJob, class... C>
+inline bool Scheduler<Args...>::IoChannel::submit(ActualJob* job, C... c)
 {
 	if(!takeJob(job))
 		return false;
 
-	state.eventList.issue(job, OverwriteCombiner<Job::submitNoTimeoutValue>());
+	job->prepare(c...);
+
+	state.eventList.issue(static_cast<Job*>(job), OverwriteCombiner<Job::submitNoTimeoutValue>());
 	return true;
 }
 
 template<class... Args>
-inline bool Scheduler<Args...>::IoChannel::submitTimeout(Job* job, uintptr_t time)
+template<class ActualJob, class... C>
+inline bool Scheduler<Args...>::IoChannel::submitTimeout(ActualJob* job, uintptr_t time, C... c)
 {
 	if(!time || time >= (uintptr_t)INTPTR_MAX)
 		return false;
@@ -112,7 +122,36 @@ inline bool Scheduler<Args...>::IoChannel::submitTimeout(Job* job, uintptr_t tim
 	if(!takeJob(job))
 		return false;
 
-	state.eventList.issue(job, [time](uintptr_t, uintptr_t& result) {
+	job->prepare(c...);
+
+	state.eventList.issue(static_cast<Job*>(job), [time](uintptr_t, uintptr_t& result) {
+		result = time;
+		return true;
+	});
+
+	return true;
+}
+
+template<class... Args>
+inline bool Scheduler<Args...>::IoChannel::submitPrepared(Job* job)
+{
+	if(!takeJob(job))
+		return false;
+
+	state.eventList.issue(static_cast<Job*>(job), OverwriteCombiner<Job::submitNoTimeoutValue>());
+	return true;
+}
+
+template<class... Args>
+inline bool Scheduler<Args...>::IoChannel::submitTimeoutPrepared(Job* job, uintptr_t time)
+{
+	if(!time || time >= (uintptr_t)INTPTR_MAX)
+		return false;
+
+	if(!takeJob(job))
+		return false;
+
+	state.eventList.issue(static_cast<Job*>(job), [time](uintptr_t, uintptr_t& result) {
 		result = time;
 		return true;
 	});
@@ -161,11 +200,11 @@ private:
 
     class DefaultReactivator: public Reactivator {
         virtual bool reactivate(Job* job, IoChannel* channel) const override final {
-            return channel->submit(job);
+            return channel->submitPrepared(job);
         }
 
         virtual bool reactivateTimeout(Job* job, IoChannel* channel, uintptr_t timeout) const override final {
-            return channel->submitTimeout(job, timeout);
+            return channel->submitTimeoutPrepared(job, timeout);
         }
     };
 

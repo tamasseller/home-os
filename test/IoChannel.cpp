@@ -175,7 +175,6 @@ TEST(IoChannelMulti) {
 		bool error = false;
 		void run() {
 			MultiJob<3> multiJob;
-			multiJob.prepare();
 			process.submit(&multiJob);
 			process.counter = 3;
 
@@ -196,7 +195,6 @@ TEST(IoChannelErrors) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			jobs[0].prepare();
 			if(process.submitTimeout(&jobs[0], 0)) {
 				error = true;
 				return;
@@ -235,40 +233,33 @@ TEST(IoSemaphoreChannel) {
 		void run() {
 			SemJob jobs[3];
 
-			jobs[0].prepare(1);
-			semProcess.submit(jobs + 0);
+			semProcess.submit(jobs + 0, 1);
 
 			if(!jobs[0].done) {error = true; return;}	// 1
 
-			jobs[0].prepare(-1);
-			semProcess.submit(jobs + 0);
+			semProcess.submit(jobs + 0, -1);
 
 			if(!jobs[0].done) {error = true; return;}	// 0
 
-			jobs[0].prepare(-1);
-			semProcess.submit(jobs + 0);
+			semProcess.submit(jobs + 0, -1);
 
 			if(jobs[0].done) {error = true; return;}	// 0
 
-			jobs[1].prepare(2);
-			semProcess.submit(jobs + 1);
+			semProcess.submit(jobs + 1, 2);
 
 			if(!jobs[1].done) {error = true; return;}	// 2
 			if(!jobs[0].done) {error = true; return;}	// 1
 
-			jobs[0].prepare(-2);
-			semProcess.submit(jobs + 0);
+			semProcess.submit(jobs + 0, -2);
 
 			if(jobs[0].done) {error = true; return;}	// 1
 
-			jobs[1].prepare(-1);
-			semProcess.submit(jobs + 1);
+			semProcess.submit(jobs + 1, -1);
 
 			if(jobs[0].done) {error = true; return;}	// 1
 			if(jobs[1].done) {error = true; return;}	// 1
 
-			jobs[2].prepare(3);
-			semProcess.submit(jobs + 2);
+			semProcess.submit(jobs + 2, 3);
 
 			if(!jobs[2].done) {error = true; return;}	// 3
 			if(!jobs[0].done) {error = true; return;}	// 1
@@ -288,14 +279,9 @@ TEST(IoChannelComposite) {
 		void run() {
 			CompositeJob jobs[3];
 
-			jobs[0].prepare(-2);
-			semProcess.submit(jobs + 0);
-
-			jobs[1].prepare(-1);
-			semProcess.submit(jobs + 1);
-
-			jobs[2].prepare(1);
-			semProcess.submit(jobs + 2);
+			semProcess.submit(jobs + 0, -2);
+			semProcess.submit(jobs + 1, -1);
+			semProcess.submit(jobs + 2, 1);
 
 			if(jobs[0].stage != 0) {error = true; return;}
 			if(jobs[1].stage != 0) {error = true; return;}
@@ -307,8 +293,7 @@ TEST(IoChannelComposite) {
 
 			if(jobs[2].stage != 2) {error = true; return;}
 
-			jobs[2].prepare(1);
-			semProcess.submit(jobs + 2);
+			semProcess.submit(jobs + 2, 1);
 
 			if(jobs[0].stage != 1) {error = true; return;}
 			if(jobs[2].stage != 1) {error = true; return;}
@@ -322,8 +307,7 @@ TEST(IoChannelComposite) {
 
 			process.counter = 100;
 
-			jobs[2].prepare(1);
-			semProcess.submit(jobs + 2);
+			semProcess.submit(jobs + 2, 1);
 
 			Os::sleep(10);
 

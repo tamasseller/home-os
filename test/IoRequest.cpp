@@ -27,8 +27,6 @@ TEST(IoRequestAlreadyDone) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postReqsNoTimeout()) {
 				error = true;
 				return;
@@ -64,8 +62,6 @@ TEST(IoRequestWaitTimeout) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postReqsNoTimeout()) {
 				error = true;
 				return;
@@ -103,8 +99,6 @@ TEST(IoRequestWaitNoTimeout) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postReqsNoTimeout()) {
 				error = true;
 				return;
@@ -133,8 +127,6 @@ TEST(IoRequestSelect) {
 	struct Task: public TestTask<Task>, Base {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postReqsNoTimeout()) {
 				error = true;
 				return;
@@ -175,11 +167,8 @@ TEST(IoRequestIoTimeoutSelect) {
 	struct Task: public TestTask<Task>, Base {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].init();
-				reqs[i].prepare();
 				reqs[i].success = -1;
 				if(!DummyProcess<Os>::instance.submitTimeout(reqs + i, 100 + 10 * i)) {
 					error = true;
@@ -195,7 +184,6 @@ TEST(IoRequestIoTimeoutSelect) {
 			}
 
 			process.counter = 3;
-			static_cast<Req*>(s1)->prepare();
 			process.submit(static_cast<Req*>(s1));
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
@@ -221,8 +209,7 @@ TEST(IoRequestMulti) {
 		void run() {
 			Os::IoRequest<MultiJob<3>> multiReq;
 			multiReq.init();
-			multiReq.prepare();
-			process.counter = 0;
+
 			process.submit(&multiReq);
 			process.counter = 3;
 
@@ -239,17 +226,44 @@ TEST(IoRequestMulti) {
 	CHECK(!task.error);
 }
 
+TEST(IoRequestComposite) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			Os::IoRequest<CompositeJob> compReq[2];
+
+			compReq[0].init();
+			semProcess.submit(&compReq[0], -1);
+			process.counter = 100;
+
+			if(compReq[0].wait(10)){
+				error = true;
+				return;
+			}
+
+			compReq[1].init();
+			semProcess.submit(&compReq[1], 1);
+
+			compReq[0].wait(10);
+			compReq[1].wait(10);
+		}
+	} task;
+
+	Base::semProcess.init();
+	Base::process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
 TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
 			Os::IoRequest<MultiJob<3>> multiReq[2];
 
-			process.counter = 0;
-
 			for(auto &x: multiReq) {
 				x.init();
-				x.prepare();
 				process.submit(&x);
 			}
 

@@ -10,7 +10,7 @@ INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 
 ifeq ('x','')
-endif
+
 
 # Atomic list related tests.
 
@@ -59,6 +59,10 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 # Io management related tests.
 
 SOURCES += $(ROOT)/test/Timeout.cpp
+SOURCES += $(ROOT)/test/IoRequest.cpp
+SOURCES += $(ROOT)/test/IoChannel.cpp
+endif
+
 SOURCES += $(ROOT)/test/IoRequest.cpp
 SOURCES += $(ROOT)/test/IoChannel.cpp
 

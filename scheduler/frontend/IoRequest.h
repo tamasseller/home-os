@@ -115,12 +115,12 @@ class Scheduler<Args...>::IoRequest:
     class HijackReactivator: public IoChannel::Job::Reactivator {
         virtual bool reactivate(typename IoChannel::Job* job, IoChannel* channel) const override final {
         	hijack(job);
-            return channel->submit(job);
+            return channel->submitPrepared(job);
         }
 
         virtual bool reactivateTimeout(typename IoChannel::Job* job, IoChannel* channel, uintptr_t timeout) const override final {
         	hijack(job);
-            return channel->submitTimeout(job, timeout);
+            return channel->submitTimeoutPrepared(job, timeout);
         }
     };
 
