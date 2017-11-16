@@ -74,6 +74,7 @@ struct SchedulerOptions {
 		class CountingSemaphore;
 
 		class IoChannel;
+		class IoJob;
 		template<class> class IoRequest;
 
 	private:
@@ -268,7 +269,8 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "frontend/Task.h"
 #include "frontend/BinarySemaphore.h"
 #include "frontend/CountingSemaphore.h"
-#include "frontend/IoRequest.h"
+#include "frontend/IoJob.h"
 #include "frontend/IoChannel.h"
+#include "frontend/IoRequest.h"
 
 #endif /* SCHEDULER_H_ */

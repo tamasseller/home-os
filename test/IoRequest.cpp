@@ -44,7 +44,7 @@ TEST(IoRequestAlreadyDone) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
 
-				if(reqs[i].success != (int)Os::IoChannel::Job::Result::Done) {
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
 					error = true;
 					return;
 				}
@@ -81,7 +81,7 @@ TEST(IoRequestWaitTimeout) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				bool ok = reqs[i].wait(10);
 
-				if(!ok || reqs[i].success != (int)Os::IoChannel::Job::Result::Done) {
+				if(!ok || reqs[i].success != (int)Os::IoJob::Result::Done) {
 					error = true;
 					return;
 				}
@@ -109,7 +109,7 @@ TEST(IoRequestWaitNoTimeout) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
 
-				if(reqs[i].success != (int)Os::IoChannel::Job::Result::Done) {
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
 					error = true;
 					return;
 				}
@@ -136,21 +136,21 @@ TEST(IoRequestSelect) {
 
 			auto* s1 = Os::select(&reqs[0], &reqs[1], &reqs[2]);
 
-			if(s1 != &reqs[0] || reqs[0].success != (int)Os::IoChannel::Job::Result::Done) {
+			if(s1 != &reqs[0] || reqs[0].success != (int)Os::IoJob::Result::Done) {
 				error = true;
 				return;
 			}
 
 			auto* s2 = Os::select(&reqs[1], &reqs[2]);
 
-			if(s2 != &reqs[1] || reqs[1].success != (int)Os::IoChannel::Job::Result::Done) {
+			if(s2 != &reqs[1] || reqs[1].success != (int)Os::IoJob::Result::Done) {
 				error = true;
 				return;
 			}
 
 			auto* s3 = Os::select(&reqs[2]);
 
-			if(s3 != &reqs[2] || reqs[2].success != (int)Os::IoChannel::Job::Result::Done) {
+			if(s3 != &reqs[2] || reqs[2].success != (int)Os::IoJob::Result::Done) {
 				error = true;
 				return;
 			}
@@ -178,7 +178,7 @@ TEST(IoRequestIoTimeoutSelect) {
 
 			auto* s1 = Os::select(&reqs[0], &reqs[1], &reqs[2]);
 
-			if(!s1 || static_cast<Req*>(s1)->success != (int)Os::IoChannel::Job::Result::TimedOut) {
+			if(!s1 || static_cast<Req*>(s1)->success != (int)Os::IoJob::Result::TimedOut) {
 				error = true;
 				return;
 			}
@@ -189,7 +189,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
 
-				if(reqs[i].success != (int)Os::IoChannel::Job::Result::Done) {
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
 					error = true;
 					return;
 				}
@@ -216,7 +216,7 @@ TEST(IoRequestMulti) {
 			multiReq.wait();
 
 			for(int i=0; i<3; i++)
-				CHECK(multiReq.success[i] == (int)Process::Job::Result::Done);
+				if(multiReq.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
 		}
 	} task;
 
@@ -280,7 +280,7 @@ TEST(IoRequestMultiSelect) {
 
 			for(auto &x: multiReq)
 				for(int i=0; i<3; i++)
-					CHECK(x.success[i] == (int)Process::Job::Result::Done);
+					if(x.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
 		}
 	} task;
 
@@ -316,7 +316,7 @@ TEST(IoRequestVsMutexPrioChange)
 
 				Os::sleep(2);
 
-				if(x.success != (int)Os::IoChannel::Job::Result::Done) {
+				if(x.success != (int)Os::IoJob::Result::Done) {
 					error = true;
 					return;
 				}

@@ -40,7 +40,7 @@ public:
 private:
 	static inline void processWorkerIsr() {
 		if(instance.counter) {
-			typename Os::IoChannel::Job* job = instance.jobs.front();
+			typename Os::IoJob* job = instance.jobs.front();
 			int* param = reinterpret_cast<int*>(job->param);
 
 			auto count = instance.counter--;
@@ -52,11 +52,11 @@ private:
 		}
 	}
 
-	virtual bool addJob(typename Os::IoChannel::Job* job) {
+	virtual bool addJob(typename Os::IoJob* job) {
 		return this->jobs.addBack(job);
 	}
 
-	virtual bool removeJob(typename Os::IoChannel::Job* job) {
+	virtual bool removeJob(typename Os::IoJob* job) {
 		return this->jobs.remove(job);
 	}
 
@@ -77,7 +77,7 @@ class SemaphoreProcess: public Os::IoChannel
 {
 	int count;
 
-	virtual bool addJob(typename Os::IoChannel::Job* job)
+	virtual bool addJob(typename Os::IoJob* job)
 	{
 		if(static_cast<int>(job->param) < 0 && this->jobs.front())
 			return this->jobs.addBack(job);
@@ -100,7 +100,7 @@ class SemaphoreProcess: public Os::IoChannel
 		return true;
 	}
 
-	virtual bool removeJob(typename Os::IoChannel::Job* job) {
+	virtual bool removeJob(typename Os::IoJob* job) {
 		this->jobs.remove(job);
 		return true;
 	}
@@ -130,8 +130,8 @@ struct DummyProcessJobsBase {
 	constexpr static Process &process = Process::instance;
 	constexpr static SemProcess &semProcess = SemProcess::instance;
 
-	class Job: public Os::IoChannel::Job {
-		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &) {
+	class Job: public Os::IoJob {
+		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &) {
 			Job* job = static_cast<Job*>(item);
 			job->success = (int)result;
 			return false;
@@ -141,7 +141,7 @@ struct DummyProcessJobsBase {
 		template <class> friend class Os::IoRequest;
 		inline void prepare() {
 			success = -1;
-			this->Os::IoChannel::Job::prepare(&Job::writeResult, reinterpret_cast<uintptr_t>(&count));
+			this->Os::IoJob::prepare(&Job::writeResult, reinterpret_cast<uintptr_t>(&count));
 		}
 
 	public:
@@ -152,13 +152,13 @@ struct DummyProcessJobsBase {
 	};
 
 	template<size_t n>
-	struct MultiJob: Os::IoChannel::Job {
-		static bool writeResult(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+	struct MultiJob: Os::IoJob {
+		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
 			MultiJob* job = static_cast<MultiJob*>(item);
 			job->success[--job->idx] = (int)result;
 
 			if(job->idx) {
-				job->Os::IoChannel::Job::prepare(&MultiJob::writeResult);
+				job->Os::IoJob::prepare(&MultiJob::writeResult);
 				react.reactivate(item, &Process::instance);
 				return true;
 			}
@@ -173,7 +173,7 @@ struct DummyProcessJobsBase {
 			for(auto &x: success)
 				x = -1;
 
-			this->Os::IoChannel::Job::prepare(&MultiJob::writeResult);
+			this->Os::IoJob::prepare(&MultiJob::writeResult);
 		}
 	public:
 		volatile int idx = n;
@@ -181,8 +181,8 @@ struct DummyProcessJobsBase {
 
 	};
 
-	class SemJob: Os::IoChannel::Job {
-		static bool callback(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+	class SemJob: Os::IoJob {
+		static bool callback(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
 			static_cast<SemJob*>(item)->done = true;
 			return false;
 		}
@@ -192,7 +192,7 @@ struct DummyProcessJobsBase {
 
 		inline void prepare(int n) {
 			done = false;
-			this->Os::IoChannel::Job::prepare(&SemJob::callback, n);
+			this->Os::IoJob::prepare(&SemJob::callback, n);
 		}
 
 	public:
@@ -200,17 +200,17 @@ struct DummyProcessJobsBase {
 
 	};
 
-	struct CompositeJob: Os::IoChannel::Job {
+	struct CompositeJob: Os::IoJob {
 
-		static bool step2(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+		static bool step2(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
 			static_cast<CompositeJob*>(item)->stage = 2;
 			return false;
 		}
 
 
-		static bool step1(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+		static bool step1(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
 			static_cast<CompositeJob*>(item)->stage = 1;
-			static_cast<CompositeJob*>(item)->Os::IoChannel::Job::prepare(&CompositeJob::step2);
+			static_cast<CompositeJob*>(item)->Os::IoJob::prepare(&CompositeJob::step2);
 			react.reactivate(item, &Process::instance);
 			return true;
 		}
@@ -220,7 +220,7 @@ struct DummyProcessJobsBase {
 
 		inline void prepare(int n) {
 			stage = 0;
-			this->Os::IoChannel::Job::prepare(&CompositeJob::step1, n);
+			this->Os::IoJob::prepare(&CompositeJob::step1, n);
 		}
 
 	public:
@@ -277,7 +277,7 @@ struct DummyProcessJobsBase {
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
 				if(jobs[i].success == -1)
 					done = false;
-				else if(jobs[i].success == (int)Os::IoChannel::Job::Result::Done)
+				else if(jobs[i].success == (int)Os::IoJob::Result::Done)
 					ret++;
 			}
 

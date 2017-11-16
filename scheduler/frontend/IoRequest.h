@@ -36,7 +36,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	static constexpr uintptr_t blockedReturnValue = 1;
 
 	Blockable* blocked = nullptr;
-	typename IoChannel::Job::Result result = IoChannel::Job::Result::NotYet;
+	typename IoJob::Result result = IoJob::Result::NotYet;
 
 	virtual void priorityChanged(Blockable* b, typename Policy::Priority old) override {
 		/*
@@ -79,7 +79,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	 */
 
     virtual Blocker* getTakeable(Task*) override final {
-        return (this->result == IoChannel::Job::Result::NotYet) ? nullptr : this;
+        return (this->result == IoJob::Result::NotYet) ? nullptr : this;
     }
 
 	virtual bool continuation(uintptr_t retval) override {
@@ -88,7 +88,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	}
 
 protected:
-	inline void resume(typename IoChannel::Job::Result result) {
+	inline void resume(typename IoJob::Result result) {
 		this->result = result;
 		if(blocked) {
 			blocked->wake(this);
@@ -103,36 +103,38 @@ class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
 {
-    typedef bool (*Method)(typename IoChannel::Job*, typename IoChannel::Job::Result, const typename IoChannel::Job::Reactivator &);
+	typedef typename Scheduler<Args...>::IoJob IoJob;
+
+    typedef bool (*Method)(IoJob*, typename IoJob::Result, const typename IoJob::Reactivator &);
     Method hijackedMethod;
 
-    static inline void hijack(typename IoChannel::Job* job) {
+    static inline void hijack(IoJob* job) {
     	IoRequest* self = static_cast<IoRequest*>(static_cast<Job*>(job));
     	self->hijackedMethod = self->Job::finished;
 		self->Job::finished = &IoRequest::activator;
     }
 
-    class HijackReactivator: public IoChannel::Job::Reactivator {
-        virtual bool reactivate(typename IoChannel::Job* job, IoChannel* channel) const override final {
+    class HijackReactivator: public IoJob::Reactivator {
+        virtual bool reactivate(IoJob* job, IoChannel* channel) const override final {
         	hijack(job);
             return channel->submitPrepared(job);
         }
 
-        virtual bool reactivateTimeout(typename IoChannel::Job* job, IoChannel* channel, uintptr_t timeout) const override final {
+        virtual bool reactivateTimeout(IoJob* job, IoChannel* channel, uintptr_t timeout) const override final {
         	hijack(job);
             return channel->submitTimeoutPrepared(job, timeout);
         }
     };
 
-	static bool activator(typename IoChannel::Job* job, typename IoChannel::Job::Result result, const typename IoChannel::Job::Reactivator &) {
+	static bool activator(IoJob* job, typename IoJob::Result result, const typename IoJob::Reactivator &) {
 		IoRequest* self = static_cast<IoRequest*>(job);
 		self->resume(result);
 		return false;
 	}
 
 	virtual bool continuation(uintptr_t) override final {
-	    typename IoChannel::Job::Result result = this->result;
-	    this->result = IoChannel::Job::Result::NotYet;
+	    typename IoJob::Result result = this->result;
+	    this->result = IoJob::Result::NotYet;
 		return hijackedMethod(this, result, HijackReactivator());
 	}
 

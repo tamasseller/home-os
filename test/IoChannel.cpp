@@ -127,7 +127,7 @@ TEST(IoChannelTimeoutDoTimout) {
 			Os::sleep(110);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-				if(jobs[i].success != (int)Os::IoChannel::Job::Result::TimedOut)
+				if(jobs[i].success != (int)Os::IoJob::Result::TimedOut)
 					error = true;
 		}
 	} task;
@@ -159,7 +159,7 @@ TEST(IoChannelTimeoutCancel) {
 			Os::sleep(50);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-				if(jobs[i].success != (int)Os::IoChannel::Job::Result::Canceled)
+				if(jobs[i].success != (int)Os::IoJob::Result::Canceled)
 					error = true;
 		}
 	} task;
@@ -181,7 +181,7 @@ TEST(IoChannelMulti) {
 			while(multiJob.idx){}
 
 			for(int i=0; i<3; i++)
-				CHECK(multiJob.success[i] == (int)Process::Job::Result::Done);
+				if(multiJob.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
 		}
 	} task;
 
@@ -217,7 +217,7 @@ TEST(IoChannelErrors) {
 
 			process.counter = 1;
 
-			while(jobs[0].success != (int)Os::IoChannel::Job::Result::Done) {}
+			while(jobs[0].success != (int)Os::IoJob::Result::Done) {}
 		}
 	} task;
 
