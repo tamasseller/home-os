@@ -6,7 +6,6 @@ API
 Internals
 ---------
 
- - Find de-virtualization opportunities in IoChannel.
  - Add option for direct syscall address passing, if enabled should prohibit
    instantiation of syscall table to enable omitting unused syscalls from binary.
  - Implement arbitrary base-class option (for add names to things and the like).
