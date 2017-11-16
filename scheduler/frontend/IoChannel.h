@@ -34,7 +34,6 @@ public:
 private:
 	virtual void enableProcess() = 0;
 	virtual void disableProcess() = 0;
-	virtual bool hasJob() = 0;
 	virtual bool addJob(Job*) = 0;
 	virtual bool removeJob(Job*) = 0;
 
@@ -48,7 +47,14 @@ private:
 
     inline bool takeJob(Job* job);
 
+	inline bool hasJob() {
+		return jobs.front() != nullptr;
+	}
+
+
 protected:
+	pet::DoubleList<Job> jobs;
+
 	void jobDone(Job* job);
 
 public:
@@ -277,11 +283,8 @@ private:
 			self->finished(self, Result::TimedOut, DefaultReactivator());
 	}
 
-	static inline bool nop(Job* job, Result result) {return false;}
-
 protected:
-
-	inline void prepare(bool (*finished)(Job*, Result, const Reactivator &) = &Job::nop, uintptr_t param = 0) {
+	inline void prepare(bool (*finished)(Job*, Result, const Reactivator &), uintptr_t param = 0) {
 		this->param = param;
 		this->finished = finished;
 	}

@@ -27,6 +27,107 @@ class DummyProcess: public Os::IoChannel {
 public:
 	inline virtual ~DummyProcess() {}
 
+	volatile unsigned int counter;
+
+	static DummyProcess instance;
+
+	void init() {
+		this->jobs.clear();
+		counter = 0;
+		this->Os::IoChannel::init();
+	}
+
+private:
+	static inline void processWorkerIsr() {
+		if(instance.counter) {
+			typename Os::IoChannel::Job* job = instance.jobs.front();
+			int* param = reinterpret_cast<int*>(job->param);
+
+			if(param)
+				*param = instance.counter--;
+
+			instance.jobDone(job);
+		}
+	}
+
+	virtual bool addJob(typename Os::IoChannel::Job* job) {
+		return this->jobs.addBack(job);
+	}
+
+	virtual bool removeJob(typename Os::IoChannel::Job* job) {
+		return this->jobs.remove(job);
+	}
+
+	virtual void enableProcess() {
+		CommonTestUtils::registerIrq(&DummyProcess::processWorkerIsr);
+	}
+
+	virtual void disableProcess() {
+		CommonTestUtils::registerIrq(nullptr);
+	}
+};
+
+template<class Os>
+DummyProcess<Os> DummyProcess<Os>::instance;
+
+template<class Os>
+class SemaphoreProcess: public Os::IoChannel
+{
+	int count;
+
+	virtual bool addJob(typename Os::IoChannel::Job* job)
+	{
+		if(static_cast<int>(job->param) < 0 && this->jobs.front())
+			return this->jobs.addBack(job);
+
+		while(job) {
+			int param = static_cast<int>(job->param);
+
+			const int newVal = count + param;
+
+			if(newVal < 0) {
+				return this->jobs.addBack(job);
+			}
+
+			count = newVal;
+			this->jobDone(job);
+
+			job = this->jobs.front();
+		}
+
+		return true;
+	}
+
+	virtual bool removeJob(typename Os::IoChannel::Job* job) {
+		this->jobs.remove(job);
+		return true;
+	}
+
+	virtual void enableProcess() {}
+	virtual void disableProcess() {}
+
+public:
+
+	void init() {
+		this->jobs.clear();
+		count = 0;
+		this->Os::IoChannel::init();
+	}
+
+	static SemaphoreProcess instance;
+};
+
+template<class Os>
+SemaphoreProcess<Os> SemaphoreProcess<Os>::instance;
+
+
+template<class Os>
+struct DummyProcessJobsBase {
+	using Process = DummyProcess<Os>;
+	using SemProcess = SemaphoreProcess<Os>;
+	constexpr static Process &process = Process::instance;
+	constexpr static SemProcess &semProcess = SemProcess::instance;
+
 	struct Job: Os::IoChannel::Job {
 		volatile int success;
 		volatile int count;
@@ -57,7 +158,7 @@ public:
 
 			if(job->idx) {
 				job->Os::IoChannel::Job::prepare(&MultiJob::writeResult);
-				react.reactivate(item, &instance);
+				react.reactivate(item, &Process::instance);
 				return true;
 			}
 
@@ -73,52 +174,43 @@ public:
 		}
 	};
 
-	volatile unsigned int counter;
+	struct SemJob: Os::IoChannel::Job {
+		volatile bool done;
 
-	static DummyProcess instance;
-
-private:
-	static inline void processWorkerIsr() {
-		if(instance.counter) {
-			typename Os::IoChannel::Job* job = instance.requests.front();
-			int* param = reinterpret_cast<int*>(job->param);
-
-			if(param)
-				*param = instance.counter--;
-
-			instance.jobDone(job);
+		static bool callback(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+			static_cast<SemJob*>(item)->done = true;
+			return false;
 		}
-	}
 
-	pet::DoubleList<typename Os::IoChannel::Job> requests;
+		inline void prepare(int n) {
+			done = false;
+			this->Os::IoChannel::Job::prepare(&SemJob::callback, n);
+		}
+	};
 
-	virtual bool addJob(typename Os::IoChannel::Job* job) {
-		return requests.addBack(job);
-	}
+	struct CompositeJob: Os::IoChannel::Job {
+		volatile int stage;
 
-	virtual bool removeJob(typename Os::IoChannel::Job* job) {
-		return requests.remove(job);
-	}
+		static bool step2(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+			static_cast<CompositeJob*>(item)->stage = 2;
+			return false;
+		}
 
-	virtual bool hasJob() {
-		return requests.front() != nullptr;
-	}
 
-	virtual void enableProcess() {
-		CommonTestUtils::registerIrq(&DummyProcess::processWorkerIsr);
-	}
+		static bool step1(typename Os::IoChannel::Job* item, typename Os::IoChannel::Job::Result result, const typename Os::IoChannel::Job::Reactivator &react) {
+			static_cast<CompositeJob*>(item)->stage = 1;
+			static_cast<CompositeJob*>(item)->Os::IoChannel::Job::prepare(&CompositeJob::step2);
+			react.reactivate(item, &Process::instance);
+			return true;
+		}
 
-	virtual void disableProcess() {
-		CommonTestUtils::registerIrq(nullptr);
-	}
-};
+	public:
+		inline void prepare(int n) {
+			stage = 0;
+			this->Os::IoChannel::Job::prepare(&CompositeJob::step1, n);
+		}
+	};
 
-template<class Os>
-DummyProcess<Os> DummyProcess<Os>::instance;
-
-template<class Os>
-struct DummyProcessJobsBase {
-	typedef typename DummyProcess<Os>::Job Job;
 	typedef typename Os::template IoRequest<Job> Req;
 	Job jobs[5];
 	Req reqs[3];

@@ -21,9 +21,7 @@
 #include "common/DummyProcess.h"
 
 using Os=OsRr;
-using Process = DummyProcess<Os>;
 using Base = DummyProcessJobsBase<Os>;
-static auto &process = Process::instance;
 
 TEST(IoRequestAlreadyDone) {
 	struct Task: public TestTask<Task>, Base  {
@@ -56,7 +54,7 @@ TEST(IoRequestAlreadyDone) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -95,7 +93,7 @@ TEST(IoRequestWaitTimeout) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -125,7 +123,7 @@ TEST(IoRequestWaitNoTimeout) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -167,7 +165,7 @@ TEST(IoRequestSelect) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -211,7 +209,7 @@ TEST(IoRequestIoTimeoutSelect) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -221,7 +219,7 @@ TEST(IoRequestMulti) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			Os::IoRequest<Process::MultiJob<3>> multiReq;
+			Os::IoRequest<MultiJob<3>> multiReq;
 			multiReq.init();
 			multiReq.prepare();
 			process.counter = 0;
@@ -235,7 +233,7 @@ TEST(IoRequestMulti) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -245,7 +243,7 @@ TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			Os::IoRequest<Process::MultiJob<3>> multiReq[2];
+			Os::IoRequest<MultiJob<3>> multiReq[2];
 
 			process.counter = 0;
 
@@ -272,7 +270,7 @@ TEST(IoRequestMultiSelect) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);

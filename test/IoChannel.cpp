@@ -21,16 +21,12 @@
 #include "common/DummyProcess.h"
 
 using Os=OsRr;
-using Process = DummyProcess<Os>;
 using Base = DummyProcessJobsBase<Os>;
-static auto &process = Process::instance;
 
 TEST(IoChannel) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postJobsNoTimeout()) {
 				error = true;
 				return;
@@ -53,7 +49,7 @@ TEST(IoChannel) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -63,7 +59,6 @@ TEST(IoChannelTimeout) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
 			for(int i=sizeof(jobs)/sizeof(jobs[0]); i>=0; i--) {
 
 				if(!postJobs()) {
@@ -81,7 +76,7 @@ TEST(IoChannelTimeout) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -91,8 +86,6 @@ TEST(IoChannelTimeoutPostpone) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postJobs()) {
 				error = true;
 				return;
@@ -116,7 +109,7 @@ TEST(IoChannelTimeoutPostpone) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -126,8 +119,6 @@ TEST(IoChannelTimeoutDoTimout) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postJobs()) {
 				error = true;
 				return;
@@ -141,7 +132,7 @@ TEST(IoChannelTimeoutDoTimout) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -151,8 +142,6 @@ TEST(IoChannelTimeoutCancel) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			if(!postJobs()) {
 				error = true;
 				return;
@@ -175,7 +164,7 @@ TEST(IoChannelTimeoutCancel) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -185,8 +174,7 @@ TEST(IoChannelMulti) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			Process::MultiJob<3> multiJob;
-			process.counter = 0;
+			MultiJob<3> multiJob;
 			multiJob.prepare();
 			process.submit(&multiJob);
 			process.counter = 3;
@@ -198,7 +186,7 @@ TEST(IoChannelMulti) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
@@ -208,8 +196,6 @@ TEST(IoChannelErrors) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			process.counter = 0;
-
 			jobs[0].prepare();
 			if(process.submitTimeout(&jobs[0], 0)) {
 				error = true;
@@ -237,7 +223,116 @@ TEST(IoChannelErrors) {
 		}
 	} task;
 
-	process.init();
+	Base::process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+TEST(IoSemaphoreChannel) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			SemJob jobs[3];
+
+			jobs[0].prepare(1);
+			semProcess.submit(jobs + 0);
+
+			if(!jobs[0].done) {error = true; return;}	// 1
+
+			jobs[0].prepare(-1);
+			semProcess.submit(jobs + 0);
+
+			if(!jobs[0].done) {error = true; return;}	// 0
+
+			jobs[0].prepare(-1);
+			semProcess.submit(jobs + 0);
+
+			if(jobs[0].done) {error = true; return;}	// 0
+
+			jobs[1].prepare(2);
+			semProcess.submit(jobs + 1);
+
+			if(!jobs[1].done) {error = true; return;}	// 2
+			if(!jobs[0].done) {error = true; return;}	// 1
+
+			jobs[0].prepare(-2);
+			semProcess.submit(jobs + 0);
+
+			if(jobs[0].done) {error = true; return;}	// 1
+
+			jobs[1].prepare(-1);
+			semProcess.submit(jobs + 1);
+
+			if(jobs[0].done) {error = true; return;}	// 1
+			if(jobs[1].done) {error = true; return;}	// 1
+
+			jobs[2].prepare(3);
+			semProcess.submit(jobs + 2);
+
+			if(!jobs[2].done) {error = true; return;}	// 3
+			if(!jobs[0].done) {error = true; return;}	// 1
+			if(!jobs[1].done) {error = true; return;}	// 0
+		}
+	} task;
+
+	Base::semProcess.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+TEST(IoChannelComposite) {
+	struct Task: Base, public TestTask<Task> {
+		bool error = false;
+		void run() {
+			CompositeJob jobs[3];
+
+			jobs[0].prepare(-2);
+			semProcess.submit(jobs + 0);
+
+			jobs[1].prepare(-1);
+			semProcess.submit(jobs + 1);
+
+			jobs[2].prepare(1);
+			semProcess.submit(jobs + 2);
+
+			if(jobs[0].stage != 0) {error = true; return;}
+			if(jobs[1].stage != 0) {error = true; return;}
+			if(jobs[2].stage != 1) {error = true; return;}
+
+			process.counter = 1;
+
+			Os::sleep(10);
+
+			if(jobs[2].stage != 2) {error = true; return;}
+
+			jobs[2].prepare(1);
+			semProcess.submit(jobs + 2);
+
+			if(jobs[0].stage != 1) {error = true; return;}
+			if(jobs[2].stage != 1) {error = true; return;}
+
+			process.counter = 2;
+
+			Os::sleep(10);
+
+			if(jobs[0].stage != 2) {error = true; return;}
+			if(jobs[2].stage != 2) {error = true; return;}
+
+			process.counter = 100;
+
+			jobs[2].prepare(1);
+			semProcess.submit(jobs + 2);
+
+			Os::sleep(10);
+
+			if(jobs[1].stage != 2) {error = true; return;}
+		}
+	} task;
+
+	Base::process.init();
+	Base::semProcess.init();
 	task.start();
 	CommonTestUtils::start();
 	CHECK(!task.error);
