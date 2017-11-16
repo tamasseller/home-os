@@ -43,8 +43,10 @@ private:
 			typename Os::IoChannel::Job* job = instance.jobs.front();
 			int* param = reinterpret_cast<int*>(job->param);
 
+			auto count = instance.counter--;
+
 			if(param)
-				*param = instance.counter--;
+				*param = count;
 
 			instance.jobDone(job);
 		}

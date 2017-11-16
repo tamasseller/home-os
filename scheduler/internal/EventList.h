@@ -42,9 +42,16 @@ class Scheduler<Args...>::EventList: SharedAtomicList
 	inline void dispatch()
 	{
 		uintptr_t arg;
-		for(auto reader = SharedAtomicList::read(); auto* element = reader.pop(arg);) {
-			Event* event = static_cast<Event*>(element);
-			event->callback(event, arg);
+		while(true) {
+			auto reader = SharedAtomicList::read();
+
+			if(auto* element = reader.pop(arg)) {
+				do {
+					Event* event = static_cast<Event*>(element);
+					event->callback(event, arg);
+				} while((element = reader.pop(arg)) != nullptr);
+			} else
+				break;
 		}
 	}
 

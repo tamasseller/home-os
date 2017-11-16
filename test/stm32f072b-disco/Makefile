@@ -12,7 +12,6 @@ INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-common
 ifeq ('x','')
 endif
 
-
 # Atomic list related tests.
 
 SOURCES += $(ROOT)/test/LimitedCTree.cpp
