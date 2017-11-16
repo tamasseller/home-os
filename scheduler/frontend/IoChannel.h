@@ -44,10 +44,6 @@ private:
 
     inline bool takeJob(IoJob* job);
 
-	inline bool hasJob() {
-		return jobs.front() != nullptr;
-	}
-
 	inline bool submitPrepared(IoJob* job);
 	inline bool submitTimeoutPrepared(IoJob* job, uintptr_t time);
 
@@ -55,6 +51,10 @@ protected:
 	pet::DoubleList<IoJob> jobs;
 
 	void jobDone(IoJob* job);
+
+	inline bool hasJob() {
+		return jobs.front() != nullptr;
+	}
 
 public:
 	template<class ActualJob, class... C>

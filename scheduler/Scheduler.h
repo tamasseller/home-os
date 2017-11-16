@@ -77,6 +77,8 @@ struct SchedulerOptions {
 		class IoJob;
 		template<class> class IoRequest;
 
+		class Event;
+
 	private:
 		template<class> friend class OsInternalTester;
 		/*
@@ -96,7 +98,6 @@ struct SchedulerOptions {
 		template<ScalabilityHint, class = void> class SleeperBase;
 		template<ScalabilityHint, class = void> class SleepListBase;
 
-		class Event;
 		class Timeout;
 		class EventList;
 		class PreemptionEvent;
@@ -189,6 +190,9 @@ struct SchedulerOptions {
 			PreemptionEvent preemptionEvent;
 		} state;
 	public:
+
+		void static submitEvent(Event*);
+
 		/**
 		 * Get current low resolution time.
 		 */

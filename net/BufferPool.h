@@ -1,21 +1,35 @@
-/*
- * BufferPool.h
+/*******************************************************************************
  *
- *  Created on: 2017.11.13.
- *      Author: tooma
- */
+ * Copyright (c) 2017 Seller Tamás. All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *******************************************************************************/
 
 #ifndef BUFFERPOOL_H_
 #define BUFFERPOOL_H_
 
 template<class Os, size_t nBlocks, size_t blockDataSize>
-struct BufferPool: Os::IoChannel
+class BufferPool: public Os::IoChannel, Os::Event
 {
+public:
 	struct Block {
 		 Block* next;
 		 char data[blockDataSize];
 	};
 
+private:
 	template<class Value> using Atomic = typename Os::template Atomic<Value>;
 
 	Atomic<size_t> nFree;
@@ -63,53 +77,91 @@ struct BufferPool: Os::IoChannel
 		});
 	}
 
-public:
-	struct Chain {
-		Block *first = nullptr, *last = nullptr;
-
-		inline size_t length()
-		{
-			size_t ret = 0;
-
-			for(Block* i = first; i; i = i->next)
-				ret++;
-
-			return ret;
-		}
-	};
-
-	inline BufferPool(): nFree(nBlocks), head(blocks)
+	inline Block* allocate(size_t n)
 	{
-		for(size_t i = 0; i < nBlocks - 1; i++)
-			blocks[i].next = &blocks[i+1];
-
-		blocks[nBlocks - 1].next = nullptr;
-	}
-
-	inline Chain allocate(size_t n)
-	{
-		Chain ret;
+		Block* ret = nullptr;
 
 		if(reserve(n)){
-			ret.first = ret.last = take();
+			Block* last = ret = take();
 
 			while(--n) {
 				Block* next = take();
-				ret.last->next = next;
-				ret.last = next;
+				last->next = next;
+				last = next;
 			}
 
-			ret.last->next = nullptr;
+			last->next = nullptr;
 		}
 
 		return ret;
 	}
 
-	inline void reclaim(const Chain &chain) {
+	bool tryToSatisfy(typename Os::IoJob* job ) {
+		size_t param = reinterpret_cast<uintptr_t>(job->param);
+
+		if(Block* first = allocate(param)) {
+			job->param = reinterpret_cast<uintptr_t>(first);
+			this->jobDone(job);
+			return true;
+		}
+
+		return false;
+	}
+
+	static void blocksReclaimed(typename Os::Event* event, uintptr_t arg) {
+		BufferPool* self = static_cast<BufferPool*>(event);
+
+		while(typename Os::IoJob* job = self->jobs.front()) {
+			if(!self->tryToSatisfy(job))
+				break;
+		}
+	}
+
+	virtual bool addJob(typename Os::IoJob* job)
+	{
+		if(!this->jobs.front()) {
+			if(tryToSatisfy(job))
+				return true;
+		}
+
+		return this->jobs.addBack(job);
+	}
+
+	virtual bool removeJob(typename Os::IoJob* job) {
+		bool isFirst = job == this->jobs.front();
+		bool ok = this->jobs.remove(job);
+
+		if(ok && isFirst) {
+			while(typename Os::IoJob* job = this->jobs.front()) {
+				if(!tryToSatisfy(job))
+					break;
+			}
+		}
+
+		return ok;
+	}
+
+	virtual void enableProcess() {}
+	virtual void disableProcess() {}
+
+public:
+	inline void init() {
+		nFree = nBlocks;
+		head = blocks;
+
+		for(size_t i = 0; i < nBlocks - 1; i++)
+			blocks[i].next = &blocks[i+1];
+
+		blocks[nBlocks - 1].next = nullptr;
+
+		Os::IoChannel::init();
+	}
+
+	inline void reclaim(Block *first) {
 		size_t n = 0;
 		Block** nextOfLast;
 
-		for(Block* b = chain.first;; b = b->next) {
+		for(Block* b = first;; b = b->next) {
 			n++;
 			if(!b->next) {
 				nextOfLast = &b->next;
@@ -117,9 +169,14 @@ public:
 			}
 		}
 
-		put(chain.first, nextOfLast);
+		put(first, nextOfLast);
 		unReserve(n);
+
+		if(this->hasJob())
+			Os::submitEvent(this);
 	};
+
+	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
 
 #endif /* BUFFERPOOL_H_ */

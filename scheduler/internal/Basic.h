@@ -25,6 +25,11 @@
 namespace home {
 
 template<class... Args>
+inline void Scheduler<Args...>::submitEvent(Event* event) {
+	state.eventList.issue(event);
+}
+
+template<class... Args>
 template<class... T>
 inline const char* Scheduler<Args...>::start(T... t) {
     /*
