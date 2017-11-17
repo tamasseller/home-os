@@ -95,6 +95,11 @@ protected:
 			blocked = nullptr;
 		}
 	}
+
+public:
+	inline typename IoJob::Result getResult() {
+	    return result;
+	}
 };
 
 template<class... Args>
@@ -105,6 +110,7 @@ class Scheduler<Args...>::IoRequest:
 {
 	typedef typename Scheduler<Args...>::IoJob IoJob;
 
+	// TODO move to parent
     typedef bool (*Method)(IoJob*, typename IoJob::Result, const typename IoJob::Reactivator &);
     Method hijackedMethod;
 
@@ -114,6 +120,7 @@ class Scheduler<Args...>::IoRequest:
 		self->Job::finished = &IoRequest::activator;
     }
 
+    // TODO move to parent
     class HijackReactivator: public IoJob::Reactivator {
         virtual bool reactivate(IoJob* job, IoChannel* channel) const override final {
         	hijack(job);
@@ -132,6 +139,7 @@ class Scheduler<Args...>::IoRequest:
 		return false;
 	}
 
+	// TODO move to parent
 	virtual bool continuation(uintptr_t) override final {
 	    typename IoJob::Result result = this->result;
 	    this->result = IoJob::Result::NotYet;

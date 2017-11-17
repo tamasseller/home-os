@@ -321,3 +321,22 @@ TEST(IoChannelComposite) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+
+TEST(IoChannelCompositeTimeout) {
+    struct Task: Base, public TestTask<Task> {
+        bool error = false;
+        void run() {
+            CompositeJob job;
+
+            semProcess.submit(&job, 1, 10);
+
+            while(!job.timedOut) {}
+        }
+    } task;
+
+    Base::process.init();
+    Base::semProcess.init();
+    task.start();
+    CommonTestUtils::start();
+    CHECK(!task.error);
+}

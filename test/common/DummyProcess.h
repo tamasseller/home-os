@@ -202,29 +202,45 @@ struct DummyProcessJobsBase {
 
 	struct CompositeJob: Os::IoJob {
 
-		static bool step2(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
-			static_cast<CompositeJob*>(item)->stage = 2;
+		static bool step2(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react)
+		{
+		    auto self = static_cast<CompositeJob*>(item);
+
+		    if(result == Os::IoJob::Result::TimedOut)
+		        self->timedOut = true;
+            else
+                self->stage = 2;
+
 			return false;
 		}
 
-
 		static bool step1(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &react) {
-			static_cast<CompositeJob*>(item)->stage = 1;
-			static_cast<CompositeJob*>(item)->Os::IoJob::prepare(&CompositeJob::step2);
-			react.reactivate(item, &Process::instance);
+		    auto self = static_cast<CompositeJob*>(item);
+			self->stage = 1;
+
+            self->Os::IoJob::prepare(&CompositeJob::step2);
+
+			if(self->timeout)
+			    react.reactivateTimeout(item, &Process::instance, self->timeout);
+			else
+			    react.reactivate(item, &Process::instance);
+
 			return true;
 		}
 
 		friend class Os::IoChannel;
 		template <class> friend class Os::IoRequest;
 
-		inline void prepare(int n) {
+		inline void prepare(int n, uintptr_t timeout = 0) {
 			stage = 0;
+			timedOut = false;
+			this->timeout = timeout;
 			this->Os::IoJob::prepare(&CompositeJob::step1, n);
 		}
 
 	public:
-
+		volatile bool timedOut;
+		uintptr_t timeout;
 		volatile int stage;
 	};
 

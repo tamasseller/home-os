@@ -307,14 +307,12 @@ TEST(IoRequestVsMutexPrioChange)
 				return;
 			}
 
-			DummyProcess<OsRrPrio>::instance.counter = 1;
-
 			for(auto& x: reqs) {
 				x.wait(3);
 
 				DummyProcess<OsRrPrio>::instance.counter = 1;
 
-				Os::sleep(2);
+                x.wait();
 
 				if(x.success != (int)Os::IoJob::Result::Done) {
 					error = true;
@@ -348,3 +346,23 @@ TEST(IoRequestVsMutexPrioChange)
 	CHECK(!tLow.error);
 }
 
+TEST(IoRequestCompositeTimeout) {
+    struct Task: Base, public TestTask<Task> {
+        bool error = false;
+        void run() {
+            Os::IoRequest<CompositeJob> req;
+            req.init();
+
+            semProcess.submit(&req, 1, 10);
+
+            req.wait();
+            error = req.getResult() == Os::IoJob::Result::TimedOut;
+        }
+    } task;
+
+    Base::process.init();
+    Base::semProcess.init();
+    task.start();
+    CommonTestUtils::start();
+    CHECK(!task.error);
+}
