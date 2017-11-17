@@ -31,7 +31,7 @@ class Atomic
 public:
 	inline Atomic(): data(0) {}
 
-	inline Atomic(const Value& value) {
+	inline Atomic(Value value) {
 		data = value;
 		clrex();
 	}

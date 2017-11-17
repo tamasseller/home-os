@@ -161,7 +161,7 @@ class ProfileLinuxUm::Atomic {
 public:
 	inline Atomic(): data(0) {}
 
-	inline Atomic(const Data& value) {
+	inline Atomic(Data value) {
 		data = value;
 	}
 

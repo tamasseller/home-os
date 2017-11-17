@@ -29,7 +29,7 @@ template<class Data>
 struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 {
 	inline Atomic(): Profile::template Atomic<Data>(0) {}
-	inline Atomic(const Data& value): Profile::template Atomic<Data>(value) {}
+	inline Atomic(Data value): Profile::template Atomic<Data>(value) {}
 
 	Data increment() {
 		return (*this)([](Data old, Data& result){
