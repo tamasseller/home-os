@@ -20,13 +20,13 @@
 #ifndef BUFFERPOOL_H_
 #define BUFFERPOOL_H_
 
-template<class Os, size_t nBlocks, size_t blockDataSize>
+template<class Os, size_t nBlocks, size_t blockDataSize, class AlignmentType = void*>
 class BufferPool: public Os::IoChannel, Os::Event
 {
 public:
 	struct Block {
+		 char data[blockDataSize] alignas(AlignmentType);
 		 Block* next;
-		 char data[blockDataSize];
 	};
 
 private:
