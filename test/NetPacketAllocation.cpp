@@ -24,6 +24,9 @@ TEST(NetPacketAllocation, Simple) {
 
 	task.start();
 	Net::init();
+	Net::addRoute(Net::Route(
+	        AddressIp4::make(10, 10, 10, 0), 8,
+	        AddressIp4::make(10, 10, 10, 10), Net::getIf<DummyIf>()));
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }

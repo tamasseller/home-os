@@ -91,6 +91,10 @@ struct SharedTable {
                 return *static_cast<DataContainer*>(this);
             }
 
+            inline Data& access() {
+                return *(static_cast<DataContainer*>(this)->getData());
+            }
+
             inline void erase() {
                 auto ret = getFlags()([](uintptr_t old, uintptr_t &result){
                     result = old & ~validFlag;
@@ -165,6 +169,31 @@ struct SharedTable {
             }
 
             return empty;
+        }
+
+        template<class C>
+        Entry* findBest(C&& c)
+        {
+            Entry* best = nullptr;
+            uintptr_t metric = 0;
+
+            for(Entry* entry = entries; entry < entries + nItems; entry++) {
+                if(entry->takeIfValid()) {
+                    if(uintptr_t newMetric = c(entry->getData())) {
+                        if(newMetric > metric) {
+                            if(best)
+                                best->release();
+
+                            best = entry;
+                            metric = newMetric;
+                        } else
+                            entry->release();
+                    } else
+                        entry->release();
+                }
+            }
+
+            return best;
         }
 
         template<class C>

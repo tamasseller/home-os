@@ -66,6 +66,16 @@ TEST_GROUP(NetSharedTable) {
                 x->erase();
         }
 
+        inline int highestKey() {
+            int ret = -1;
+
+            if(auto *x = this->SharedTable<Os, Kv, 16>::findBest([](Kv* e){ return e->k;})) {
+                ret = (*x)->k;
+                x->release();
+            }
+
+            return ret;
+        }
     };
 };
 
@@ -134,4 +144,27 @@ TEST(NetSharedTable, OpenDeleteCollision)
 
     auto* v = uut.openOrCreate(2);
     CHECK(v != y);
+}
+
+TEST(NetSharedTable, FindBest)
+{
+    KvTable uut;
+
+    CHECK(uut.highestKey() == -1);
+
+    uut.set(2, 1);
+
+    CHECK(uut.highestKey() == 2);
+
+    uut.set(1, 1);
+
+    CHECK(uut.highestKey() == 2);
+
+    uut.remove(2);
+
+    CHECK(uut.highestKey() == 1);
+
+    uut.set(3, 1);
+
+    CHECK(uut.highestKey() == 3);
 }

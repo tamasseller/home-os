@@ -70,6 +70,11 @@ int main()
 
     auto parentPid = getpid();
 
+    std::set_terminate([](){
+        std::cout << "Unhandled exception\n";
+        std::abort();
+    });
+
     pid_t childPid = fork();
     if(childPid == 0) { // child process
     	do {

@@ -67,22 +67,22 @@ public:
 	inline virtual ~Packet() {}
 };
 
+template<class Child>
 class ChunkedPacket: public Packet
 {
-	virtual size_t getSize() = 0;
-	virtual char* nextBlock() = 0;
-
 	virtual inline Chunk nextChunk() override
 	{
-		if(block()) {
-			const size_t size = getSize();
+	    auto self = static_cast<Child*>(this);
+
+		if(this->block()) {
+			const size_t size = self->getSize();
 
 			if(offset() < size) {
-				return Chunk(block() + offset(), block() + (size - offset()));
+				return Chunk(this->block() + this->offset(), this->block() + (size - this->offset()));
 			} else {
-				auto newBlock = nextBlock();
-				block() = newBlock;
-				offset() = 0;
+				auto newBlock = self->nextBlock();
+				this->block() = newBlock;
+				this->offset() = 0;
 
 				if(newBlock)
 					return Chunk(newBlock, newBlock + size);
@@ -95,14 +95,9 @@ class ChunkedPacket: public Packet
 protected:
 
 	ChunkedPacket(char* newBlock, size_t newOffset) {
-		block() = newBlock;
-		offset() = newOffset;
+		this->block() = newBlock;
+		this->offset() = newOffset;
 	}
-
-public:
-
-	inline virtual ~ChunkedPacket() {}
-
 };
 
 
