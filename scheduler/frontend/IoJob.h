@@ -37,24 +37,6 @@ public:
 		NotYet, Done, Canceled, TimedOut
 	};
 
-    struct Reactivator {
-        virtual bool reactivate(IoJob*, IoChannel*) const = 0;
-        virtual bool reactivateTimeout(IoJob*, IoChannel*, uintptr_t) const = 0;
-    };
-
-private:
-
-    class DefaultReactivator: public Reactivator {
-        virtual bool reactivate(IoJob* job, IoChannel* channel) const override final {
-            return channel->submitPrepared(job);
-        }
-
-        virtual bool reactivateTimeout(IoJob* job, IoChannel* channel, uintptr_t timeout) const override final {
-            return channel->submitTimeoutPrepared(job, timeout);
-        }
-    };
-
-
 public /* IoChannel implementations */:
     IoJob *next, *prev;
 	uintptr_t param;
@@ -64,8 +46,7 @@ private:
 	// TODO describe actors and their locking and actions.
 	Atomic<IoChannel *> channel = nullptr;
 
-	bool (* finished)(IoJob*, Result, const Reactivator&);
-
+	bool (* finished)(IoJob*, Result, void (*hook)(IoJob*));
 
 	static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 	static constexpr intptr_t cancelValue = (intptr_t) -2;
@@ -76,32 +57,23 @@ private:
 		// possible re-submission), cancelation and timeout on channel field).
 		while(IoChannel *channel = self->channel) {
 
-			Registry<IoChannel>::check(channel);
+			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
 
-			channel->disableProcess();
-
-			Profile::memoryFence();
-
-			if(channel != self->channel) {
-				channel->enableProcess();
+			typename IoChannel::RemoveResult result = channel->remove(self);
+			if(result == IoChannel::RemoveResult::Raced)
 				continue;
-			}
 
-			bool ok = channel->removeJob(self);
 			/*
 			 * This operation must not fail because the channel pointer
 			 * is acquired exclusively
 			 */
-			assert(ok, "Internal error, invalid I/O operation state");
+			assert(result == IoChannel::RemoveResult::Ok, "Internal error, invalid I/O operation state");
 
-			self->channel = nullptr;
-
-			if(channel->hasJob())
-				channel->enableProcess();
-
-			self->finished(self, Result::Canceled, DefaultReactivator());
-			return ok;
+			self->finished(self, Result::Canceled, nullptr);
+			return true;
 		}
+
+		return false;
 	}
 
 	static void handleRequest(Event* event, uintptr_t uarg)
@@ -131,11 +103,9 @@ private:
 
 			assert(channel, "Internal error, invalid I/O operation state");
 
-			Registry<IoChannel>::check(channel);
+			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
 
-			channel->disableProcess();
-			channel->addJob(self);
-			channel->enableProcess();
+			channel->add(self);
 
 			if(hasTimeout) {
 				if(self->isSleeping())
@@ -154,9 +124,9 @@ private:
 
 			if(isCancel) {
 				if(removeSynhronized(self))
-					self->finished(self, Result::Canceled, DefaultReactivator());
+					self->finished(self, Result::Canceled, nullptr);
 			} else
-				self->finished(self, Result::Done, DefaultReactivator());
+				self->finished(self, Result::Done, nullptr);
 
 		}
 	}
@@ -165,11 +135,11 @@ private:
 		IoJob* self = static_cast<IoJob*>(sleeper);
 
 		if(removeSynhronized(self))
-			self->finished(self, Result::TimedOut, DefaultReactivator());
+			self->finished(self, Result::TimedOut, nullptr);
 	}
 
 protected:
-	inline void prepare(bool (*finished)(IoJob*, Result, const Reactivator &), uintptr_t param = 0) {
+	inline void prepare(bool (*finished)(IoJob*, Result, void (*hook)(IoJob*)), uintptr_t param = 0) {
 		this->param = param;
 		this->finished = finished;
 	}

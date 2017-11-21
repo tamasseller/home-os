@@ -111,39 +111,30 @@ class Scheduler<Args...>::IoRequest:
 	typedef typename Scheduler<Args...>::IoJob IoJob;
 
 	// TODO move to parent
-    typedef bool (*Method)(IoJob*, typename IoJob::Result, const typename IoJob::Reactivator &);
+    typedef bool (*Method)(IoJob*, typename IoJob::Result, void (*hook)(IoJob*));
     Method hijackedMethod;
 
     static inline void hijack(IoJob* job) {
     	IoRequest* self = static_cast<IoRequest*>(static_cast<Job*>(job));
-    	self->hijackedMethod = self->Job::finished;
-		self->Job::finished = &IoRequest::activator;
+    	self->hijackedMethod = self->IoJob::finished;
+		self->IoJob::finished = &IoRequest::activator;
     }
 
-    // TODO move to parent
-    class HijackReactivator: public IoJob::Reactivator {
-        virtual bool reactivate(IoJob* job, IoChannel* channel) const override final {
-        	hijack(job);
-            return channel->submitPrepared(job);
-        }
-
-        virtual bool reactivateTimeout(IoJob* job, IoChannel* channel, uintptr_t timeout) const override final {
-        	hijack(job);
-            return channel->submitTimeoutPrepared(job, timeout);
-        }
-    };
-
-	static bool activator(IoJob* job, typename IoJob::Result result, const typename IoJob::Reactivator &) {
+	static bool activator(IoJob* job, typename IoJob::Result result, void (*hook)(IoJob*)) {
 		IoRequest* self = static_cast<IoRequest*>(job);
 		self->resume(result);
 		return false;
 	}
 
 	// TODO move to parent
-	virtual bool continuation(uintptr_t) override final {
+	virtual bool continuation(uintptr_t) override final
+	{
+		if(this->result == IoJob::Result::NotYet)
+			return false;
+
 	    typename IoJob::Result result = this->result;
 	    this->result = IoJob::Result::NotYet;
-		return hijackedMethod(this, result, HijackReactivator());
+		return hijackedMethod(this, result, &IoRequest::hijack);
 	}
 
 public:
@@ -155,6 +146,7 @@ public:
 	template<class... C>
 	inline void prepare(C... c) {
 		this->Job::prepare(c...);
+		this->result = IoJob::Result::NotYet;
 		hijack(this);
 	}
 

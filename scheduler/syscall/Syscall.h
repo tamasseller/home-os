@@ -97,8 +97,8 @@ struct Scheduler<Args...>::SyscallMap: detail::SyscallDb<
     SYSCALL(doBlock<WaitableSet>),
     SYSCALL(doTimedBlock<WaitableSet>),
 
-    SYSCALL(doRegisterObject<IoChannel>),
-    SYSCALL(doUnregisterObject<IoChannel>),
+    SYSCALL(doRegisterObject<IoChannelCommon>),
+    SYSCALL(doUnregisterObject<IoChannelCommon>),
 
     SYSCALL(doRegisterObject<IoRequestCommon>),
     SYSCALL(doUnregisterObject<IoRequestCommon>),

@@ -10,7 +10,7 @@ INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 
 ifeq ('x','')
-
+endif
 
 # Atomic list related tests.
 
@@ -65,10 +65,9 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 # Networking related tests.
 
-SOURCES += $(ROOT)/test/NetBufferPool.cpp
+#SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
-endif
-SOURCES += $(ROOT)/test/NetPacketAllocation.cpp
+#SOURCES += $(ROOT)/test/NetPacketAllocation.cpp
 
 
 # Testing utilities.
@@ -124,7 +123,7 @@ CXXFLAGS += -fsanitize=returns-nonnull-attribute
 CXXFLAGS += -fsanitize=bool
 CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
-CXXFLAGS += -fsanitize=undefined					 
+CXXFLAGS += -fsanitize=undefined
 
 CXXFLAGS += -rdynamic								# Allows meaningful backrtaces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
