@@ -17,6 +17,8 @@
  *
  *******************************************************************************/
 
+#include <stddef.h>
+
 extern "C" {
 	int __aeabi_atexit(void (func)(void *), void* arg, void* d) {
 		return 0;
@@ -31,4 +33,6 @@ void operator delete(void *)
 {
 }
 
-
+void operator delete(void *, size_t)
+{
+}

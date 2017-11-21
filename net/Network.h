@@ -11,10 +11,9 @@
 #include "meta/Configuration.h"
 
 #include "BufferPool.h"
-#include "Packet.h"
 #include "SharedTable.h"
+#include "Packet.h"
 #include "AddressIp4.h"
-
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(TransmitPoolSize, size_t);
@@ -38,8 +37,8 @@ struct NetworkOptions {
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 
 	public:
-		typedef typename Os::IoChannel Interface;
-        struct Route;
+		class Interface;
+		class Route;
 
 	private:
 		template<class> class TxBinder;
@@ -66,7 +65,7 @@ struct NetworkOptions {
 				Interface* dev;
 			};
 
-			static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &) {
+			static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
 			    auto self = static_cast<AllocateTxPacketJob*>(item);
 
 				if(result == Os::IoJob::Result::Done) {
@@ -76,7 +75,7 @@ struct NetworkOptions {
 					 if(auto route = state.routingTable.findRoute(self->in.dst)) {
 					     /* TODO fill in headers */
 					     self->dev = route->dev;
-	                     item->param = reinterpret_cast<uintptr_t>(static_cast<Packet*>(packet));
+	                     item->param = reinterpret_cast<uintptr_t>(packet);
 					 } else {
 					     packet->~TxPacket();
 					     item->param = 0;
@@ -96,35 +95,19 @@ struct NetworkOptions {
 			}
 		};
 
-		struct SendTxPacketJob: Os::IoJob {
-			friend class Os::IoChannel;
-
-			static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &) {
-			    reinterpret_cast<TxPacket*>(item->param)->~TxPacket();
-				return false;
-			}
-
-			inline void prepare() {
-				this->Os::IoJob::prepare(&SendTxPacketJob::done);
-			}
-		};
-
 	public:
 		static inline void init() {
 			state.txPool.init();
-		}
-
-		template<class C> constexpr static inline Interface *getIf() {
-			return static_cast<TxBinder<C>*>(&state.interfaces);
+			state.interfaces.init();
 		}
 
 		struct PreparedPacket {
-			Packet* packet;
+			TxPacket* packet;
 			Interface* dev;
 			void send() {
-				typename Os::template IoRequest<SendTxPacketJob> req;
+				typename Interface::SendPacketRequest req;
 				req.init();
-				dev->submit(&req);
+				dev->sendPacket(&req, packet);
 				req.wait();
 			}
 		};
@@ -134,12 +117,15 @@ struct NetworkOptions {
 			req.init();
 			state.txPool.submit(&req, dst, port, size);
 			req.wait();
-			return {reinterpret_cast<Packet*>(req.param), req.dev};
+			return {reinterpret_cast<TxPacket*>(req.param), req.dev};
 		}
 
 		static inline bool addRoute(const Route& route) {
 		    return state.routingTable.add(route);
 		}
+
+		template<class C> constexpr static inline Interface *getIf();
+		template<class C> constexpr static inline TxPacket *getEgressPacket();
 	};
 };
 
@@ -149,86 +135,8 @@ typename NetworkOptions::Configurable<S, Args...>::State NetworkOptions::Configu
 template<class S, class... Args>
 using Network = NetworkOptions::Configurable<S, Args...>;
 
-template<class S, class... Args>
-class Network<S, Args...>::Route {
-    friend class Network<S, Args...>;
-	AddressIp4 net;
-	AddressIp4 src;
-	Interface* dev;
-	uint8_t mask;
-	uint8_t metric;
-
-public:
-	inline Route(AddressIp4 net, uint8_t mask, AddressIp4 src, Interface* dev, uint8_t metric = 0):
-	    net(net), src(src), dev(dev), mask(mask), metric(metric) {}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::RoutingTable: SharedTable<Os, Route, routingTableEntries> {
-public:
-	bool add(const Route& route) {
-	    auto entry = this->findOrAllocate([&route](Route* other){
-	        return route.net == other->net && route.src == other->src && route.dev == other->dev && route.mask == other->mask;
-	    });
-
-	    if(entry->isValid()) {
-	        entry->release();
-	        return false;
-	    }
-
-	    *entry->getData() = route;
-	    entry->finalize();
-		return true;
-	}
-
-	Route* findRoute(const AddressIp4& dst)
-	{
-	    auto entry = this->findBest([&dst](Route* route){
-            return (route->net / route->mask != dst / route->mask) ? 0 : (route->mask << 8) | route->metric;
-        });
-
-	    if(!entry)
-	        return nullptr;
-
-	    return entry->getData();
-	}
-};
-
-template<class S, class... Args>
-template<class... Input>
-struct Network<S, Args...>::Ifs<typename NetworkOptions::Set<Input...>, void>: TxBinder<Input>...{};
-
-template<class S, class... Args>
-template<class If>
-class Network<S, Args...>::TxBinder: Network<S, Args...>::Os::IoChannel {
-	friend class Network<S, Args...>;
-	virtual void enableProcess() override final {}
-	virtual void disableProcess() override final {}
-	virtual bool addJob(typename Os::IoJob*) override final {return true;}
-	virtual bool removeJob(typename Os::IoJob*) override final {return true;}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::TxPacket: public ChunkedPacket<TxPacket> {
-    friend class ChunkedPacket<TxPacket>;
-	size_t getSize() {
-		return transmitBlockSize;
-	}
-
-	char* nextBlock() {
-		auto currentBlock = reinterpret_cast<typename TxPool::Block*>(this->block());
-		auto successorBlock = currentBlock->next;
-		return reinterpret_cast<char*>(successorBlock);
-	}
-
-public:
-
-	inline TxPacket(): ChunkedPacket<TxPacket>((char*)this, sizeof(*this)) {}
-
-	inline virtual ~TxPacket() override final{
-		auto first = reinterpret_cast<typename TxPool::Block*>(this);
-		state.txPool.reclaim(first);
-	}
-};
+#include "Routing.h"
+#include "Interfaces.h"
+#include "TxPacket.h"
 
 #endif /* NETWORK_H_ */

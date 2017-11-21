@@ -21,8 +21,10 @@
 #define BUFFERPOOL_H_
 
 template<class Os, size_t nBlocks, size_t blockDataSize, class AlignmentType = void*>
-class BufferPool: public Os::IoChannel, Os::Event
+class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockDataSize, AlignmentType>>, Os::Event
 {
+	friend class BufferPool::IoChannelBase;
+
 public:
 	struct Block {
 		 char data[blockDataSize] alignas(AlignmentType);
@@ -36,7 +38,7 @@ private:
 	Atomic<Block*> head;
 	Block blocks[nBlocks];
 
-	Block* take() {
+	inline Block* take() {
 		Block* ret;
 
 		head([&ret](Block* old, Block* &result){
@@ -48,7 +50,7 @@ private:
 		return ret;
 	}
 
-	void put(Block* b, Block** nextOfLast) {
+	inline void put(Block* b, Block** nextOfLast) {
 		head([b, nextOfLast](Block* old, Block* &result){
 			*nextOfLast = old;
 			result = b;
@@ -56,7 +58,7 @@ private:
 		});
 	}
 
-	bool reserve(size_t n) {
+	inline bool reserve(size_t n) {
 		bool ok;
 
 		nFree([&ok, n](size_t old, size_t &result){
@@ -70,7 +72,7 @@ private:
 		return ok;
 	}
 
-	void unReserve(size_t n) {
+	inline void unReserve(size_t n) {
 		nFree([n](size_t old, size_t &result){
 			result = old + n;
 			return true;
@@ -96,7 +98,7 @@ private:
 		return ret;
 	}
 
-	bool tryToSatisfy(typename Os::IoJob* job ) {
+	inline bool tryToSatisfy(typename Os::IoJob* job ) {
 		size_t param = reinterpret_cast<uintptr_t>(job->param);
 
 		if(Block* first = allocate(param)) {
@@ -117,7 +119,7 @@ private:
 		}
 	}
 
-	virtual bool addJob(typename Os::IoJob* job)
+	inline bool addJob(typename Os::IoJob* job)
 	{
 		if(!this->jobs.front()) {
 			if(tryToSatisfy(job))
@@ -127,7 +129,7 @@ private:
 		return this->jobs.addBack(job);
 	}
 
-	virtual bool removeJob(typename Os::IoJob* job) {
+	inline bool removeJob(typename Os::IoJob* job) {
 		bool isFirst = job == this->jobs.front();
 		bool ok = this->jobs.remove(job);
 
@@ -141,8 +143,8 @@ private:
 		return ok;
 	}
 
-	virtual void enableProcess() {}
-	virtual void disableProcess() {}
+	inline void enableProcess() {}
+	inline void disableProcess() {}
 
 public:
 	inline void init() {
@@ -154,7 +156,7 @@ public:
 
 		blocks[nBlocks - 1].next = nullptr;
 
-		Os::IoChannel::init();
+		BufferPool::IoChannelBase::init();
 	}
 
 	inline void reclaim(Block *first) {

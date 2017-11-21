@@ -101,7 +101,7 @@ COMMONFLAGS += -fomit-frame-pointer
 COMMONFLAGS += -static
 
 CXXFLAGS += $(COMMONFLAGS)
-CXXFLAGS += -std=c++11 
+CXXFLAGS += -std=c++17
 CXXFLAGS += -fno-rtti
 CXXFLAGS += -fno-exceptions #-S
 

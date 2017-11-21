@@ -27,7 +27,7 @@ TEST_GROUP(NetBufferPool) {
 	typedef BufferPool<Os, 10, 10> Pool;
 
 	class PoolJob: public Os::IoJob {
-		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, const typename Os::IoJob::Reactivator &) {
+		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
 			if(result == Os::IoJob::Result::Done) {
 				static_cast<PoolJob*>(item)->result = reinterpret_cast<Pool::Block*>(item->param);
 			}
@@ -35,13 +35,12 @@ TEST_GROUP(NetBufferPool) {
 			return false;
 		}
 
-		friend class Os::IoChannel;
+	public:
 		inline void prepare(size_t n) {
 			result = nullptr;
 			this->Os::IoJob::prepare(&PoolJob::writeResult, n);
 		}
 
-	public:
 		Pool::Block* volatile result;
 		inline PoolJob(): result(nullptr) {}
 	};

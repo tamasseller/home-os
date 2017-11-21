@@ -12,12 +12,18 @@
 #include "Network.h"
 
 struct DummyIf {
-
+	inline static void enableTxIrq();
+	inline static void disableTxIrq() {}
+	inline static void enableRxIrq() {}
+	inline static void disableRxIrq() {}
 };
 
 using Net = Network<OsRr,
 		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf>>
 >;
 
+inline void DummyIf::enableTxIrq() {
+	while(Net::getEgressPacket<DummyIf>());
+}
 
 #endif /* TESTNETDEFINITIONS_H_ */
