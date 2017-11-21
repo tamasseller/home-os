@@ -18,7 +18,7 @@
  *******************************************************************************/
 
 #include "common/CommonTestUtils.h"
-#include "common/DummyProcess.h"
+#include "common/SampleIoActivities.h"
 
 using Os=OsRr;
 using Base = DummyProcessJobsBase<Os>;

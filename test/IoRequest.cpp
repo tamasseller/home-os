@@ -18,11 +18,11 @@
  *******************************************************************************/
 
 #include "common/CommonTestUtils.h"
-#include "common/DummyProcess.h"
+#include "common/SampleIoActivities.h"
 
 using Os=OsRr;
 using Base = DummyProcessJobsBase<Os>;
-/*
+
 TEST(IoRequestAlreadyDone) {
 	struct Task: public TestTask<Task>, Base  {
 		bool error = false;
@@ -225,7 +225,7 @@ TEST(IoRequestMulti) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
-*/
+
 TEST(IoRequestComposite) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
@@ -255,7 +255,7 @@ TEST(IoRequestComposite) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
-/*
+
 TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
@@ -366,4 +366,3 @@ TEST(IoRequestCompositeTimeout) {
     CommonTestUtils::start();
     CHECK(!task.error);
 }
-*/
