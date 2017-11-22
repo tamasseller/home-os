@@ -170,7 +170,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].init();
 				reqs[i].success = -1;
-				if(!DummyProcess<Os>::instance.submitTimeout(reqs + i, 100 + 10 * i)) {
+				if(!reqs[i].startTimeout(100 + 10 * i)) {
 					error = true;
 					return;
 				}
@@ -184,7 +184,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			}
 
 			process.counter = 3;
-			process.submit(static_cast<Req*>(s1));
+			static_cast<Req*>(s1)->start();
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
@@ -210,7 +210,7 @@ TEST(IoRequestMulti) {
 			Os::IoRequest<MultiJob<3>> multiReq;
 			multiReq.init();
 
-			process.submit(&multiReq);
+			multiReq.start();
 			process.counter = 3;
 
 			multiReq.wait();
@@ -233,7 +233,7 @@ TEST(IoRequestComposite) {
 			Os::IoRequest<CompositeJob> compReq[2];
 
 			compReq[0].init();
-			semProcess.submit(&compReq[0], -1);
+			compReq[0].start(-1, 0);
 			process.counter = 100;
 
 			if(compReq[0].wait(10)){
@@ -242,10 +242,10 @@ TEST(IoRequestComposite) {
 			}
 
 			compReq[1].init();
-			semProcess.submit(&compReq[1], 1);
+			compReq[1].start(1, 0);
 
-			compReq[0].wait(10);
-			compReq[1].wait(10);
+			compReq[0].wait();
+			compReq[1].wait();
 		}
 	} task;
 
@@ -264,7 +264,7 @@ TEST(IoRequestMultiSelect) {
 
 			for(auto &x: multiReq) {
 				x.init();
-				process.submit(&x);
+				x.start();
 			}
 
 			process.counter = 6;
@@ -353,7 +353,7 @@ TEST(IoRequestCompositeTimeout) {
             Os::IoRequest<CompositeJob> req;
             req.init();
 
-            semProcess.submit(&req, 1, 10);
+            req.start(1, 10);
 
             req.wait();
             error = req.getResult() == Os::IoJob::Result::TimedOut;

@@ -36,9 +36,9 @@ TEST_GROUP(NetBufferPool) {
 		}
 
 	public:
-		inline void prepare(size_t n) {
+		inline bool start(Pool &pool, size_t n, Os::IoJob::Hook hook = nullptr) {
 			result = nullptr;
-			this->Os::IoJob::prepare(&PoolJob::writeResult, n);
+			return submit(hook, &pool, &PoolJob::writeResult, n);
 		}
 
 		Pool::Block* volatile result;
@@ -55,17 +55,17 @@ TEST(NetBufferPool, Simple) {
 			pool.init();
 
 			PoolJob jobs[3];
-			pool.submit(jobs + 0, 3);
+			jobs[0].start(pool, 3);
 
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 1, 4);
+			jobs[1].start(pool, 4);
 
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 2, 5);
+			jobs[2].start(pool, 5);
 
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) {error = true; return;}
@@ -91,19 +91,19 @@ TEST(NetBufferPool, Ordering) {
 			PoolJob jobs[4];
 			pool.init();
 
-			pool.submit(jobs + 0, 5);
+			jobs[0].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 1, 5);
+			jobs[1].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 2, 6);
+			jobs[2].start(pool, 6);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) {error = true; return;}
 
-			pool.submit(jobs + 3, 4);
+			jobs[3].start(pool, 4);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) {error = true; return;}
 
@@ -133,19 +133,19 @@ TEST(NetBufferPool, Cancelation) {
 			PoolJob jobs[4];
 			pool.init();
 
-			pool.submit(jobs + 0, 5);
+			jobs[0].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 1, 5);
+			jobs[1].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) {error = true; return;}
 
-			pool.submit(jobs + 2, 6);
+			jobs[2].start(pool, 6);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) {error = true; return;}
 
-			pool.submit(jobs + 3, 4);
+			jobs[3].start(pool, 4);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) {error = true; return;}
 
@@ -154,7 +154,7 @@ TEST(NetBufferPool, Cancelation) {
 			if(jobs[2].result != nullptr) {error = true; return;}
 			if(jobs[3].result != nullptr) {error = true; return;}
 
-			pool.cancel(jobs + 2);
+			jobs[2].cancel();
 			Os::sleep(1);
 			if(jobs[3].result == nullptr) {error = true; return;}
 		}

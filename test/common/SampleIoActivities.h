@@ -25,25 +25,20 @@ struct DummyProcessJobsBase {
 			return false;
 		}
 
-		template <class> friend class Os::IoChannelBase;
-		template <class> friend class Os::IoRequest;
-		inline void prepare() {
-			success = -1;
-			this->Os::IoJob::prepare(&Job::writeResult, reinterpret_cast<uintptr_t>(&count));
-		}
-
 	public:
 		volatile int success;
 		volatile int count;
 
 		inline Job(): success(-1), count(-1) {}
 
-		bool start() {
-			return DummyProcess<Os>::instance.submit(this);
+		bool start(typename Os::IoJob::Hook hook = nullptr) {
+			success = -1;
+			return this->submit(hook, &DummyProcess<Os>::instance, &Job::writeResult, reinterpret_cast<uintptr_t>(&count));
 		}
 
-		bool startTimeout(uintptr_t timeout) {
-			return DummyProcess<Os>::instance.submitTimeout(this, timeout);
+		bool startTimeout(uintptr_t timeout, typename Os::IoJob::Hook hook = nullptr) {
+			success = -1;
+			return this->submitTimeout(hook, &DummyProcess<Os>::instance, timeout, &Job::writeResult);
 		}
 	};
 
@@ -56,26 +51,23 @@ struct DummyProcessJobsBase {
 			job->success[--job->idx] = (int)result;
 
 			if(job->idx) {
-				Process::instance.resubmit(hook, item, &MultiJob::writeResult);
+				job->submit(hook, &Process::instance, &MultiJob::writeResult);
 				return true;
 			}
 
 			return false;
 		}
 
-		template <class> friend class Os::IoChannelBase;
-		template <class> friend class Os::IoRequest;
-
-		inline void prepare() {
-			for(auto &x: success)
-				x = -1;
-
-			this->Os::IoJob::prepare(&MultiJob::writeResult);
-		}
 	public:
 		volatile int idx = n;
 		volatile int success[n];
 
+		inline bool start(typename Os::IoJob::Hook hook = nullptr) {
+			for(auto &x: success)
+				x = -1;
+
+			return this->submit(hook, &process, &MultiJob::writeResult);
+		}
 	};
 
 	class SemJob: Os::IoJob {
@@ -84,17 +76,16 @@ struct DummyProcessJobsBase {
 			return false;
 		}
 
-		template <class> friend class Os::IoChannelBase;
+		friend class Os::IoChannel;
 		template <class> friend class Os::IoRequest;
-
-		inline void prepare(int n) {
-			done = false;
-			this->Os::IoJob::prepare(&SemJob::callback, n);
-		}
 
 	public:
 		volatile bool done;
 
+		bool start(int n, typename Os::IoJob::Hook hook = nullptr) {
+			done = false;
+			return this->submit(hook, &SemaphoreProcess<Os>::instance, &SemJob::callback, n);
+		}
 	};
 
 	struct CompositeJob: Os::IoJob {
@@ -117,24 +108,23 @@ struct DummyProcessJobsBase {
 		    self->stage = 1;
 
 			if(self->timeout)
-				Process::instance.resubmitTimeout(hook, item, self->timeout, &CompositeJob::step2);
+				self->submitTimeout(hook, &Process::instance, self->timeout, &CompositeJob::step2);
 			else
-				Process::instance.resubmit(hook, item, &CompositeJob::step2);
+				self->submit(hook, &Process::instance, &CompositeJob::step2);
 
 			return true;
 		}
 
-		friend class Os::IoChannel;
-		template <class> friend class Os::IoRequest;
+	public:
 
-		inline void prepare(int n, uintptr_t timeout = 0) {
+		bool start(int n, uintptr_t timeout, typename Os::IoJob::Hook hook = nullptr) {
 			stage = 0;
 			timedOut = false;
 			this->timeout = timeout;
-			this->Os::IoJob::prepare(&CompositeJob::step1, n);
+
+			return this->submit(hook, &SemaphoreProcess<Os>::instance, &CompositeJob::step1, n);
 		}
 
-	public:
 		volatile bool timedOut;
 		uintptr_t timeout;
 		volatile int stage;
@@ -149,7 +139,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			if(!DummyProcess<Os>::instance.submitTimeout(jobs + i, 100))
+			if(!jobs[i].startTimeout(100))
 				ret = false;
 		}
 
@@ -161,7 +151,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			if(!DummyProcess<Os>::instance.submit(jobs + i))
+			if(!jobs[i].start())
 				ret = false;
 		}
 
@@ -171,7 +161,7 @@ struct DummyProcessJobsBase {
 	bool postReqsNoTimeout() {
 		for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 			reqs[i].init();
-			if(!DummyProcess<Os>::instance.submit(reqs + i))
+			if(!reqs[i].start())
 				return false;
 		}
 

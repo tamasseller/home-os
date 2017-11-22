@@ -37,7 +37,7 @@ struct NetworkOptions {
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 
 	public:
-		class Interface;
+		typedef typename Os::IoChannel Interface;
 		class Route;
 
 	private:
@@ -87,11 +87,11 @@ struct NetworkOptions {
 				return false;
 			}
 
-			inline void prepare(AddressIp4 dst, uint16_t port, size_t freeStorageSize) {
+			inline bool start(AddressIp4 dst, uint16_t port, size_t freeStorageSize, typename Os::IoJob::Hook hook = 0) {
 				in.dst = dst;
 				in.port = port;
 				const size_t nBlocks = (freeStorageSize /* TODO + header size */ + transmitBlockSize - 1) / transmitBlockSize;
-				this->Os::IoJob::prepare(&AllocateTxPacketJob::done, nBlocks);
+				return this->submit(hook, &state.txPool, &AllocateTxPacketJob::done, nBlocks);
 			}
 		};
 
@@ -105,9 +105,20 @@ struct NetworkOptions {
 			TxPacket* packet;
 			Interface* dev;
 			void send() {
-				typename Interface::SendPacketRequest req;
+				struct SendPacket: Os::IoJob {
+					static bool nop(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
+						return false;
+					}
+
+				public:
+					bool start(Interface *dev, TxPacket* packet, typename Os::IoJob::Hook hook = 0) {
+						return this->submit(hook, dev, &SendPacket::nop, reinterpret_cast<uintptr_t>(packet));
+					}
+				};
+
+				typename Os::template IoRequest<SendPacket> req;
 				req.init();
-				dev->sendPacket(&req, packet);
+				req.start(dev, packet);
 				req.wait();
 			}
 		};
@@ -115,7 +126,7 @@ struct NetworkOptions {
 		static PreparedPacket prepareUdpPacket(AddressIp4 dst, uint16_t port, size_t size) {
 			typename Os::template IoRequest<AllocateTxPacketJob> req;
 			req.init();
-			state.txPool.submit(&req, dst, port, size);
+			req.start(dst, port, size);
 			req.wait();
 			return {reinterpret_cast<TxPacket*>(req.param), req.dev};
 		}

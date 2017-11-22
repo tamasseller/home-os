@@ -82,39 +82,6 @@ TEST(IoChannelTimeout) {
 	CHECK(!task.error);
 }
 
-TEST(IoChannelTimeoutPostpone) {
-	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
-			if(!postJobs()) {
-				error = true;
-				return;
-			}
-
-			Os::sleep(50);
-
-			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-				if(jobs[i].success != -1)
-					error = true;
-
-			if(postJobs()) {
-				error = true;
-				return;
-			}
-
-			process.counter = 5;
-
-			if(checkJobs() != 5)
-				error = true;
-		}
-	} task;
-
-	Base::process.init();
-	task.start();
-	CommonTestUtils::start();
-	CHECK(!task.error);
-}
-
 TEST(IoChannelTimeoutDoTimout) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
@@ -150,7 +117,7 @@ TEST(IoChannelTimeoutCancel) {
 			Os::sleep(40);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
-				process.cancel(jobs + i);
+				jobs[i].cancel();
 
 			Os::sleep(10);
 
@@ -175,7 +142,7 @@ TEST(IoChannelMulti) {
 		bool error = false;
 		void run() {
 			MultiJob<3> multiJob;
-			process.submit(&multiJob);
+			multiJob.start();
 			process.counter = 3;
 
 			while(multiJob.idx){}
@@ -195,22 +162,22 @@ TEST(IoChannelErrors) {
 	struct Task: Base, public TestTask<Task> {
 		bool error = false;
 		void run() {
-			if(process.submitTimeout(&jobs[0], 0)) {
+			if(jobs[0].startTimeout(0)) {
 				error = true;
 				return;
 			}
 
-			if(process.submitTimeout(&jobs[0], (uintptr_t)-1)) {
+			if(jobs[0].startTimeout((uintptr_t)-1)) {
 				error = true;
 				return;
 			}
 
-			if(!process.submit(&jobs[0])) {
+			if(!jobs[0].start()) {
 				error = true;
 				return;
 			}
 
-			if(process.submit(&jobs[0])) {
+			if(jobs[0].start()) {
 				error = true;
 				return;
 			}
@@ -233,33 +200,33 @@ TEST(IoSemaphoreChannel) {
 		void run() {
 			SemJob jobs[3];
 
-			semProcess.submit(jobs + 0, 1);
+			jobs[0].start(1);
 
 			if(!jobs[0].done) {error = true; return;}	// 1
 
-			semProcess.submit(jobs + 0, -1);
+			jobs[0].start(-1);
 
 			if(!jobs[0].done) {error = true; return;}	// 0
 
-			semProcess.submit(jobs + 0, -1);
+			jobs[0].start(-1);
 
 			if(jobs[0].done) {error = true; return;}	// 0
 
-			semProcess.submit(jobs + 1, 2);
+			jobs[1].start(2);
 
 			if(!jobs[1].done) {error = true; return;}	// 2
 			if(!jobs[0].done) {error = true; return;}	// 1
 
-			semProcess.submit(jobs + 0, -2);
+			jobs[0].start(-2);
 
 			if(jobs[0].done) {error = true; return;}	// 1
 
-			semProcess.submit(jobs + 1, -1);
+			jobs[1].start(-1);
 
 			if(jobs[0].done) {error = true; return;}	// 1
 			if(jobs[1].done) {error = true; return;}	// 1
 
-			semProcess.submit(jobs + 2, 3);
+			jobs[2].start(3);
 
 			if(!jobs[2].done) {error = true; return;}	// 3
 			if(!jobs[0].done) {error = true; return;}	// 1
@@ -279,9 +246,9 @@ TEST(IoChannelComposite) {
 		void run() {
 			CompositeJob jobs[3];
 
-			semProcess.submit(jobs + 0, -2);
-			semProcess.submit(jobs + 1, -1);
-			semProcess.submit(jobs + 2, 1);
+			jobs[0].start(-2, 0);
+			jobs[1].start(-1, 0);
+			jobs[2].start(1, 0);
 
 			if(jobs[0].stage != 0) {error = true; return;}
 			if(jobs[1].stage != 0) {error = true; return;}
@@ -293,7 +260,7 @@ TEST(IoChannelComposite) {
 
 			if(jobs[2].stage != 2) {error = true; return;}
 
-			semProcess.submit(jobs + 2, 1);
+			jobs[2].start(1, 0);
 
 			if(jobs[0].stage != 1) {error = true; return;}
 			if(jobs[2].stage != 1) {error = true; return;}
@@ -307,7 +274,7 @@ TEST(IoChannelComposite) {
 
 			process.counter = 100;
 
-			semProcess.submit(jobs + 2, 1);
+			jobs[2].start(1, 0);
 
 			Os::sleep(10);
 
@@ -328,7 +295,7 @@ TEST(IoChannelCompositeTimeout) {
         void run() {
             CompositeJob job;
 
-            semProcess.submit(&job, 1, 10);
+            job.start(1, 10);
 
             while(!job.timedOut) {}
         }

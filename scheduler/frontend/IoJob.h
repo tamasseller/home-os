@@ -37,6 +37,10 @@ public:
 		NotYet, Done, Canceled, TimedOut
 	};
 
+	typedef void (*Hook)(IoJob*);
+	typedef bool (*Callback)(IoJob*, Result, Hook);
+
+
 public /* IoChannel implementations */:
     IoJob *next, *prev;
 	uintptr_t param;
@@ -46,7 +50,7 @@ private:
 	// TODO describe actors and their locking and actions.
 	Atomic<IoChannel *> channel = nullptr;
 
-	bool (* finished)(IoJob*, Result, void (*hook)(IoJob*));
+	Callback finished;
 
 	static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 	static constexpr intptr_t cancelValue = (intptr_t) -2;
@@ -138,15 +142,67 @@ private:
 			self->finished(self, Result::TimedOut, nullptr);
 	}
 
+
+	template<uintptr_t value> struct OverwriteCombiner {
+		inline bool operator()(uintptr_t old, uintptr_t& result) const {
+			result = value;
+			return true;
+		}
+	};
+
+	inline bool takeOver(IoChannel *channel) {
+	    	return this->channel.compareAndSwap(nullptr, channel);
+    }
+
 protected:
-	inline void prepare(bool (*finished)(IoJob*, Result, void (*hook)(IoJob*)), uintptr_t param = 0) {
-		this->param = param;
-		this->finished = finished;
+
+	inline bool submit(void (*hook)(IoJob*), IoChannel* channel, Callback callback, uintptr_t param = 0) {
+		if(takeOver(channel)) {
+			this->finished = callback;
+			this->param = param;
+
+			if(hook)
+				hook(this);
+
+			state.eventList.issue(this, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
+
+			return true;
+		}
+
+		return false;
+	}
+
+	inline bool submitTimeout(Hook hook, IoChannel* channel, uintptr_t time, Callback callback, uintptr_t param = 0)
+	{
+		if(!time || time >= (uintptr_t)INTPTR_MAX)
+			return false;
+
+		if(takeOver(channel)) {
+			this->finished = callback;
+			this->param = param;
+
+			if(hook)
+				hook(this);
+
+			state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
+				result = time;
+				return true;
+			});
+
+			return true;
+		}
+
+		return false;
 	}
 
 public:
 
 	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
+
+	inline void cancel() {
+		state.eventList.issue(this, OverwriteCombiner<IoJob::cancelValue>());
+	}
+
 };
 
 }

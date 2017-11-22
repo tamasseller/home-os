@@ -118,6 +118,7 @@ class Scheduler<Args...>::IoRequest:
     	IoRequest* self = static_cast<IoRequest*>(static_cast<Job*>(job));
     	self->hijackedMethod = self->IoJob::finished;
 		self->IoJob::finished = &IoRequest::activator;
+		self->result = IoJob::Result::NotYet;
     }
 
 	static bool activator(IoJob* job, typename IoJob::Result result, void (*hook)(IoJob*)) {
@@ -144,10 +145,13 @@ public:
 	}
 
 	template<class... C>
-	inline void prepare(C... c) {
-		this->Job::prepare(c...);
-		this->result = IoJob::Result::NotYet;
-		hijack(this);
+	inline bool start(C... c) {
+		return this->Job::start(c..., &IoRequest::hijack);
+	}
+
+	template<class... C>
+	inline bool startTimeout(C... c) {
+		return this->Job::startTimeout(c..., &IoRequest::hijack);
 	}
 
 	inline ~IoRequest() {

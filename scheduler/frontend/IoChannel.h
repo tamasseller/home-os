@@ -40,22 +40,10 @@ template<class... Args>
 class Scheduler<Args...>::IoChannelCommon: Registry<IoChannelCommon>::ObjectBase, public IoChannel
 {
 	friend class Scheduler<Args...>;
-protected:
-
-	template<uintptr_t value> struct OverwriteCombiner {
-		inline bool operator()(uintptr_t old, uintptr_t& result) const {
-			result = value;
-			return true;
-		}
-	};
 
 public:
 	inline void init() {
 		Registry<IoChannelCommon>::registerObject(this);
-	}
-
-	inline void cancel(IoJob* job) {
-		state.eventList.issue(job, OverwriteCombiner<IoJob::cancelValue>());
 	}
 
 	~IoChannelCommon() {
@@ -75,7 +63,6 @@ template<class Child>
 class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 	friend class Scheduler<Args...>;
 	using RemoveResult = typename IoChannelCommon::RemoveResult;
-	template<uintptr_t value> using OverwriteCombiner = typename IoChannelCommon::template OverwriteCombiner<value>;
 
 	inline void enableProcess() {}
 	inline void disableProcess() {}
@@ -113,10 +100,6 @@ class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 		return ret;
 	}
 
-	inline bool takeOver(IoJob *job) {
-	    	return job->channel.compareAndSwap(nullptr, this);
-    }
-
 protected:
 	pet::DoubleList<IoJob> jobs;
 
@@ -134,66 +117,11 @@ protected:
 		if(!self->hasJob())
 			self->disableProcess();
 
-		state.eventList.issue(job, OverwriteCombiner<IoJob::doneValue>());
+		state.eventList.issue(job, typename IoJob::template OverwriteCombiner<IoJob::doneValue>());
 	}
 
 	inline bool hasJob() {
 		return jobs.front() != nullptr;
-	}
-
-public:
-
-	template<class ActualJob, class... C>
-	inline bool resubmit(void (*hook)(IoJob*), ActualJob *job, C... c) {
-		IoJob *ioJob = job;
-
-		if(takeOver(ioJob)) {
-			job->prepare(c...);
-
-			if(hook)
-				hook(job);
-
-			state.eventList.issue(ioJob, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
-
-			return true;
-		}
-
-		return false;
-	}
-
-	template<class ActualJob, class... C>
-	inline bool submit(ActualJob *job, C... c) {
-		return resubmit(nullptr, job, c...);
-	}
-
-	template<class ActualJob, class... C>
-	inline bool resubmitTimeout(void (*hook)(IoJob*), ActualJob* job, uintptr_t time, C... c)
-	{
-		IoJob *ioJob = job;
-
-		if(!time || time >= (uintptr_t)INTPTR_MAX)
-			return false;
-
-		if(takeOver(ioJob)) {
-			job->prepare(c...);
-
-			if(hook)
-				hook(job);
-
-			state.eventList.issue(ioJob, [time](uintptr_t, uintptr_t& result) {
-				result = time;
-				return true;
-			});
-
-			return true;
-		}
-
-		return false;
-	}
-
-	template<class ActualJob, class... C>
-	inline bool submitTimeout(ActualJob* job, uintptr_t time, C... c){
-		return resubmitTimeout(nullptr, job, time, c...);
 	}
 };
 

@@ -11,15 +11,6 @@
 #include "meta/ApplyToPack.h"
 
 template<class S, class... Args>
-struct Network<S, Args...>::Interface {
-	typedef typename Network<S, Args...>::Os::IoJob SendPacketJob;
-	typedef typename Network<S, Args...>::Os::template IoRequest<SendPacketJob> SendPacketRequest;
-
-	virtual bool sendPacket(SendPacketJob*, Network<S, Args...>::TxPacket*) = 0;
-	virtual bool sendPacket(SendPacketRequest*, Network<S, Args...>::TxPacket*) = 0;
-};
-
-template<class S, class... Args>
 template<class... Input>
 class Network<S, Args...>::Ifs<typename NetworkOptions::Set<Input...>, void>: public TxBinder<Input>... {
     typedef void (*link)(Ifs* const ifs);
@@ -43,7 +34,7 @@ public:
 
 template<class S, class... Args>
 template<class If>
-class Network<S, Args...>::TxBinder: Interface, Network<S, Args...>::Os::template IoChannelBase<TxBinder<If>> {
+class Network<S, Args...>::TxBinder: Network<S, Args...>::Os::template IoChannelBase<TxBinder<If>> {
 	friend class Network<S, Args...>;
 	friend class TxBinder::IoChannelBase;
 
@@ -55,14 +46,6 @@ class Network<S, Args...>::TxBinder: Interface, Network<S, Args...>::Os::templat
 	static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
 	    reinterpret_cast<TxPacket*>(item->param)->~TxPacket();
 		return false;
-	}
-
-	virtual bool sendPacket(typename TxBinder::SendPacketJob* job, Network<S, Args...>::TxPacket* packet) override final {
-		return this->submit(job, &TxBinder::done, reinterpret_cast<uintptr_t>(packet));
-	}
-
-	virtual bool sendPacket(typename TxBinder::SendPacketRequest* req, Network<S, Args...>::TxPacket* packet) override final {
-		return this->submit(req, &TxBinder::done, reinterpret_cast<uintptr_t>(packet));
 	}
 
 	TxPacket* getEgressPacket() {
