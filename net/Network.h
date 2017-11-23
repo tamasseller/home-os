@@ -37,7 +37,7 @@ struct NetworkOptions {
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 
 	public:
-		typedef typename Os::IoChannel Interface;
+		class Interface;
 		class Route;
 
 	private:

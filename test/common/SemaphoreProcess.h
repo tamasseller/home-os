@@ -13,48 +13,59 @@ class SemaphoreProcess: public Os::template IoChannelBase<SemaphoreProcess<Os>>
 {
 	friend class SemaphoreProcess::IoChannelBase;
 
+public:
+
+	void init() {
+		this->items.clear();
+		count = 0;
+		this->SemaphoreProcess::IoChannelBase::init();
+	}
+
+	struct Data: Os::IoJob::Data {
+		Data *next, *prev;
+		int param;
+	};
+
+	static SemaphoreProcess instance;
+
+private:
+
 	int count;
+	pet::LinkedList<Data> items;
 
-	bool addJob(typename Os::IoJob* job)
+	bool hasJob() {
+		return this->items.iterator().current() != nullptr;
+	}
+
+	bool addItem(typename Os::IoJob::Data* ioItem)
 	{
-		if(static_cast<int>(job->param) < 0 && this->jobs.front())
-			return this->jobs.addBack(job);
+		Data* item = static_cast<Data*>(ioItem);
 
-		while(job) {
-			int param = static_cast<int>(job->param);
+		if(item->param < 0 && this->items.iterator().current())
+			return this->items.addBack(item);
 
-			const int newVal = count + param;
+		while(item) {
+			const int newVal = count + item->param;
 
-			if(newVal < 0) {
-				return this->jobs.addBack(job);
-			}
+			if(newVal < 0)
+				return this->items.addBack(item);
 
 			count = newVal;
-			this->jobDone(job);
+			this->jobDone(item);
 
-			job = this->jobs.front();
+			item = this->items.iterator().current();
 		}
 
 		return true;
 	}
 
-	bool removeJob(typename Os::IoJob* job) {
-		this->jobs.remove(job);
+	bool removeItem(typename Os::IoJob::Data* item) {
+		this->items.remove(static_cast<Data*>(item));
 		return true;
 	}
 
 	void enableProcess() {}
 	void disableProcess() {}
-
-public:
-
-	void init() {
-		this->jobs.clear();
-		count = 0;
-		this->SemaphoreProcess::IoChannelBase::init();
-	}
-
-	static SemaphoreProcess instance;
 };
 
 template<class Os>

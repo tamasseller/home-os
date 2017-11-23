@@ -33,25 +33,41 @@ public:
 };
 
 template<class S, class... Args>
-template<class If>
-class Network<S, Args...>::TxBinder: Network<S, Args...>::Os::template IoChannelBase<TxBinder<If>> {
+class Network<S, Args...>::Interface {
 	friend class Network<S, Args...>;
-	friend class TxBinder::IoChannelBase;
+	virtual Os::IoChannel *getAllocator() = 0;
+	virtual Os::IoChannel *getSender() = 0;
+};
 
-	void enableProcess() {If::enableTxIrq();}
-	void disableProcess() {If::disableTxIrq();}
-	bool addJob(typename Os::IoJob* job) {return this->jobs.addBack(job);}
-	bool removeJob(typename Os::IoJob* job) {return this->jobs.remove(job);}
+template<class S, class... Args>
+template<class If>
+class Network<S, Args...>::TxBinder: Interface {
+	friend class Network<S, Args...>;
 
-	static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
-	    reinterpret_cast<TxPacket*>(item->param)->~TxPacket();
-		return false;
+	struct Sender: Network<S, Args...>::Os::template IoChannelBase<Sender> {
+		friend class Sender::IoChannelBase;
+		friend class Sender::TxBinder;
+
+		void enableProcess() {If::enableTxIrq();}
+		void disableProcess() {If::disableTxIrq();}
+		bool addJob(typename Os::IoJob* job) {return this->jobs.addBack(job);}
+		bool removeJob(typename Os::IoJob* job) {return this->jobs.remove(job);}
+
+	} sender;
+
+	virtual Os::IoChannel *getAllocator() override final {
+		return &allocator;
 	}
+
+	virtual Os::IoChannel *getSender() override final {
+		return &sender;
+	}
+
 
 	TxPacket* getEgressPacket() {
 		if(typename Os::IoJob* job = this->jobs.front()) {
 			TxPacket* ret = reinterpret_cast<TxPacket*>(job->param);
-			this->jobDone(job); 										// XXX
+//			this->jobDone(job); 										// XXX
 			return ret;
 		}
 

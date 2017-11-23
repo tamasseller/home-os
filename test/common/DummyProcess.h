@@ -30,34 +30,45 @@ public:
 	static DummyProcess instance;
 
 	void init() {
-		this->jobs.clear();
+		this->items.clear();
 		counter = 0;
 		this->DummyProcess::IoChannelBase::init();
 	}
 
+	struct Data: Os::IoJob::Data {
+		Data *next, *prev;
+		volatile int *param;
+	};
+
 private:
 	friend class DummyProcess::IoChannelBase;
 
+	pet::DoubleList<Data> items;
+
 	static inline void processWorkerIsr() {
 		if(instance.counter) {
-			typename Os::IoJob* job = instance.jobs.front();
-			int* param = reinterpret_cast<int*>(job->param);
+			Data* item = instance.items.front();
+			volatile int* param = item->param;
 
 			auto count = instance.counter--;
 
 			if(param)
 				*param = count;
 
-			instance.jobDone(job);
+			instance.jobDone(item);
 		}
 	}
 
-	bool addJob(typename Os::IoJob* job) {
-		return this->jobs.addBack(job);
+	bool hasJob() {
+		return this->items.front() != nullptr;
 	}
 
-	bool removeJob(typename Os::IoJob* job) {
-		return this->jobs.remove(job);
+	bool addItem(typename Os::IoJob::Data* item) {
+		return this->items.addBack(static_cast<Data*>(item));
+	}
+
+	bool removeItem(typename Os::IoJob::Data* item) {
+		return this->items.remove(static_cast<Data*>(item));
 	}
 
 	void enableProcess() {

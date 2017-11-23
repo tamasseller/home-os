@@ -31,12 +31,23 @@ public:
 		 Block* next;
 	};
 
+	class Data: public Os::IoJob::Data {
+		friend pet::LinkedList<Data>;
+		Data* next;
+	public:
+		union {
+			size_t size;
+			Block* first;
+		};
+	};
+
 private:
 	template<class Value> using Atomic = typename Os::template Atomic<Value>;
 
 	Atomic<size_t> nFree;
 	Atomic<Block*> head;
 	Block blocks[nBlocks];
+	pet::LinkedList<Data> items;
 
 	inline Block* take() {
 		Block* ret;
@@ -98,12 +109,10 @@ private:
 		return ret;
 	}
 
-	inline bool tryToSatisfy(typename Os::IoJob* job ) {
-		size_t param = reinterpret_cast<uintptr_t>(job->param);
-
-		if(Block* first = allocate(param)) {
-			job->param = reinterpret_cast<uintptr_t>(first);
-			this->jobDone(job);
+	inline bool tryToSatisfy(Data* data) {
+		if(Block* first = allocate(data->size)) {
+			data->first = first;
+			this->jobDone(data);
 			return true;
 		}
 
@@ -113,29 +122,37 @@ private:
 	static void blocksReclaimed(typename Os::Event* event, uintptr_t arg) {
 		BufferPool* self = static_cast<BufferPool*>(event);
 
-		while(typename Os::IoJob* job = self->jobs.front()) {
-			if(!self->tryToSatisfy(job))
+		while(Data* job = self->items.iterator().current()) {
+			if(!self->tryToSatisfy(static_cast<Data*>(job)))
 				break;
 		}
 	}
 
-	inline bool addJob(typename Os::IoJob* job)
+	inline bool hasJob() {
+		return this->items.iterator().current() != nullptr;
+	}
+
+	inline bool addItem(typename Os::IoJob::Data* job)
 	{
-		if(!this->jobs.front()) {
-			if(tryToSatisfy(job))
+		Data* data = static_cast<Data*>(job);
+
+		if(!items.iterator().current()) {
+			if(tryToSatisfy(data))
 				return true;
 		}
 
-		return this->jobs.addBack(job);
+		return items.addBack(data);
 	}
 
-	inline bool removeJob(typename Os::IoJob* job) {
-		bool isFirst = job == this->jobs.front();
-		bool ok = this->jobs.remove(job);
+	inline bool removeItem(typename Os::IoJob::Data* job) {
+		Data* data = static_cast<Data*>(job);
+
+		bool isFirst = data == items.iterator().current();
+		bool ok = items.remove(data);
 
 		if(ok && isFirst) {
-			while(typename Os::IoJob* job = this->jobs.front()) {
-				if(!tryToSatisfy(job))
+			while(Data* item = items.iterator().current()) {
+				if(!tryToSatisfy(item))
 					break;
 			}
 		}

@@ -46,6 +46,7 @@ struct Scheduler<Args...>::ErrorStrings {
 
 	static constexpr const char* ioRequestReuse = "Attempt to reuse an already occupied io request object";
 	static constexpr const char* ioRequestState = "Internal error, invalid I/O operation state";
+	static constexpr const char* ioRequestArgument = "Internal error, invalid I/O operation argument";
 };
 
 }

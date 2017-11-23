@@ -63,11 +63,13 @@ template<class Child>
 class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 	friend class Scheduler<Args...>;
 	using RemoveResult = typename IoChannelCommon::RemoveResult;
+	using Data = typename IoJob::Data;
 
 	inline void enableProcess() {}
 	inline void disableProcess() {}
-	inline bool addJob(IoJob*);
-	inline bool removeJob(IoJob*);
+	inline bool addItem(Data*);
+	inline bool removeItem(Data*);
+	inline bool hasJob();
 
 	virtual RemoveResult remove(IoJob* job) override final
 	{
@@ -82,7 +84,7 @@ class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 			return RemoveResult::Raced;
 		}
 
-		bool ok = self->removeJob(job);
+		bool ok = self->removeItem(job->data);
 		job->channel = nullptr;
 
 		if(self->hasJob())
@@ -95,33 +97,31 @@ class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 	{
 		auto self = static_cast<Child*>(this);
 		self->disableProcess();
-		bool ret = self->addJob(job);
+		bool ret = self->addItem(job->data);
 		self->enableProcess();
 		return ret;
 	}
 
 protected:
-	pet::DoubleList<IoJob> jobs;
-
-	void jobDone(IoJob* job) {
+	void jobDone(Data* data) {
 		auto self = static_cast<Child*>(this);
+		assert(data->job, ErrorStrings::ioRequestState);
+
 		/*
 		 * TODO describe relevance in locking mechanism of removeSynchronized.
 		 */
-		job->channel = nullptr;
+
+
+		data->job->channel = nullptr;
 
 		Profile::memoryFence();
 
-		self->removeJob(job);
+		self->removeItem(data);
 
 		if(!self->hasJob())
 			self->disableProcess();
 
-		state.eventList.issue(job, typename IoJob::template OverwriteCombiner<IoJob::doneValue>());
-	}
-
-	inline bool hasJob() {
-		return jobs.front() != nullptr;
+		state.eventList.issue(data->job, typename IoJob::template OverwriteCombiner<IoJob::doneValue>());
 	}
 };
 

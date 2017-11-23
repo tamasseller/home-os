@@ -26,10 +26,11 @@ using Os = OsRr;
 TEST_GROUP(NetBufferPool) {
 	typedef BufferPool<Os, 10, 10> Pool;
 
-	class PoolJob: public Os::IoJob {
-		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
+	class PoolJob: public Os::IoJob, Pool::Data {
+		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
 			if(result == Os::IoJob::Result::Done) {
-				static_cast<PoolJob*>(item)->result = reinterpret_cast<Pool::Block*>(item->param);
+				auto self = static_cast<PoolJob*>(item);
+				self->result = self->first;
 			}
 
 			return false;
@@ -38,7 +39,8 @@ TEST_GROUP(NetBufferPool) {
 	public:
 		inline bool start(Pool &pool, size_t n, Os::IoJob::Hook hook = nullptr) {
 			result = nullptr;
-			return submit(hook, &pool, &PoolJob::writeResult, n);
+			this->size = n;
+			return submit(hook, &pool, &PoolJob::writeResult, this);
 		}
 
 		Pool::Block* volatile result;

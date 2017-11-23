@@ -40,16 +40,15 @@ public:
 	typedef void (*Hook)(IoJob*);
 	typedef bool (*Callback)(IoJob*, Result, Hook);
 
-
-public /* IoChannel implementations */:
-    IoJob *next, *prev;
-	uintptr_t param;
-
+	class Data {
+		friend Scheduler<Args...>;
+		IoJob* job;
+	};
 
 private:
 	// TODO describe actors and their locking and actions.
 	Atomic<IoChannel *> channel = nullptr;
-
+	Data* data;
 	Callback finished;
 
 	static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
@@ -71,7 +70,7 @@ private:
 			 * This operation must not fail because the channel pointer
 			 * is acquired exclusively
 			 */
-			assert(removeResult == IoChannel::RemoveResult::Ok, "Internal error, invalid I/O operation state");
+			assert(removeResult == IoChannel::RemoveResult::Ok, ErrorStrings::ioRequestState);
 
 			finished(this, result, nullptr);
 			break;
@@ -103,7 +102,7 @@ private:
 			 */
 			IoChannel *channel = self->channel;
 
-			assert(channel, "Internal error, invalid I/O operation state");
+			assert(channel, ErrorStrings::ioRequestState);
 
 			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
 
@@ -119,7 +118,7 @@ private:
 			bool isCancel = hasTimeout || arg == cancelValue;
 			bool isDone = hasTimeout || arg == doneValue;
 
-			assert(isDone || isCancel, "Internal error, invalid I/O operation argument");
+			assert(isDone || isCancel, ErrorStrings::ioRequestArgument);
 
 			if(self->isSleeping())
 				state.sleepList.remove(self);
@@ -143,12 +142,13 @@ private:
 		}
 	};
 
-	inline bool takeOver(void (*hook)(IoJob*), IoChannel* channel, Callback callback, uintptr_t param = 0) {
+	inline bool takeOver(void (*hook)(IoJob*), IoChannel* channel, Callback callback, Data* data) {
 		if(!this->channel.compareAndSwap(nullptr, channel))
 			return false;
 
 		this->finished = callback;
-		this->param = param;
+		data->job = this;
+		this->data = data;
 
 		if(hook)
 			hook(this);
@@ -158,20 +158,20 @@ private:
 
 protected:
 
-	inline bool submit(void (*hook)(IoJob*), IoChannel* channel, Callback callback, uintptr_t param = 0) {
-		if(!takeOver(hook, channel, callback, param))
+	inline bool submit(void (*hook)(IoJob*), IoChannel* channel, Callback callback, Data* data) {
+		if(!takeOver(hook, channel, callback, data))
 			return false;
 
 		state.eventList.issue(this, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
 		return true;
 	}
 
-	inline bool submitTimeout(Hook hook, IoChannel* channel, uintptr_t time, Callback callback, uintptr_t param = 0)
+	inline bool submitTimeout(Hook hook, IoChannel* channel, uintptr_t time, Callback callback, Data* data)
 	{
 		if(!time || time >= (uintptr_t)INTPTR_MAX)
 			return false;
 
-		if(!takeOver(hook, channel, callback, param))
+		if(!takeOver(hook, channel, callback, data))
 			return false;
 
 		state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
