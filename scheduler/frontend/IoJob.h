@@ -56,28 +56,26 @@ private:
 	static constexpr intptr_t cancelValue = (intptr_t) -2;
 	static constexpr intptr_t doneValue = (intptr_t) -3;
 
-	static inline bool removeSynhronized(IoJob* self) {
+	inline void removeSynhronized(Result result) {
 		// TODO describe locking hackery (race between process completion (and
 		// possible re-submission), cancelation and timeout on channel field).
-		while(IoChannel *channel = self->channel) {
+		while(IoChannel *channel = this->channel) {
 
 			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
 
-			typename IoChannel::RemoveResult result = channel->remove(self);
-			if(result == IoChannel::RemoveResult::Raced)
+			typename IoChannel::RemoveResult removeResult = channel->remove(this);
+			if(removeResult == IoChannel::RemoveResult::Raced)
 				continue;
 
 			/*
 			 * This operation must not fail because the channel pointer
 			 * is acquired exclusively
 			 */
-			assert(result == IoChannel::RemoveResult::Ok, "Internal error, invalid I/O operation state");
+			assert(removeResult == IoChannel::RemoveResult::Ok, "Internal error, invalid I/O operation state");
 
-			self->finished(self, Result::Canceled, nullptr);
-			return true;
+			finished(this, result, nullptr);
+			break;
 		}
-
-		return false;
 	}
 
 	static void handleRequest(Event* event, uintptr_t uarg)
@@ -127,8 +125,7 @@ private:
 				state.sleepList.remove(self);
 
 			if(isCancel) {
-				if(removeSynhronized(self))
-					self->finished(self, Result::Canceled, nullptr);
+				self->removeSynhronized(Result::Canceled);
 			} else
 				self->finished(self, Result::Done, nullptr);
 
@@ -136,12 +133,8 @@ private:
 	}
 
 	static void timedOut(Sleeper* sleeper) {
-		IoJob* self = static_cast<IoJob*>(sleeper);
-
-		if(removeSynhronized(self))
-			self->finished(self, Result::TimedOut, nullptr);
+		static_cast<IoJob*>(sleeper)->removeSynhronized(Result::TimedOut);
 	}
-
 
 	template<uintptr_t value> struct OverwriteCombiner {
 		inline bool operator()(uintptr_t old, uintptr_t& result) const {
@@ -150,26 +143,27 @@ private:
 		}
 	};
 
-	inline bool takeOver(IoChannel *channel) {
-	    	return this->channel.compareAndSwap(nullptr, channel);
+	inline bool takeOver(void (*hook)(IoJob*), IoChannel* channel, Callback callback, uintptr_t param = 0) {
+		if(!this->channel.compareAndSwap(nullptr, channel))
+			return false;
+
+		this->finished = callback;
+		this->param = param;
+
+		if(hook)
+			hook(this);
+
+		return true;
     }
 
 protected:
 
 	inline bool submit(void (*hook)(IoJob*), IoChannel* channel, Callback callback, uintptr_t param = 0) {
-		if(takeOver(channel)) {
-			this->finished = callback;
-			this->param = param;
+		if(!takeOver(hook, channel, callback, param))
+			return false;
 
-			if(hook)
-				hook(this);
-
-			state.eventList.issue(this, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
-
-			return true;
-		}
-
-		return false;
+		state.eventList.issue(this, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
+		return true;
 	}
 
 	inline bool submitTimeout(Hook hook, IoChannel* channel, uintptr_t time, Callback callback, uintptr_t param = 0)
@@ -177,22 +171,15 @@ protected:
 		if(!time || time >= (uintptr_t)INTPTR_MAX)
 			return false;
 
-		if(takeOver(channel)) {
-			this->finished = callback;
-			this->param = param;
+		if(!takeOver(hook, channel, callback, param))
+			return false;
 
-			if(hook)
-				hook(this);
-
-			state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
-				result = time;
-				return true;
-			});
-
+		state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
+			result = time;
 			return true;
-		}
+		});
 
-		return false;
+		return true;
 	}
 
 public:

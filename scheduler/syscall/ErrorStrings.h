@@ -45,6 +45,7 @@ struct Scheduler<Args...>::ErrorStrings {
 	static constexpr const char* ioChannelDelete = "Io channels can not be deleted with an active scheduler.";
 
 	static constexpr const char* ioRequestReuse = "Attempt to reuse an already occupied io request object";
+	static constexpr const char* ioRequestState = "Internal error, invalid I/O operation state";
 };
 
 }
