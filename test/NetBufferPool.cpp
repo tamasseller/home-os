@@ -26,7 +26,7 @@ using Os = OsRr;
 TEST_GROUP(NetBufferPool) {
 	typedef BufferPool<Os, 10, 10> Pool;
 
-	class PoolJob: public Os::IoJob, Pool::Data {
+	class PoolJob: public Os::IoJob, Pool::IoData {
 		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
 			if(result == Os::IoJob::Result::Done) {
 				auto self = static_cast<PoolJob*>(item);
@@ -52,9 +52,10 @@ TEST(NetBufferPool, Simple) {
 	struct Task: public TestTask<Task> {
 		bool error = false;
 		Pool pool;
+		Pool::Storage storage;
 
 		void run() {
-			pool.init();
+			pool.init(storage);
 
 			PoolJob jobs[3];
 			jobs[0].start(pool, 3);
@@ -88,10 +89,11 @@ TEST(NetBufferPool, Ordering) {
 	struct Task: public TestTask<Task> {
 		bool error = false;
 		Pool pool;
+		Pool::Storage storage;
 
 		void run() {
 			PoolJob jobs[4];
-			pool.init();
+			pool.init(storage);
 
 			jobs[0].start(pool, 5);
 			Os::sleep(1);
@@ -130,10 +132,11 @@ TEST(NetBufferPool, Cancelation) {
 	struct Task: public TestTask<Task> {
 		bool error = false;
 		Pool pool;
+		Pool::Storage storage;
 
 		void run() {
 			PoolJob jobs[4];
-			pool.init();
+			pool.init(storage);
 
 			jobs[0].start(pool, 5);
 			Os::sleep(1);

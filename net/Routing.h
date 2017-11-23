@@ -8,6 +8,8 @@
 #ifndef ROUTING_H_
 #define ROUTING_H_
 
+#include "Network.h"
+
 template<class S, class... Args>
 class Network<S, Args...>::Route {
     friend class Network<S, Args...>;

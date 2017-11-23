@@ -20,40 +20,56 @@
 #ifndef BUFFERPOOL_H_
 #define BUFFERPOOL_H_
 
-template<class Os, size_t nBlocks, size_t blockDataSize, class AlignmentType = void*>
-class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockDataSize, AlignmentType>>, Os::Event
+template<class Header>
+static inline Header* &trivialNextAccessor(Header* header) {
+	return header->next;
+}
+
+struct TrivialHeader {
+	TrivialHeader* next;
+};
+
+template<class Os>
+class BufferPoolIoData: public Os::IoJob::Data {
+	template<class, size_t, size_t, class Header, Header* &(*Next)(Header*)> class BufferPool;
+	friend pet::LinkedList<BufferPoolIoData>;
+	BufferPoolIoData* next;
+public:
+	union {
+		size_t size;
+		void* first;
+	};
+};
+
+template<class Os, size_t nBlocks, size_t blockDataSize, class Header = TrivialHeader, Header* &(*accessNext)(Header* header) = &trivialNextAccessor<Header>>
+class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockDataSize, Header, accessNext>>, Os::Event
 {
 	friend class BufferPool::IoChannelBase;
+	using IoData = BufferPoolIoData<Os>;
 
 public:
-	struct Block {
-		 char data[blockDataSize] alignas(AlignmentType);
-		 Block* next;
+	struct Block: Header {
+		 char data[blockDataSize] alignas(Header);
+
+		 Header* &getNext() {
+			 return accessNext(this);
+		 }
 	};
 
-	class Data: public Os::IoJob::Data {
-		friend pet::LinkedList<Data>;
-		Data* next;
-	public:
-		union {
-			size_t size;
-			Block* first;
-		};
-	};
+	typedef Block Storage[nBlocks];
 
 private:
 	template<class Value> using Atomic = typename Os::template Atomic<Value>;
 
 	Atomic<size_t> nFree;
-	Atomic<Block*> head;
-	Block blocks[nBlocks];
-	pet::LinkedList<Data> items;
+	Atomic<Header*> head;
+	pet::LinkedList<IoData> items;
 
-	inline Block* take() {
-		Block* ret;
+	inline Header* take() {
+		Header* ret;
 
-		head([&ret](Block* old, Block* &result){
-			result = old->next;
+		head([&ret](Header* old, Header* &result){
+			result = accessNext(old);
 			ret = old;
 			return true;
 		});
@@ -61,8 +77,8 @@ private:
 		return ret;
 	}
 
-	inline void put(Block* b, Block** nextOfLast) {
-		head([b, nextOfLast](Block* old, Block* &result){
+	inline void put(Header* b, Header** nextOfLast) {
+		head([b, nextOfLast](Header* old, Header* &result){
 			*nextOfLast = old;
 			result = b;
 			return true;
@@ -90,28 +106,30 @@ private:
 		});
 	}
 
-	inline Block* allocate(size_t n)
+	inline Header* allocate(size_t n)
 	{
-		Block* ret = nullptr;
+		Header* ret = nullptr;
 
 		if(reserve(n)){
-			Block* last = ret = take();
+			Header* last = ret = take();
 
 			while(--n) {
-				Block* next = take();
-				last->next = next;
+				Header* next = take();
+				accessNext(last) = next;
 				last = next;
 			}
 
-			last->next = nullptr;
+			accessNext(last) = nullptr;
 		}
 
 		return ret;
 	}
 
-	inline bool tryToSatisfy(Data* data) {
-		if(Block* first = allocate(data->size)) {
-			data->first = first;
+	inline bool tryToSatisfy(IoData* data) {
+		const size_t nBlocksToAlloc = (data->size + blockDataSize - 1) / blockDataSize;
+
+		if(Header* first = allocate(nBlocksToAlloc)) {
+			data->first = static_cast<Block*>(first);
 			this->jobDone(data);
 			return true;
 		}
@@ -122,8 +140,8 @@ private:
 	static void blocksReclaimed(typename Os::Event* event, uintptr_t arg) {
 		BufferPool* self = static_cast<BufferPool*>(event);
 
-		while(Data* job = self->items.iterator().current()) {
-			if(!self->tryToSatisfy(static_cast<Data*>(job)))
+		while(IoData* job = self->items.iterator().current()) {
+			if(!self->tryToSatisfy(static_cast<IoData*>(job)))
 				break;
 		}
 	}
@@ -134,7 +152,7 @@ private:
 
 	inline bool addItem(typename Os::IoJob::Data* job)
 	{
-		Data* data = static_cast<Data*>(job);
+		IoData* data = static_cast<IoData*>(job);
 
 		if(!items.iterator().current()) {
 			if(tryToSatisfy(data))
@@ -145,13 +163,13 @@ private:
 	}
 
 	inline bool removeItem(typename Os::IoJob::Data* job) {
-		Data* data = static_cast<Data*>(job);
+		IoData* data = static_cast<IoData*>(job);
 
 		bool isFirst = data == items.iterator().current();
 		bool ok = items.remove(data);
 
 		if(ok && isFirst) {
-			while(Data* item = items.iterator().current()) {
+			while(IoData* item = items.iterator().current()) {
 				if(!tryToSatisfy(item))
 					break;
 			}
@@ -164,7 +182,7 @@ private:
 	inline void disableProcess() {}
 
 public:
-	inline void init() {
+	inline void init(Storage &blocks) {
 		nFree = nBlocks;
 		head = blocks;
 
@@ -178,12 +196,12 @@ public:
 
 	inline void reclaim(Block *first) {
 		size_t n = 0;
-		Block** nextOfLast;
+		Header** nextOfLast;
 
-		for(Block* b = first;; b = b->next) {
+		for(Header* b = first;; b = accessNext(b)) {
 			n++;
-			if(!b->next) {
-				nextOfLast = &b->next;
+			if(!accessNext(b)) {
+				nextOfLast = &accessNext(b);
 				break;
 			}
 		}
@@ -197,5 +215,7 @@ public:
 
 	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
+
+
 
 #endif /* BUFFERPOOL_H_ */

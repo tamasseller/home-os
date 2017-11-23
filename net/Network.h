@@ -45,91 +45,83 @@ struct NetworkOptions {
 		template<class, class = void> struct Ifs;
 
 		class TxPacket;
-		typedef BufferPool<Os, transmitPoolSize, transmitBlockSize, TxPacket> TxPool;
 
 		struct RoutingTable;
 
 		static struct State {
-			TxPool txPool;
 			Ifs<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 		} state;
 
-		struct AllocateTxPacketJob: Os::IoJob {
+		struct UdpTxJob: Os::IoJob {
 			friend class Os::IoChannel;
+			AddressIp4 dst;
+			uint16_t port;
+			Interface* dev;
+
 			union {
-				struct {
-					AddressIp4 dst;
-					uint16_t port;
-				} in;
-				Interface* dev;
+				BufferPoolIoData<Os> poolParams;
+				TxPacket packet;
 			};
 
 			static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
-			    auto self = static_cast<AllocateTxPacketJob*>(item);
+			    auto self = static_cast<UdpTxJob*>(item);
 
 				if(result == Os::IoJob::Result::Done) {
-					 auto first = reinterpret_cast<typename TxPool::Block*>(item->param);
-					 TxPacket* packet = new(first) TxPacket;
-
-					 if(auto route = state.routingTable.findRoute(self->in.dst)) {
-					     /* TODO fill in headers */
-					     self->dev = route->dev;
-	                     item->param = reinterpret_cast<uintptr_t>(packet);
-					 } else {
-					     packet->~TxPacket();
-					     item->param = 0;
-					 }
-
-					 // TODO table lookups and restructuring
+					void* firstBlock = self->poolParams.first;
+					//self->packet.init(firstBlock, 0, self->dev->getStandardPacketOperations());
 				}
 
 				return false;
 			}
 
-			inline bool start(AddressIp4 dst, uint16_t port, size_t freeStorageSize, typename Os::IoJob::Hook hook = 0) {
-				in.dst = dst;
-				in.port = port;
-				const size_t nBlocks = (freeStorageSize /* TODO + header size */ + transmitBlockSize - 1) / transmitBlockSize;
-				return this->submit(hook, &state.txPool, &AllocateTxPacketJob::done, nBlocks);
+			inline bool start(AddressIp4 dst, uint16_t port, size_t freeStorageSize, typename Os::IoJob::Hook hook = 0)
+			{
+				if(auto route = state.routingTable.findRoute(dst)) { // TODO fill in headers
+					this->dev = route->dev;
+					this->dst = dst;
+					this->port = port;
+
+					 // TODO ARP lookup
+
+					poolParams.size = freeStorageSize /* TODO + header size */;
+					return this->submit(hook, this->dev->getAllocator(), &UdpTxJob::done, &poolParams);
+				}
+
+				return false;
+			}
+
+			inline bool start(typename Os::IoJob::Hook hook = 0) {
+				// TODO submit to sender
+				return false;
 			}
 		};
+
 
 	public:
 		static inline void init() {
-			state.txPool.init();
 			state.interfaces.init();
 		}
 
-		struct PreparedPacket {
-			TxPacket* packet;
-			Interface* dev;
-			void send() {
-				struct SendPacket: Os::IoJob {
-					static bool nop(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
-						return false;
-					}
+		struct UdpTransmission: private Os::template IoRequest<UdpTxJob> {
+			bool prepare(AddressIp4 dst, uint16_t port, size_t size) {
+				// TODO check state somehow
+				// TODO block if needed
+				return this->start(dst, port, size);
+			}
 
-				public:
-					bool start(Interface *dev, TxPacket* packet, typename Os::IoJob::Hook hook = 0) {
-						return this->submit(hook, dev, &SendPacket::nop, reinterpret_cast<uintptr_t>(packet));
-					}
-				};
+			bool send() {
+				// TODO check state somehow
+				// TODO block if needed
+				return this->start();
+			}
 
-				typename Os::template IoRequest<SendPacket> req;
-				req.init();
-				req.start(dev, packet);
-				req.wait();
+			bool fill(const char* data, size_t length) {
+				// TODO check state somehow
+				//return this->packet.copyIn(data, length);
+				return false;
 			}
 		};
-
-		static PreparedPacket prepareUdpPacket(AddressIp4 dst, uint16_t port, size_t size) {
-			typename Os::template IoRequest<AllocateTxPacketJob> req;
-			req.init();
-			req.start(dst, port, size);
-			req.wait();
-			return {reinterpret_cast<TxPacket*>(req.param), req.dev};
-		}
 
 		static inline bool addRoute(const Route& route) {
 		    return state.routingTable.add(route);

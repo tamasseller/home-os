@@ -16,9 +16,10 @@ TEST(NetPacketAllocation, Simple) {
 		bool error = false;
 
 		void run() {
-			auto ret = Net::prepareUdpPacket(AddressIp4::make(10, 10, 10, 10), 12345, 6);
-			ret.packet->copyIn("foobar", 6);
-			ret.send();
+			Net::UdpTransmission tx;
+			tx.prepare(AddressIp4::make(10, 10, 10, 10), 12345, 6);
+			tx.fill("foobar", 6);
+			tx.send();
 		}
 	} task;
 
@@ -26,7 +27,7 @@ TEST(NetPacketAllocation, Simple) {
 	Net::init();
 	Net::addRoute(Net::Route(
 	        AddressIp4::make(10, 10, 10, 0), 8,
-	        AddressIp4::make(10, 10, 10, 10), Net::getIf<DummyIf>()));
+	        AddressIp4::make(10, 10, 10, 10), Net::getIf<DummyIf<0>>()));
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }

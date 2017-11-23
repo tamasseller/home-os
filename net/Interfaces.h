@@ -8,6 +8,8 @@
 #ifndef INTERFACES_H_
 #define INTERFACES_H_
 
+#include "Network.h"
+
 #include "meta/ApplyToPack.h"
 
 template<class S, class... Args>
@@ -35,8 +37,9 @@ public:
 template<class S, class... Args>
 class Network<S, Args...>::Interface {
 	friend class Network<S, Args...>;
-	virtual Os::IoChannel *getAllocator() = 0;
-	virtual Os::IoChannel *getSender() = 0;
+	virtual typename Os::IoChannel *getAllocator() = 0;
+	virtual typename Os::IoChannel *getSender() = 0;
+	virtual typename Packet::Operations const *getStandardPacketOperations() = 0;
 };
 
 template<class S, class... Args>
@@ -44,34 +47,56 @@ template<class If>
 class Network<S, Args...>::TxBinder: Interface {
 	friend class Network<S, Args...>;
 
-	struct Sender: Network<S, Args...>::Os::template IoChannelBase<Sender> {
+	class Sender: Network<S, Args...>::Os::template IoChannelBase<Sender> {
 		friend class Sender::IoChannelBase;
-		friend class Sender::TxBinder;
+		friend class TxBinder;
+
+		pet::LinkedList<TxPacket> items;
 
 		void enableProcess() {If::enableTxIrq();}
 		void disableProcess() {If::disableTxIrq();}
-		bool addJob(typename Os::IoJob* job) {return this->jobs.addBack(job);}
-		bool removeJob(typename Os::IoJob* job) {return this->jobs.remove(job);}
+		bool addItem(typename Os::IoJob::Data* data) {
+			return this->items.addBack(static_cast<TxPacket*>(data));
+			return false;
+		}
 
+		bool removeItem(typename Os::IoJob::Data* data) {
+			return this->items.remove(static_cast<TxPacket*>(data));
+			return false;
+		}
+
+		bool hasJob() {
+			return false;
+		}
+
+	public:
+		TxPacket* getEgressPacket() {
+/*			if(typename Os::IoJob* job = this->items.front()) {
+				TxPacket* ret = reinterpret_cast<TxPacket*>(job->param);
+				this->jobDone(job); 										// XXX
+				TxPacket* ret = nullptr;
+				return ret;
+			}*/
+
+			return nullptr;
+		}
 	} sender;
 
-	virtual Os::IoChannel *getAllocator() override final {
-		return &allocator;
+	virtual typename Os::IoChannel *getAllocator() override final {
+		return &If::allocator;
 	}
 
-	virtual Os::IoChannel *getSender() override final {
+	virtual typename Os::IoChannel *getSender() override final {
 		return &sender;
 	}
 
+	virtual typename Packet::Operations const *getStandardPacketOperations() override final {
+		return &If::standardPacketOperations;
+	}
 
-	TxPacket* getEgressPacket() {
-		if(typename Os::IoJob* job = this->jobs.front()) {
-			TxPacket* ret = reinterpret_cast<TxPacket*>(job->param);
-//			this->jobDone(job); 										// XXX
-			return ret;
-		}
-
-		return nullptr;
+	void init() {
+		sender.init();
+		If::init();
 	}
 };
 
@@ -84,7 +109,7 @@ constexpr inline typename Network<S, Args...>::Interface *Network<S, Args...>::g
 template<class S, class... Args>
 template<class C>
 constexpr inline typename Network<S, Args...>::TxPacket *Network<S, Args...>::getEgressPacket() {
-	return static_cast<TxBinder<C>*>(&state.interfaces)->getEgressPacket();
+	return static_cast<TxBinder<C>*>(&state.interfaces)->sender.getEgressPacket();
 }
 
 

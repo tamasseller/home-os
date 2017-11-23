@@ -10,22 +10,28 @@
 
 #include "Chunk.h"
 
+// TODO change visibility
+
 class Packet
 {
 public:
-	class Point {
-		friend Packet;
-		char* block;
+	struct Point {
+		void* block;
 		size_t offset;
 	};
 
-protected:
+	struct Operations {
+		Chunk (*nextChunk)(Packet*) = 0;
+		void (*dispose)(Packet*) = 0;
+	};
 
+	Operations *ops;
 	Point cursor;
-	inline char* &block() {return cursor.block;}
-	inline size_t &offset() {return cursor.offset;}
 
-public:
+	void init(Operations *ops, char* block, size_t offset) {
+		cursor.block = block;
+		cursor.offset = offset;
+	}
 
 	inline Point getPoint() const {
 		return cursor;
@@ -36,7 +42,7 @@ public:
 	}
 
 	inline void leaveAt(size_t newOffset) {
-		offset() += newOffset;
+		cursor.offset += newOffset;
 	}
 
 	bool copyIn(const char* data, size_t dataLength) {
@@ -62,43 +68,50 @@ public:
 		return true;
 	}
 
-	virtual Chunk nextChunk() = 0;
+	Chunk nextChunk() {
+		return ops->nextChunk(this);
+	}
 
-	inline virtual ~Packet() {}
+	inline void dispose() {
+		ops->dispose(this);
+	}
 };
 
 template<class Child>
-class ChunkedPacket: public Packet
+class ChunkedPacket
 {
-	virtual inline Chunk nextChunk() override
+	static Chunk nextChunk(Packet* self)
 	{
-	    auto self = static_cast<Child*>(this);
+		if(self->cursor.block) {
+			const size_t size = Child::getSize(self->cursor.block);
 
-		if(this->block()) {
-			const size_t size = self->getSize();
-
-			if(offset() < size) {
-				return Chunk(this->block() + this->offset(), this->block() + (size - this->offset()));
+			if(self->cursor.offset < size) {
+				char* data = Child::getData(self->cursor.block);
+				return Chunk(data + self->cursor.offset, data + (size - self->cursor.offset));
 			} else {
-				auto newBlock = self->nextBlock();
-				this->block() = newBlock;
-				this->offset() = 0;
+				self->cursor.block = Child::nextBlock(self->cursor.block);
+				self->cursor.offset = 0;
 
-				if(newBlock)
-					return Chunk(newBlock, newBlock + size);
+				if(self->cursor.block) {
+					char* data = Child::getData(self->cursor.block);
+					return Chunk(data, data + size);
+				}
 			}
 		}
 
 		return Chunk(nullptr, nullptr);
 	}
 
-protected:
-
-	ChunkedPacket(char* newBlock, size_t newOffset) {
-		this->block() = newBlock;
-		this->offset() = newOffset;
+	static void dispose(Packet* packet) {
+		Child::dispose(packet);
 	}
+
+public:
+	static constexpr Packet::Operations operations = Packet::Operations{&ChunkedPacket::nextChunk, &ChunkedPacket::dispose};
 };
+
+template<class Child>
+constexpr Packet::Operations ChunkedPacket<Child>::operations;
 
 
 #endif /* PACKET_H_ */
