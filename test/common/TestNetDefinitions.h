@@ -15,6 +15,7 @@ template<int id = 0>
 class DummyIf {
 	static constexpr size_t txBufferCount = 64;
 	static constexpr size_t txBufferSize = 64;
+	static constexpr size_t arpCacheEnties = 8;
 
 	struct TxHeader {
 		char dummyByte;
@@ -31,7 +32,6 @@ class DummyIf {
 		Tx txPool;
 		typename Tx::Storage txStorage;
 	} pools;
-
 
 	struct TxChunkInfo {
 		static inline size_t getSize(void *block) {
@@ -69,7 +69,10 @@ using Net = Network<OsRr,
 
 template<int id>
 inline void DummyIf<id>::enableTxIrq() {
-	while(Net::getEgressPacket<DummyIf<id>>());
+	auto x = Net::getIf<DummyIf<id>>()->getTxInfoProvider();
+	while(auto p = x->getCurrentPacket()) {
+		x->packetTransmitted();
+	}
 }
 
 #endif /* TESTNETDEFINITIONS_H_ */

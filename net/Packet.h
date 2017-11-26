@@ -12,9 +12,8 @@
 
 // TODO change visibility
 
-class Packet
+struct Packet
 {
-public:
 	struct Point {
 		void* block;
 		size_t offset;
@@ -25,12 +24,15 @@ public:
 		void (*dispose)(Packet*) = 0;
 	};
 
-	Operations *ops;
+	const Operations *ops;
+	Packet *next;
+	void* first;
 	Point cursor;
 
-	void init(Operations *ops, char* block, size_t offset) {
-		cursor.block = block;
+	void init(void* block, size_t offset, const Operations *ops) {
+		first = cursor.block = block;
 		cursor.offset = offset;
+		this->ops = ops;
 	}
 
 	inline Point getPoint() const {

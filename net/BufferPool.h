@@ -45,9 +45,10 @@ template<class Os, size_t nBlocks, size_t blockDataSize, class Header = TrivialH
 class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockDataSize, Header, accessNext>>, Os::Event
 {
 	friend class BufferPool::IoChannelBase;
-	using IoData = BufferPoolIoData<Os>;
 
 public:
+	using IoData = BufferPoolIoData<Os>;
+
 	struct Block: Header {
 		 char data[blockDataSize] alignas(Header);
 
@@ -163,19 +164,25 @@ private:
 	}
 
 	inline bool removeItem(typename Os::IoJob::Data* job) {
+		items.remove(static_cast<IoData*>(job));
+		return true;
+	}
+
+	inline bool removeCanceled(typename Os::IoJob::Data* job) {
 		IoData* data = static_cast<IoData*>(job);
 
-		bool isFirst = data == items.iterator().current();
-		bool ok = items.remove(data);
+		auto it = items.iterator();
 
-		if(ok && isFirst) {
+		if(it.current() == data) {
+			it.remove();
 			while(IoData* item = items.iterator().current()) {
 				if(!tryToSatisfy(item))
 					break;
 			}
+			return true;
 		}
 
-		return ok;
+		return items.remove(data);
 	}
 
 	inline void enableProcess() {}

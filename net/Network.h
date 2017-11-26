@@ -14,6 +14,7 @@
 #include "SharedTable.h"
 #include "Packet.h"
 #include "AddressIp4.h"
+#include "AddressEthernet.h"
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(TransmitPoolSize, size_t);
@@ -28,12 +29,9 @@ struct NetworkOptions {
 	template<class Scheduler, class... Options>
 	class Configurable {
 		typedef Scheduler Os;
-		PET_EXTRACT_VALUE(transmitPoolSize, TransmitPoolSize, 64, Options);
-		PET_EXTRACT_VALUE(transmitBlockSize, TransmitBlockSize, 64, Options);
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
-		static_assert(sizeof(Packet) <= transmitBlockSize, "Buffer block size smaller than internal packet header size");
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 
 	public:
@@ -44,9 +42,10 @@ struct NetworkOptions {
 		template<class> class TxBinder;
 		template<class, class = void> struct Ifs;
 
-		class TxPacket;
-
+		struct ArpEntry;
+		template<class, size_t> struct ArpTable;
 		struct RoutingTable;
+		struct TxPacket;
 
 		static struct State {
 			Ifs<IfsToBeUsed> interfaces;
@@ -56,44 +55,50 @@ struct NetworkOptions {
 		struct UdpTxJob: Os::IoJob {
 			friend class Os::IoChannel;
 			AddressIp4 dst;
-			uint16_t port;
+			uint16_t dstPort, srcPort;
 			Interface* dev;
 
 			union {
 				BufferPoolIoData<Os> poolParams;
-				TxPacket packet;
+				Packet packet;
 			};
 
-			static bool done(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
+			static bool allocated(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
 			    auto self = static_cast<UdpTxJob*>(item);
 
 				if(result == Os::IoJob::Result::Done) {
 					void* firstBlock = self->poolParams.first;
-					//self->packet.init(firstBlock, 0, self->dev->getStandardPacketOperations());
+					self->packet.init(firstBlock, 0, self->dev->getStandardPacketOperations());
 				}
 
 				return false;
 			}
 
-			inline bool start(AddressIp4 dst, uint16_t port, size_t freeStorageSize, typename Os::IoJob::Hook hook = 0)
+			static bool sent(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
+				auto self = static_cast<UdpTxJob*>(item);
+				self->packet.dispose();
+				return false;
+			}
+
+			inline bool start(AddressIp4 dst, uint16_t dstPort, uint16_t srcPort, size_t freeStorageSize, typename Os::IoJob::Hook hook = 0)
 			{
 				if(auto route = state.routingTable.findRoute(dst)) { // TODO fill in headers
 					this->dev = route->dev;
 					this->dst = dst;
-					this->port = port;
+					this->dstPort = dstPort;
+					this->srcPort = srcPort;
 
-					 // TODO ARP lookup
+					// TODO ARP lookup
 
 					poolParams.size = freeStorageSize /* TODO + header size */;
-					return this->submit(hook, this->dev->getAllocator(), &UdpTxJob::done, &poolParams);
+					return this->submit(hook, this->dev->getAllocator(), &UdpTxJob::allocated, &poolParams);
 				}
 
 				return false;
 			}
 
 			inline bool start(typename Os::IoJob::Hook hook = 0) {
-				// TODO submit to sender
-				return false;
+				return this->submit(hook, this->dev->getSender(), &UdpTxJob::sent, &poolParams);
 			}
 		};
 
@@ -104,19 +109,19 @@ struct NetworkOptions {
 		}
 
 		struct UdpTransmission: private Os::template IoRequest<UdpTxJob> {
-			bool prepare(AddressIp4 dst, uint16_t port, size_t size) {
+			inline bool prepare(AddressIp4 dst, uint16_t dstPort, uint16_t srcPort, size_t size) {
 				// TODO check state somehow
 				// TODO block if needed
-				return this->start(dst, port, size);
+				return this->start(dst, dstPort, srcPort, size);
 			}
 
-			bool send() {
+			inline bool send() {
 				// TODO check state somehow
 				// TODO block if needed
 				return this->start();
 			}
 
-			bool fill(const char* data, size_t length) {
+			inline bool fill(const char* data, size_t length) {
 				// TODO check state somehow
 				//return this->packet.copyIn(data, length);
 				return false;
@@ -127,8 +132,7 @@ struct NetworkOptions {
 		    return state.routingTable.add(route);
 		}
 
-		template<class C> constexpr static inline Interface *getIf();
-		template<class C> constexpr static inline TxPacket *getEgressPacket();
+		template<class C> constexpr static inline TxBinder<C> *getIf();
 	};
 };
 

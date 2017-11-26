@@ -29,10 +29,10 @@ class Scheduler<Args...>::IoChannel {
 	friend Scheduler<Args...>;
 
 	enum class RemoveResult {
-		Ok, NotPresent, Raced
+		Ok, NotPresent, Raced, Denied
 	};
 
-	virtual RemoveResult remove(IoJob* job) = 0;
+	virtual RemoveResult remove(IoJob* job, typename IoJob::Result result) = 0;
 	virtual bool add(IoJob* job) = 0;
 };
 
@@ -69,9 +69,10 @@ class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 	inline void disableProcess() {}
 	inline bool addItem(Data*);
 	inline bool removeItem(Data*);
+	inline bool removeCanceled(Data* data) {return static_cast<Child*>(this)->removeItem(data);}
 	inline bool hasJob();
 
-	virtual RemoveResult remove(IoJob* job) override final
+	virtual RemoveResult remove(IoJob* job, typename IoJob::Result result) override final
 	{
 		auto self = static_cast<Child*>(this);
 
@@ -84,13 +85,20 @@ class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
 			return RemoveResult::Raced;
 		}
 
-		bool ok = self->removeItem(job->data);
+		if(result == IoJob::Result::Done) {
+			if(!self->removeItem(job->data))
+				return RemoveResult::NotPresent;
+		} else {
+			if(!self->removeCanceled(job->data))
+				return RemoveResult::Denied;
+		}
+
 		job->channel = nullptr;
 
 		if(self->hasJob())
 			self->enableProcess();
 
-		return ok ? RemoveResult::Ok : RemoveResult::NotPresent;
+		return RemoveResult::Ok;
 	}
 
 	virtual bool add(IoJob* job) override final
@@ -111,12 +119,12 @@ protected:
 		 * TODO describe relevance in locking mechanism of removeSynchronized.
 		 */
 
-
 		data->job->channel = nullptr;
 
 		Profile::memoryFence();
 
-		self->removeItem(data);
+		bool ok = self->removeItem(data);
+		assert(ok, ErrorStrings::ioRequestState);
 
 		if(!self->hasJob())
 			self->disableProcess();

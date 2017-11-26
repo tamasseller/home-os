@@ -1,7 +1,7 @@
 /*
  * TxPacket.h
  *
- *  Created on: 2017.11.21.
+ *  Created on: 2017.11.26.
  *      Author: tooma
  */
 
@@ -11,10 +11,8 @@
 #include "Network.h"
 
 template<class S, class... Args>
-class Network<S, Args...>::TxPacket: public Os::IoJob::Data, public Packet {
-    friend class Network<S, Args...>;
-    friend class pet::LinkedList<TxPacket>;
-    TxPacket *next;
+struct Network<S, Args...>::TxPacket: Packet, Os::IoJob::Data {
+	TxPacket *next;
 };
 
 #endif /* TXPACKET_H_ */

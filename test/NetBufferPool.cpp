@@ -24,13 +24,13 @@
 using Os = OsRr;
 
 TEST_GROUP(NetBufferPool) {
-	typedef BufferPool<Os, 10, 10> Pool;
+	typedef BufferPool<Os, 10, 1> Pool;
 
 	class PoolJob: public Os::IoJob, Pool::IoData {
 		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
 			if(result == Os::IoJob::Result::Done) {
 				auto self = static_cast<PoolJob*>(item);
-				self->result = self->first;
+				self->result = static_cast<Pool::Block*>(self->first);
 			}
 
 			return false;

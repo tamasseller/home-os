@@ -137,7 +137,6 @@ struct SchedulerOptions {
 		template<class Syscall, class... T> static uintptr_t syscall(T...);
 		template<class Syscall, class... T> static inline uintptr_t conditionalSyscall(T... );
 
-		static inline void assert(bool, const char*);
 
 		/**
 		 * Utility method, used for re-initialization of an object.
@@ -193,6 +192,8 @@ struct SchedulerOptions {
 			PreemptionEvent preemptionEvent;
 		} state;
 	public:
+
+		static inline void assert(bool, const char*);
 
 		void static submitEvent(Event*);
 

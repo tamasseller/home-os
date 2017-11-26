@@ -62,7 +62,7 @@ private:
 
 			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
 
-			typename IoChannel::RemoveResult removeResult = channel->remove(this);
+			typename IoChannel::RemoveResult removeResult = channel->remove(this, result);
 			if(removeResult == IoChannel::RemoveResult::Raced)
 				continue;
 
@@ -70,9 +70,11 @@ private:
 			 * This operation must not fail because the channel pointer
 			 * is acquired exclusively
 			 */
-			assert(removeResult == IoChannel::RemoveResult::Ok, ErrorStrings::ioRequestState);
+			assert(removeResult != IoChannel::RemoveResult::NotPresent, ErrorStrings::ioRequestState);
 
-			finished(this, result, nullptr);
+			if(removeResult == IoChannel::RemoveResult::Ok)
+				finished(this, result, nullptr);
+
 			break;
 		}
 	}
