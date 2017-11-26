@@ -27,7 +27,7 @@ public:
 template<class S, class... Args>
 class Network<S, Args...>::RoutingTable: SharedTable<Os, Route, routingTableEntries> {
 public:
-	bool add(const Route& route) {
+	inline bool add(const Route& route) {
 	    auto entry = this->findOrAllocate([&route](Route* other){
 	        return route.net == other->net && route.src == other->src && route.dev == other->dev && route.mask == other->mask;
 	    });
@@ -42,7 +42,7 @@ public:
 		return true;
 	}
 
-	Route* findRoute(const AddressIp4& dst)
+	inline Route* findRoute(const AddressIp4& dst)
 	{
 	    auto entry = this->findBest([&dst](Route* route){
             return (route->net / route->mask != dst / route->mask) ? 0 : (route->mask << 8) | route->metric;
@@ -53,8 +53,10 @@ public:
 
 	    return entry->getData();
 	}
+
+	inline void releaseRoute(Route* route) {
+		this->entryFromData(route)->release();
+	}
 };
-
-
 
 #endif /* ROUTING_H_ */

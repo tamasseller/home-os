@@ -15,12 +15,11 @@ template<int id = 0>
 class DummyIf {
 	static constexpr size_t txBufferCount = 64;
 	static constexpr size_t txBufferSize = 64;
-	static constexpr size_t arpCacheEnties = 8;
+	static constexpr size_t arpCacheEntries = 8;
 
 	struct TxHeader {
 		char dummyByte;
 		TxHeader* next;
-		short dummyHalf;
 
 		static inline TxHeader* &accessNext(TxHeader* header) {
 			return header->next;
@@ -52,6 +51,7 @@ class DummyIf {
 	};
 
 public:
+	static constexpr size_t arpReqTimeout = 100;
 	static constexpr OsRr::IoChannel& allocator = pools.txPool;
 	static constexpr auto& standardPacketOperations = ChunkedPacket<TxChunkInfo>::operations;
 	inline static void enableTxIrq();
@@ -64,7 +64,8 @@ typename DummyIf<id>::Pools DummyIf<id>::pools;
 
 
 using Net = Network<OsRr,
-		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf<0>>>
+		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf<0>>>,
+		NetworkOptions::ArpRequestRetry<3>
 >;
 
 template<int id>

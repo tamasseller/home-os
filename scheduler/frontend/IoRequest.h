@@ -64,8 +64,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	}
 
 	/*
-	 * This two method are never called during normal operation, so
-	 * LCOV_EXCL_START is placed here to exclude them from coverage analysis
+	 * Never called during normal operation. ( LCOV_EXCL_START )
 	 */
 
 	virtual bool release(uintptr_t arg) override final {
@@ -74,8 +73,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	}
 
 	/*
-	 * From here on, the rest should be check for test coverage, so
-	 * LCOV_EXCL_STOP is placed here.
+	 * The rest should be check for test coverage. ( LCOV_EXCL_STOP )
 	 */
 
     virtual Blocker* getTakeable(Task*) override final {
@@ -128,17 +126,22 @@ class Scheduler<Args...>::IoRequest:
 	}
 
 	// TODO move to parent
-	virtual bool continuation(uintptr_t) override final
+	virtual bool continuation(uintptr_t retval) override final
 	{
-		if(this->result == IoJob::Result::NotYet)
+	    typename IoJob::Result result = this->result;
+
+		if(result == IoJob::Result::NotYet)// TODO fix WaitableSet, then use: if(!(bool)retval)
 			return false;
 
-	    typename IoJob::Result result = this->result;
 	    this->result = IoJob::Result::NotYet;
 		return hijackedMethod(this, result, &IoRequest::hijack);
 	}
 
 public:
+	inline bool shouldWait() {
+		return this->isOccupied() || this->result != IoJob::Result::NotYet;
+	}
+
 	inline void init() {
 		resetObject(this);
 		Registry<IoRequestCommon>::registerObject(this);

@@ -32,6 +32,9 @@ TEST(IoRequestAlreadyDone) {
 				return;
 			}
 
+			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++)
+				if(!reqs[i].shouldWait()) { error = true; return; }
+
 			process.counter = 3;
 
 			Os::sleep(10);
@@ -42,7 +45,9 @@ TEST(IoRequestAlreadyDone) {
 			}
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
+				if(!reqs[i].shouldWait()) { error = true; return; }
 				reqs[i].wait();
+				if(reqs[i].shouldWait()) { error = true; return; }
 
 				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
 					error = true;

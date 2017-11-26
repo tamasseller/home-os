@@ -10,24 +10,7 @@
 
 #include <stddef.h>
 
-class Chunk {
-	char *startPtr, *endPtr;
-public:
 
-	inline Chunk(char *start, char *end): startPtr(start), endPtr(end) {}
-
-	inline size_t length() {
-		return endPtr - startPtr;
-	}
-
-	inline char* begin() {
-		return startPtr;
-	}
-
-	inline char* end() {
-		return endPtr;
-	}
-};
 
 
 

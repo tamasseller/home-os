@@ -33,12 +33,19 @@ TEST(IoChannel) {
 			}
 
 			Os::sleep(50);
+
+			for(int i = 0; i < 5; i++)
+				if(!jobs[i].isOccupied()) { error = true; return; }
+
 			process.counter = 5;
 
 			if(checkJobs() != 5) {
 				error = true;
 				return;
 			}
+
+			for(int i = 0; i < 5; i++)
+				if(jobs[i].isOccupied()) { error = true; return; }
 
 			for(int i = 0; i < 5; i++) {
 				if(jobs[i].count != 5 - i) {

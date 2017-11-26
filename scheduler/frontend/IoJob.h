@@ -158,9 +158,12 @@ private:
 		return true;
     }
 
-protected:
+public:
+	inline bool isOccupied() {
+		return this->channel != nullptr;
+	}
 
-	inline bool submit(void (*hook)(IoJob*), IoChannel* channel, Callback callback, Data* data) {
+	inline bool submit(Hook hook, IoChannel* channel, Callback callback, Data* data) {
 		if(!takeOver(hook, channel, callback, data))
 			return false;
 
@@ -183,8 +186,6 @@ protected:
 
 		return true;
 	}
-
-public:
 
 	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
 

@@ -16,8 +16,9 @@ TEST(NetPacketAllocation, Simple) {
 		bool error = false;
 
 		void run() {
-			Net::UdpTransmission tx;
-			tx.prepare(AddressIp4::make(10, 10, 10, 10), 1234, 5678, 6);
+			Net::IpTransmission tx;
+			tx.init();
+			tx.prepare(AddressIp4::make(10, 10, 10, 10), 6);
 			tx.fill("foobar", 6);
 			tx.send();
 		}

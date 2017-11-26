@@ -114,6 +114,8 @@ public:
 	class ObjectBase {};
 	struct Root {};
 
+	static inline bool add(Object* object) {return false;}
+	static inline bool remove(Object* object) {return false;}
 	static inline void registerObject(Object* object) {}
 	static inline void unregisterObject(Object* object) {}
 	static inline void check(Object* object) {}

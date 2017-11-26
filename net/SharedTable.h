@@ -134,9 +134,12 @@ struct SharedTable {
         Entry entries[nItems];
 
     public:
+        static inline Entry* entryFromData(Data* data) {
+        	return static_cast<Entry*>(reinterpret_cast<DataContainer*>(data));
+        }
 
         template<class C>
-        Entry* findOrAllocate(C&& c)
+        inline Entry* findOrAllocate(C&& c)
         {
             Entry* empty = nullptr;
 
@@ -172,7 +175,7 @@ struct SharedTable {
         }
 
         template<class C>
-        Entry* findBest(C&& c)
+        inline Entry* findBest(C&& c)
         {
             Entry* best = nullptr;
             uintptr_t metric = 0;
@@ -197,7 +200,7 @@ struct SharedTable {
         }
 
         template<class C>
-        Entry* find(C&& c)
+        inline Entry* find(C&& c)
         {
             for(Entry* entry = entries; entry < entries + nItems; entry++) {
                 if(entry->takeIfValid()) {

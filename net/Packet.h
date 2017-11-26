@@ -8,10 +8,26 @@
 #ifndef PACKET_H_
 #define PACKET_H_
 
-#include "Chunk.h"
+class Chunk {
+	char *startPtr, *endPtr;
+public:
+
+	inline Chunk(char *start, char *end): startPtr(start), endPtr(end) {}
+
+	inline size_t length() {
+		return endPtr - startPtr;
+	}
+
+	inline char* begin() {
+		return startPtr;
+	}
+
+	inline char* end() {
+		return endPtr;
+	}
+};
 
 // TODO change visibility
-
 struct Packet
 {
 	struct Point {
@@ -105,7 +121,7 @@ class ChunkedPacket
 	}
 
 	static void dispose(Packet* packet) {
-		Child::dispose(packet);
+		Child::dispose(packet->first);
 	}
 
 public:
