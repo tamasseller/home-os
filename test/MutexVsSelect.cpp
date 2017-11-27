@@ -28,7 +28,7 @@ namespace {
 
 	struct T1: public TestTask<T1, OsRrPrio> {
 		volatile int counter = -1;
-		void run() {
+		bool run() {
 			*tp++ = 'a';
 			OsRrPrio::sleep(10);
 			*tp++ = 'f';
@@ -36,21 +36,25 @@ namespace {
 			*tp++ = 'i';
 			mutex.unlock();
 			*tp++ = 'j';
+
+			return ok;
 		}
 	} t1;
 
 	struct T2: public TestTask<T2, OsRrPrio> {
 		volatile int counter = -1;
-		void run() {
+		bool run() {
 			*tp++ = 'b';
 			OsRrPrio::select(&sem);
 			*tp++ = 'm';
+
+			return ok;
 		}
 	} t2;
 
 	struct T3: public TestTask<T3, OsRrPrio> {
 		volatile int counter = -1;
-		void run() {
+		bool run() {
 			*tp++ = 'c';
 			mutex.lock();
 			*tp++ = 'd';
@@ -58,12 +62,14 @@ namespace {
 			*tp++ = 'h';
 			mutex.unlock();
 			*tp++ = 'k';
+
+			return ok;
 		}
 	} t3;
 
 	struct T4: public TestTask<T4, OsRrPrio> {
 		volatile int counter = -1;
-		void run() {
+		bool run() {
 			*tp++ = 'e';
 			OsRrPrio::sleep(20);
 			*tp++ = 'g';
@@ -71,6 +77,8 @@ namespace {
 			*tp++ = 'l';
 			sem.notifyFromTask();
 			*tp++ = 'n';
+
+			return ok;
 		}
 	} t4;
 }

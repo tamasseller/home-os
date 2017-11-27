@@ -26,14 +26,16 @@ namespace {
 
 	struct Task: public TestTask<Task> {
 		volatile int counter = -1;
-		void run() {
-			for(counter = 0; counter < UINT16_MAX/nTasks; counter++) {
+		bool run() {
+			for(counter = 0; counter < 4096/nTasks; counter++) {
 				mutex.lock();
 				mutex.lock(); 		// recursive relocking
 				data.update();
 				mutex.unlock();
 				mutex.unlock();
 			}
+
+			return ok;
 		}
 	} t[nTasks];
 }
@@ -46,5 +48,5 @@ TEST(SingleMutex) {
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(UINT16_MAX/nTasks*nTasks));
+	CHECK(data.check(4096/nTasks*nTasks));
 }

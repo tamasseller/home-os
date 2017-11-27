@@ -22,13 +22,12 @@
 namespace {
 	constexpr auto nTasks = 2;
 	int data[nTasks] = {0,};
-	static bool error = false;
 
 	struct Task: public TestTask<Task> {
-		void run();
+		bool run();
 	} t[nTasks];
 
-	void Task::run() {
+	bool Task::run() {
 		uintptr_t selfIdx = this - t;
 		for(int i = 0; i < 1000; i++) {
 			data[selfIdx]++;
@@ -37,9 +36,9 @@ namespace {
 
 		for(auto i = 0u; i < nTasks; i++)
 			if(i != selfIdx && data[i])
-				return;
+				return Task::TestTask::ok;
 
-		error = true;
+		return Task::TestTask::bad;
 	}
 }
 
@@ -52,5 +51,6 @@ TEST(Yield) {
 	for(int i = 0; i < nTasks; i++)
 		CHECK(data[i] == 1000);
 
-	CHECK(!error);
+	for(int i = 0; i < nTasks; i++)
+		CHECK(!t[i].error);
 }

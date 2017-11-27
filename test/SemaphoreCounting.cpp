@@ -27,11 +27,13 @@ namespace {
 	struct Task: public TestTask<Task, OsRrPrio> {
 		int counter = 0;
 
-		void run() {
-			for(int i = 0; i < 150; i++) {
+		bool run() {
+			for(int i = 0; i < 15; i++) {
 				sem.wait();
 				counter++;
 			}
+
+			return ok;
 		}
 	} t1, t2;
 
@@ -42,7 +44,7 @@ namespace {
 		sem.notifyFromInterrupt();
 		sem.notifyFromInterrupt();
 
-		if(++irqCounter == 100) {
+		if(++irqCounter == 10) {
 			CommonTestUtils::registerIrq(nullptr);
 		}
 	}
@@ -57,7 +59,7 @@ TEST(SemaphoreCounting) {
 	CommonTestUtils::start<OsRrPrio>();
 
 	CHECK(!error);
-	CHECK(t1.counter == 150);
-	CHECK(t2.counter == 150);
-	CHECK(irqCounter == 100);
+	CHECK(t1.counter == 15);
+	CHECK(t2.counter == 15);
+	CHECK(irqCounter == 10);
 }

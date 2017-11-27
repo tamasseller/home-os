@@ -22,25 +22,27 @@
 namespace {
 	static typename OsRrPrio::BinarySemaphore sem;
 
-	bool error = false;
-
 	struct TWaiter: public TestTask<TWaiter, OsRrPrio> {
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < 15000; i++) {
+		bool run() {
+			for(int i = 0; i < 1500; i++) {
 				sem.wait();
 				counter++;
 			}
+
+			return ok;
 		}
 	} t1, t2;
 
 	struct TSender: public TestTask<TSender, OsRrPrio> {
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < 10000; i++) {
+		bool run() {
+			for(int i = 0; i < 1000; i++) {
 				sem.notifyFromTask();
 				counter++;
 			}
+
+			return ok;
 		}
 	} t3, t4, t5;
 }
@@ -55,11 +57,10 @@ TEST(SemaphorePrio) {
 
 	CommonTestUtils::start<OsRrPrio>();
 
-	CHECK(!error);
-	CHECK(t1.counter == 15000);
-	CHECK(t2.counter == 15000);
-	CHECK(t3.counter == 10000);
-	CHECK(t4.counter == 10000);
-	CHECK(t5.counter == 10000);
+	CHECK(t1.counter == 1500);
+	CHECK(t2.counter == 1500);
+	CHECK(t3.counter == 1000);
+	CHECK(t4.counter == 1000);
+	CHECK(t5.counter == 1000);
 }
 

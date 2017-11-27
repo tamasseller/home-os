@@ -13,14 +13,13 @@ TEST_GROUP(NetPacketAllocation) {
 
 TEST(NetPacketAllocation, Simple) {
 	struct Task: public TestTask<Task> {
-		bool error = false;
-
-		void run() {
+		bool run() {
 			Net::IpTransmission tx;
 			tx.init();
 			tx.prepare(AddressIp4::make(10, 10, 10, 10), 6);
 			tx.fill("foobar", 6);
 			tx.send();
+			return ok;
 		}
 	} task;
 

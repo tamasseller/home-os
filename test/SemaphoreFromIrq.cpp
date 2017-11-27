@@ -22,8 +22,6 @@
 namespace {
 	static typename OsRrPrio::CountingSemaphore sem;
 
-	bool error = false;
-
 	template<class Child>
 	struct Common: public TestTask<Common<Child>, OsRrPrio> {
 		int counter = 0;
@@ -36,40 +34,44 @@ namespace {
 			return counter == 201;
 		}
 
-		void run() {
+		bool run() {
 			for(int i = 0; i < 200; i++) {
 				sem.wait();
 				counter++;
 			}
 
 			counter++;
-			((Child*)this)->check();
+			return ((Child*)this)->check();
 		}
 
 	};
 
-	struct T1: Common<T1> { void check(); } t1, t2;
-	struct T2: Common<T2> { void check(); } t3, t4;
+	struct T1: Common<T1> { bool check(); } t1, t2;
+	struct T2: Common<T2> { bool check(); } t3, t4;
 
-	void T1::check() {
+	bool T1::check() {
 		bool highStarted = t1.started() && t2.started();
 		bool highFinished = t1.finished() && t2.finished();
 		bool lowNotStarted = !t3.started() || !t4.started();
 
 		if(!highStarted)
-			error = true;
+			return T1::Common::TestTask::bad;
 
 		if(!highFinished)
 			if(!lowNotStarted)
-				error = true;
+				return T1::Common::TestTask::bad;
+
+		return T1::Common::TestTask::ok;
 	}
 
-	void T2::check() {
+	bool T2::check() {
 		bool highFinished = t1.finished() && t2.finished();
 		bool lowStarted = t3.started() && t4.started();
 
 		if(!(highFinished && lowStarted))
-			error = true;
+			return T1::Common::TestTask::bad;
+
+		return T1::Common::TestTask::ok;
 	}
 
 	int irqCounter = 0;
@@ -94,10 +96,9 @@ TEST(SemaphoreFromIrq) {
 	CommonTestUtils::registerIrq(irq);
 	CommonTestUtils::start<OsRrPrio>();
 
-	CHECK(!error);
-	CHECK(t1.finished());
-	CHECK(t2.finished());
-	CHECK(t3.finished());
-	CHECK(t4.finished());
+	CHECK(!t1.error && t1.finished());
+	CHECK(!t2.error && t2.finished());
+	CHECK(!t3.error && t3.finished());
+	CHECK(!t4.error && t4.finished());
 	CHECK(irqCounter == 400);
 }

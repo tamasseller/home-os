@@ -22,17 +22,16 @@
 namespace SemaphorePassaround {
 	typedef typename OsRr::BinarySemaphore Semaphore;
 	static SharedData<16> data;
-	bool error = false;
 
 	struct Task: public TestTask<Task> {
 		Semaphore &sPend, &sSend;
 		int counter = 0;
 		bool to;
-		void run() {
-			for(int i = 0; i < UINT16_MAX/3; i++) {
+		bool run() {
+			for(int i = 0; i < UINT16_MAX/30; i++) {
 				if(to) {
 					if(!sPend.wait(100))
-						error = true;
+						return bad;
 				}else
 					sPend.wait();
 
@@ -40,6 +39,8 @@ namespace SemaphorePassaround {
 				sSend.notifyFromTask();
 				counter++;
 			}
+
+			return ok;
 		}
 
 		Task(Semaphore &sPend, Semaphore &sSend): sPend(sPend), sSend(sSend) {}
@@ -78,10 +79,10 @@ TEST(SemaphorePassaround)
 
 	CommonTestUtils::start();
 
-	CHECK(t1.counter == UINT16_MAX/3);
-	CHECK(t2.counter == UINT16_MAX/3);
-	CHECK(t3.counter == UINT16_MAX/3);
-	CHECK(data.check(UINT16_MAX/3*3));
+	CHECK(!t1.error && t1.counter == UINT16_MAX/30);
+	CHECK(!t2.error && t2.counter == UINT16_MAX/30);
+	CHECK(!t3.error && t3.counter == UINT16_MAX/30);
+	CHECK(data.check(UINT16_MAX/30*3));
 }
 
 
@@ -100,11 +101,9 @@ TEST(SemaphorePassaroundWithTimeout)
 
 	CommonTestUtils::start();
 
-	CHECK(!error);
-
-	CHECK(t1.counter == UINT16_MAX/3);
-	CHECK(t2.counter == UINT16_MAX/3);
-	CHECK(t3.counter == UINT16_MAX/3);
-	CHECK(data.check(UINT16_MAX/3*3));
+	CHECK(!t1.error && t1.counter == UINT16_MAX/30);
+	CHECK(!t2.error && t2.counter == UINT16_MAX/30);
+	CHECK(!t3.error && t3.counter == UINT16_MAX/30);
+	CHECK(data.check(UINT16_MAX/30*3));
 }
 

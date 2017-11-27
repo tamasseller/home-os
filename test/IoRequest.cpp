@@ -25,35 +25,27 @@ using Base = DummyProcessJobsBase<Os>;
 
 TEST(IoRequestAlreadyDone) {
 	struct Task: public TestTask<Task>, Base  {
-		bool error = false;
-		void run() {
-			if(!postReqsNoTimeout()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postReqsNoTimeout()) return bad;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++)
-				if(!reqs[i].shouldWait()) { error = true; return; }
+				if(!reqs[i].shouldWait()) return bad;
 
 			process.counter = 3;
 
 			Os::sleep(10);
 
-			if(process.counter) {
-				error = true;
-				return;
-			}
+			if(process.counter) return bad;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
-				if(!reqs[i].shouldWait()) { error = true; return; }
+				if(!reqs[i].shouldWait()) return bad;
 				reqs[i].wait();
-				if(reqs[i].shouldWait()) { error = true; return; }
+				if(reqs[i].shouldWait()) return bad;
 
-				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
-					error = true;
-					return;
-				}
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) return bad;
 			}
+
+			return ok;
 		}
 	} task;
 
@@ -65,32 +57,24 @@ TEST(IoRequestAlreadyDone) {
 
 TEST(IoRequestWaitTimeout) {
 	struct Task: public TestTask<Task>, Base  {
-		bool error = false;
-		void run() {
-			if(!postReqsNoTimeout()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postReqsNoTimeout()) return bad;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				bool ok = reqs[i].wait(10);
 
-				if(ok) {
-					error = true;
-					return;
-				}
+				if(ok) return bad;
 			}
 
-			process.counter = 3;
+			process.counter = 5;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				bool ok = reqs[i].wait(10);
 
-				if(!ok || reqs[i].success != (int)Os::IoJob::Result::Done) {
-					error = true;
-					return;
-				}
+				if(!ok || reqs[i].success != (int)Os::IoJob::Result::Done) return bad;
 			}
+
+			return ok;
 		}
 	} task;
 
@@ -102,23 +86,18 @@ TEST(IoRequestWaitTimeout) {
 
 TEST(IoRequestWaitNoTimeout) {
 	struct Task: public TestTask<Task>, Base  {
-		bool error = false;
-		void run() {
-			if(!postReqsNoTimeout()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postReqsNoTimeout()) return bad;
 
 			process.counter = 3;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
 
-				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
-					error = true;
-					return;
-				}
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) return bad;
 			}
+
+			return ok;
 		}
 	} task;
 
@@ -130,35 +109,24 @@ TEST(IoRequestWaitNoTimeout) {
 
 TEST(IoRequestSelect) {
 	struct Task: public TestTask<Task>, Base {
-		bool error = false;
-		void run() {
-			if(!postReqsNoTimeout()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postReqsNoTimeout()) return bad;
 
 			process.counter = 3;
 
 			auto* s1 = Os::select(&reqs[0], &reqs[1], &reqs[2]);
 
-			if(s1 != &reqs[0] || reqs[0].success != (int)Os::IoJob::Result::Done) {
-				error = true;
-				return;
-			}
+			if(s1 != &reqs[0] || reqs[0].success != (int)Os::IoJob::Result::Done) return bad;
 
 			auto* s2 = Os::select(&reqs[1], &reqs[2]);
 
-			if(s2 != &reqs[1] || reqs[1].success != (int)Os::IoJob::Result::Done) {
-				error = true;
-				return;
-			}
+			if(s2 != &reqs[1] || reqs[1].success != (int)Os::IoJob::Result::Done) return bad;
 
 			auto* s3 = Os::select(&reqs[2]);
 
-			if(s3 != &reqs[2] || reqs[2].success != (int)Os::IoJob::Result::Done) {
-				error = true;
-				return;
-			}
+			if(s3 != &reqs[2] || reqs[2].success != (int)Os::IoJob::Result::Done) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -170,23 +138,16 @@ TEST(IoRequestSelect) {
 
 TEST(IoRequestIoTimeoutSelect) {
 	struct Task: public TestTask<Task>, Base {
-		bool error = false;
-		void run() {
+		bool run() {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].init();
 				reqs[i].success = -1;
-				if(!reqs[i].startTimeout(100 + 10 * i)) {
-					error = true;
-					return;
-				}
+				if(!reqs[i].startTimeout(100 + 10 * i)) return bad;
 			}
 
 			auto* s1 = Os::select(&reqs[0], &reqs[1], &reqs[2]);
 
-			if(!s1 || static_cast<Req*>(s1)->success != (int)Os::IoJob::Result::TimedOut) {
-				error = true;
-				return;
-			}
+			if(!s1 || static_cast<Req*>(s1)->success != (int)Os::IoJob::Result::TimedOut) return bad;
 
 			process.counter = 3;
 			static_cast<Req*>(s1)->start();
@@ -194,11 +155,10 @@ TEST(IoRequestIoTimeoutSelect) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
 
-				if(reqs[i].success != (int)Os::IoJob::Result::Done) {
-					error = true;
-					return;
-				}
+				if(reqs[i].success != (int)Os::IoJob::Result::Done) return bad;
 			}
+
+			return ok;
 		}
 	} task;
 
@@ -210,8 +170,7 @@ TEST(IoRequestIoTimeoutSelect) {
 
 TEST(IoRequestMulti) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			Os::IoRequest<MultiJob<3>> multiReq;
 			multiReq.init();
 
@@ -221,7 +180,9 @@ TEST(IoRequestMulti) {
 			multiReq.wait();
 
 			for(int i=0; i<3; i++)
-				if(multiReq.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
+				if(multiReq.success[i] != (int)Os::IoJob::Result::Done) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -233,24 +194,22 @@ TEST(IoRequestMulti) {
 
 TEST(IoRequestComposite) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			Os::IoRequest<CompositeJob> compReq[2];
 
 			compReq[0].init();
 			compReq[0].start(-1, 0);
 			process.counter = 100;
 
-			if(compReq[0].wait(10)){
-				error = true;
-				return;
-			}
+			if(compReq[0].wait(10))return bad;
 
 			compReq[1].init();
 			compReq[1].start(1, 0);
 
 			compReq[0].wait();
 			compReq[1].wait();
+
+			return ok;
 		}
 	} task;
 
@@ -263,8 +222,7 @@ TEST(IoRequestComposite) {
 
 TEST(IoRequestMultiSelect) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			Os::IoRequest<MultiJob<3>> multiReq[2];
 
 			for(auto &x: multiReq) {
@@ -285,7 +243,9 @@ TEST(IoRequestMultiSelect) {
 
 			for(auto &x: multiReq)
 				for(int i=0; i<3; i++)
-					if(x.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
+					if(x.success[i] != (int)Os::IoJob::Result::Done) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -300,17 +260,13 @@ TEST(IoRequestVsMutexPrioChange)
 	OsRrPrio::Mutex m;
 
 	struct Tlow: public TestTask<Tlow, OsRrPrio>, DummyProcessJobsBase<OsRrPrio> {
-		bool error = false;
 		OsRrPrio::Mutex &m;
-		void run() {
+		bool run() {
 			m.lock();
 
 			DummyProcess<OsRrPrio>::instance.counter = 0;
 
-			if(!postReqsNoTimeout()) {
-				error = true;
-				return;
-			}
+			if(!postReqsNoTimeout()) return bad;
 
 			for(auto& x: reqs) {
 				x.wait(3);
@@ -319,25 +275,26 @@ TEST(IoRequestVsMutexPrioChange)
 
                 x.wait();
 
-				if(x.success != (int)Os::IoJob::Result::Done) {
-					error = true;
-					return;
-				}
+				if(x.success != (int)Os::IoJob::Result::Done) return bad;
 			}
 
 			m.unlock();
+
+			return ok;
 		}
 
 		Tlow(OsRrPrio::Mutex &m): m(m) {}
 	} tLow(m);
 
 	struct Thigh: public TestTask<Thigh, OsRrPrio> {
-		bool error = false;
 		OsRrPrio::Mutex &m;
-		void run() {
+		bool run() {
 			OsRrPrio::sleep(1);
+
 			m.lock();
 			m.unlock();
+
+			return ok;
 		}
 
 		Thigh(OsRrPrio::Mutex &m): m(m) {}
@@ -353,15 +310,18 @@ TEST(IoRequestVsMutexPrioChange)
 
 TEST(IoRequestCompositeTimeout) {
     struct Task: Base, public TestTask<Task> {
-        bool error = false;
-        void run() {
+        bool run() {
             Os::IoRequest<CompositeJob> req;
             req.init();
 
             req.start(1, 10);
 
             req.wait();
-            error = req.getResult() == Os::IoJob::Result::TimedOut;
+
+            if(req.getResult() == Os::IoJob::Result::TimedOut)
+            	return bad;
+
+            return ok;
         }
     } task;
 

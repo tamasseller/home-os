@@ -62,7 +62,6 @@ public:
 template<int id>
 typename DummyIf<id>::Pools DummyIf<id>::pools;
 
-
 using Net = Network<OsRr,
 		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf<0>>>,
 		NetworkOptions::ArpRequestRetry<3>

@@ -26,7 +26,7 @@ namespace {
 	uint32_t abortCounter, limit;
 
 	struct Task: public TestTask<Task> {
-		void run() {
+		bool run() {
 			while(true) {
 				abortMutex.lock();
 
@@ -35,6 +35,8 @@ namespace {
 
 				abortMutex.unlock();
 			}
+
+			return ok;
 		}
 	} abortTasks[4];
 }

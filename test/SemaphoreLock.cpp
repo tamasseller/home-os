@@ -26,12 +26,14 @@ namespace {
 	static constexpr auto nTasks = 4;
 
 	struct Task: public TestTask<Task> {
-		void run() {
-			for(int i = 0; i < UINT16_MAX/nTasks; i++) {
+		bool run() {
+			for(int i = 0; i < 4096/nTasks; i++) {
 				sem.wait();
 				data.update();
 				sem.notifyFromTask();
 			}
+
+			return Task::TestTask::ok;
 		}
 	} t[nTasks];
 }
@@ -44,5 +46,5 @@ TEST(SemaphoreLock) {
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(UINT16_MAX/nTasks*nTasks));
+	CHECK(data.check(4096/nTasks*nTasks));
 }

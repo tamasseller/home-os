@@ -21,7 +21,6 @@
 
 namespace {
 	constexpr auto nTasks = 5;
-	static bool error = false;
 
 	template<int n> struct Task;
 
@@ -30,14 +29,15 @@ namespace {
 		OsRr::BinarySemaphore sem;
 		bool done = false;
 
-		void run() {
+		bool run() {
 			CommonTestUtils::busyWorkMs(10);
 			done = true;
 			sem.notifyFromTask();
+			return Task::TestTask::ok;
 		}
 
 		bool checkDone() {
-			return done;
+			return !this->error && done;
 		}
 	};
 
@@ -47,20 +47,22 @@ namespace {
 		OsRr::BinarySemaphore sem;
 
 		bool done = false;
-		void run() {
+		bool run() {
 			startee.sem.init(false);
 			startee.start();
 			startee.sem.wait();
 
 			if(!startee.done)
-				error = true;
+				return Task::TestTask::bad;
 
 			done = true;
 			sem.notifyFromTask();
+
+			return Task::TestTask::ok;
 		}
 
 		bool checkDone() {
-			return done && startee.checkDone();
+			return !this->error && done && startee.checkDone();
 		}
 	};
 
@@ -75,5 +77,4 @@ TEST(TaskStart) {
 	root.sem.init(false);
 	CommonTestUtils::start();
 	CHECK(root.checkDone());
-	CHECK(!error);
 }

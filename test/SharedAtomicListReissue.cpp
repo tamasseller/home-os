@@ -38,13 +38,13 @@ namespace {
 
 	struct Task: public TestTask<Task> {
 
-		void run() {
+		bool run() {
 			auto combiner = [](uintptr_t old, uintptr_t &result){
 				result = old+1;
 				return true;
 			};
 
-			for(int i = 0; i < UINT16_MAX/3; i++) {
+			for(int i = 0; i < 4096/3; i++) {
 				list.push(&e1, combiner);
 				list.push(&e2, combiner);
 				list.push(&e3, combiner);
@@ -56,6 +56,8 @@ namespace {
 				while(Element* x = (Element*)it.pop(arg))
 					x->work(arg);
 			}
+
+			return ok;
 		}
 	} t1, t2, t3;
 }
@@ -68,7 +70,7 @@ TEST(AtomicListReissue) {
 	CommonTestUtils::start();
 
 	CHECK(argMax > 1);
-	CHECK(e1.data == UINT16_MAX/3*3);
-	CHECK(e2.data == UINT16_MAX/3*3);
-	CHECK(e3.data == UINT16_MAX/3*3);
+	CHECK(e1.data == 4096/3*3);
+	CHECK(e2.data == 4096/3*3);
+	CHECK(e3.data == 4096/3*3);
 }

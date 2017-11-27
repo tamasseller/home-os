@@ -55,12 +55,14 @@ TEST(Timeout, Simple)
 {
 	struct Task: public TestTask<Task> {
 		Os::TickType exit;
-		void run() {
+		bool run() {
 			for(unsigned int i=0; i < sizeof(timeouts)/sizeof(timeouts[0]); i++)
 				timeouts[i].start(10 + 3 * i);
 			while(counter != 10);
 
 			exit = (int)Os::getTick();
+
+			return ok;
 		}
 	} task;
 
@@ -82,11 +84,12 @@ TEST(Timeout, Interrupt)
 			CommonTestUtils::registerIrq(nullptr);
 		}
 
-		void run() {
-
+		bool run() {
 			CommonTestUtils::registerIrq(isr);
 			while(counter != 10);
 			exit = (int)Os::getTick();
+
+			return ok;
 		}
 	} task;
 
@@ -100,14 +103,16 @@ TEST(Timeout, Cancel)
 {
 	struct Task: public TestTask<Task> {
 		Os::TickType exit;
-		void run() {
+		bool run() {
 			for(unsigned int i=0; i < sizeof(timeouts)/sizeof(timeouts[0]); i++)
-				timeouts[i].start(100);
+				timeouts[i].start(10);
 
 			for(unsigned int i=0; i < sizeof(timeouts)/sizeof(timeouts[0]); i++)
 				timeouts[i].cancel();
 
-			Os::sleep(1000);
+			Os::sleep(100);
+
+			return ok;
 		}
 	} task;
 

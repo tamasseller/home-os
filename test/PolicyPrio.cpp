@@ -23,17 +23,15 @@ namespace {
 
 template<class Os>
 class Test {
-	struct T1: public TestTask<T1, Os> { bool done = false; bool started = false; void run(); };
-	struct T2: public TestTask<T2, Os> { bool done = false; bool started = false; void run(); };
-	struct T3: public TestTask<T3, Os> { bool done = false; bool started = false; void run(); };
+	struct T1: public TestTask<T1, Os> { bool done = false; bool started = false; bool run(); };
+	struct T2: public TestTask<T2, Os> { bool done = false; bool started = false; bool run(); };
+	struct T3: public TestTask<T3, Os> { bool done = false; bool started = false; bool run(); };
 
 	static T1 t1;
 	static T1 t2;
 	static T2 t3;
 	static T3 t4;
 	static T3 t5;
-
-	static bool error;
 
 public:
 	static void work() {
@@ -45,19 +43,13 @@ public:
 
 		CommonTestUtils::start<Os>();
 
-		CHECK(!error);
-
-		CHECK(t1.done);
-		CHECK(t2.done);
-		CHECK(t3.done);
-		CHECK(t4.done);
-		CHECK(t5.done);
+		CHECK(!t1.error && t1.done);
+		CHECK(!t2.error && t2.done);
+		CHECK(!t3.error && t3.done);
+		CHECK(!t4.error && t4.done);
+		CHECK(!t5.error && t5.done);
 	}
 };
-
-template<class Os>
-bool Test<Os>::error = false;
-
 
 template<class Os>
 typename Test<Os>::T1 Test<Os>::t1;
@@ -75,33 +67,39 @@ template<class Os>
 typename Test<Os>::T3 Test<Os>::t5;
 
 template<class Os>
-void Test<Os>::T1::run() {
+bool Test<Os>::T1::run() {
 	started = true;
-	CommonTestUtils::busyWorkMs(100);
+	CommonTestUtils::busyWorkMs(30);
 	done = true;
 
 	if(!(t1.started && t2.started && !t3.started && !t4.started && !t5.started))
-		error = true;
+		return T1::TestTask::bad;
+
+	return T1::TestTask::ok;
 }
 
 template<class Os>
-void Test<Os>::T2::run() {
+bool Test<Os>::T2::run() {
 	started = true;
-	CommonTestUtils::busyWorkMs(100);
+	CommonTestUtils::busyWorkMs(30);
 	done = true;
 
 	if(!(t1.done && t2.done && !t4.started && !t5.started))
-		error = true;
+		return T2::TestTask::bad;
+
+	return T2::TestTask::ok;
 }
 
 template<class Os>
-void Test<Os>::T3::run() {
+bool Test<Os>::T3::run() {
 	started = true;
-	CommonTestUtils::busyWorkMs(100);
+	CommonTestUtils::busyWorkMs(30);
 	done = true;
 
 	if(!(t1.done && t2.done && t3.done && t4.started && t5.started))
-		error = true;
+		return T3::TestTask::bad;
+
+	return T3::TestTask::ok;
 }
 
 }

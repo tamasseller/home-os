@@ -50,33 +50,34 @@ TEST_GROUP(NetBufferPool) {
 
 TEST(NetBufferPool, Simple) {
 	struct Task: public TestTask<Task> {
-		bool error = false;
 		Pool pool;
 		Pool::Storage storage;
 
-		void run() {
+		bool run() {
 			pool.init(storage);
 
 			PoolJob jobs[3];
 			jobs[0].start(pool, 3);
 
 			Os::sleep(1);
-			if(jobs[0].result == nullptr) {error = true; return;}
+			if(jobs[0].result == nullptr) return bad;
 
 			jobs[1].start(pool, 4);
 
 			Os::sleep(1);
-			if(jobs[1].result == nullptr) {error = true; return;}
+			if(jobs[1].result == nullptr) return bad;
 
 			jobs[2].start(pool, 5);
 
 			Os::sleep(1);
-			if(jobs[2].result != nullptr) {error = true; return;}
+			if(jobs[2].result != nullptr) return bad;
 
 			pool.reclaim(jobs[0].result);
 
 			Os::sleep(1);
-			if(jobs[2].result == nullptr) {error = true; return;}
+			if(jobs[2].result == nullptr) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -87,39 +88,40 @@ TEST(NetBufferPool, Simple) {
 
 TEST(NetBufferPool, Ordering) {
 	struct Task: public TestTask<Task> {
-		bool error = false;
 		Pool pool;
 		Pool::Storage storage;
 
-		void run() {
+		bool run() {
 			PoolJob jobs[4];
 			pool.init(storage);
 
 			jobs[0].start(pool, 5);
 			Os::sleep(1);
-			if(jobs[0].result == nullptr) {error = true; return;}
+			if(jobs[0].result == nullptr) return bad;
 
 			jobs[1].start(pool, 5);
 			Os::sleep(1);
-			if(jobs[1].result == nullptr) {error = true; return;}
+			if(jobs[1].result == nullptr) return bad;
 
 			jobs[2].start(pool, 6);
 			Os::sleep(1);
-			if(jobs[2].result != nullptr) {error = true; return;}
+			if(jobs[2].result != nullptr) return bad;
 
 			jobs[3].start(pool, 4);
 			Os::sleep(1);
-			if(jobs[3].result != nullptr) {error = true; return;}
+			if(jobs[3].result != nullptr) return bad;
 
 			pool.reclaim(jobs[0].result);
 			Os::sleep(1);
-			if(jobs[2].result != nullptr) {error = true; return;}
-			if(jobs[3].result != nullptr) {error = true; return;}
+			if(jobs[2].result != nullptr) return bad;
+			if(jobs[3].result != nullptr) return bad;
 
 			pool.reclaim(jobs[1].result);
 			Os::sleep(1);
-			if(jobs[2].result == nullptr) {error = true; return;}
-			if(jobs[3].result == nullptr) {error = true; return;}
+			if(jobs[2].result == nullptr) return bad;
+			if(jobs[3].result == nullptr) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -130,38 +132,39 @@ TEST(NetBufferPool, Ordering) {
 
 TEST(NetBufferPool, Cancelation) {
 	struct Task: public TestTask<Task> {
-		bool error = false;
 		Pool pool;
 		Pool::Storage storage;
 
-		void run() {
+		bool run() {
 			PoolJob jobs[4];
 			pool.init(storage);
 
 			jobs[0].start(pool, 5);
 			Os::sleep(1);
-			if(jobs[0].result == nullptr) {error = true; return;}
+			if(jobs[0].result == nullptr) return bad;
 
 			jobs[1].start(pool, 5);
 			Os::sleep(1);
-			if(jobs[1].result == nullptr) {error = true; return;}
+			if(jobs[1].result == nullptr) return bad;
 
 			jobs[2].start(pool, 6);
 			Os::sleep(1);
-			if(jobs[2].result != nullptr) {error = true; return;}
+			if(jobs[2].result != nullptr) return bad;
 
 			jobs[3].start(pool, 4);
 			Os::sleep(1);
-			if(jobs[3].result != nullptr) {error = true; return;}
+			if(jobs[3].result != nullptr) return bad;
 
 			pool.reclaim(jobs[0].result);
 			Os::sleep(1);
-			if(jobs[2].result != nullptr) {error = true; return;}
-			if(jobs[3].result != nullptr) {error = true; return;}
+			if(jobs[2].result != nullptr) return bad;
+			if(jobs[3].result != nullptr) return bad;
 
 			jobs[2].cancel();
 			Os::sleep(1);
-			if(jobs[3].result == nullptr) {error = true; return;}
+			if(jobs[3].result == nullptr) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -169,3 +172,4 @@ TEST(NetBufferPool, Cancelation) {
 	CommonTestUtils::start();
 	CHECK(!task.error);
 }
+

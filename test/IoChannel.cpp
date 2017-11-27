@@ -25,34 +25,25 @@ using Base = DummyProcessJobsBase<Os>;
 
 TEST(IoChannel) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
-			if(!postJobsNoTimeout()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postJobsNoTimeout()) return bad;
 
 			Os::sleep(50);
 
 			for(int i = 0; i < 5; i++)
-				if(!jobs[i].isOccupied()) { error = true; return; }
+				if(!jobs[i].isOccupied()) return bad;
 
 			process.counter = 5;
 
-			if(checkJobs() != 5) {
-				error = true;
-				return;
-			}
+			if(checkJobs() != 5) return bad;
 
 			for(int i = 0; i < 5; i++)
-				if(jobs[i].isOccupied()) { error = true; return; }
+				if(jobs[i].isOccupied()) return bad;
 
-			for(int i = 0; i < 5; i++) {
-				if(jobs[i].count != 5 - i) {
-					error = true;
-					return;
-				}
-			}
+			for(int i = 0; i < 5; i++)
+				if(jobs[i].count != 5 - i) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -64,21 +55,16 @@ TEST(IoChannel) {
 
 TEST(IoChannelTimeout) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			for(int i=sizeof(jobs)/sizeof(jobs[0]); i>=0; i--) {
 
-				if(!postJobs()) {
-					error = true;
-					return;
-				}
+				if(!postJobs()) return bad;
 
 				process.counter = i;
 
-				if(checkJobs() != i) {
-					error = true;
-					return;
-				}
+				if(checkJobs() != i) return bad;
+
+				return ok;
 			}
 		}
 	} task;
@@ -91,18 +77,16 @@ TEST(IoChannelTimeout) {
 
 TEST(IoChannelTimeoutDoTimout) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
-			if(!postJobs()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postJobs()) return bad;
 
 			Os::sleep(110);
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
 				if(jobs[i].success != (int)Os::IoJob::Result::TimedOut)
-					error = true;
+					return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -114,12 +98,8 @@ TEST(IoChannelTimeoutDoTimout) {
 
 TEST(IoChannelTimeoutCancel) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
-			if(!postJobs()) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(!postJobs()) return bad;
 
 			Os::sleep(40);
 
@@ -134,7 +114,9 @@ TEST(IoChannelTimeoutCancel) {
 
 			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
 				if(jobs[i].success != (int)Os::IoJob::Result::Canceled)
-					error = true;
+					return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -146,8 +128,7 @@ TEST(IoChannelTimeoutCancel) {
 
 TEST(IoChannelMulti) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			MultiJob<3> multiJob;
 			multiJob.start();
 			process.counter = 3;
@@ -155,7 +136,9 @@ TEST(IoChannelMulti) {
 			while(multiJob.idx){}
 
 			for(int i=0; i<3; i++)
-				if(multiJob.success[i] != (int)Os::IoJob::Result::Done) {error = true; return;}
+				if(multiJob.success[i] != (int)Os::IoJob::Result::Done) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -167,31 +150,20 @@ TEST(IoChannelMulti) {
 
 TEST(IoChannelErrors) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
-			if(jobs[0].startTimeout(0)) {
-				error = true;
-				return;
-			}
+		bool run() {
+			if(jobs[0].startTimeout(0)) return bad;
 
-			if(jobs[0].startTimeout((uintptr_t)-1)) {
-				error = true;
-				return;
-			}
+			if(jobs[0].startTimeout((uintptr_t)-1)) return bad;
 
-			if(!jobs[0].start()) {
-				error = true;
-				return;
-			}
+			if(!jobs[0].start()) return bad;
 
-			if(jobs[0].start()) {
-				error = true;
-				return;
-			}
+			if(jobs[0].start()) return bad;
 
 			process.counter = 1;
 
 			while(jobs[0].success != (int)Os::IoJob::Result::Done) {}
+
+			return ok;
 		}
 	} task;
 
@@ -203,41 +175,42 @@ TEST(IoChannelErrors) {
 
 TEST(IoSemaphoreChannel) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			SemJob jobs[3];
 
 			jobs[0].start(1);
 
-			if(!jobs[0].done) {error = true; return;}	// 1
+			if(!jobs[0].done) return bad;	// 1
 
 			jobs[0].start(-1);
 
-			if(!jobs[0].done) {error = true; return;}	// 0
+			if(!jobs[0].done) return bad;	// 0
 
 			jobs[0].start(-1);
 
-			if(jobs[0].done) {error = true; return;}	// 0
+			if(jobs[0].done) return bad;	// 0
 
 			jobs[1].start(2);
 
-			if(!jobs[1].done) {error = true; return;}	// 2
-			if(!jobs[0].done) {error = true; return;}	// 1
+			if(!jobs[1].done) return bad;	// 2
+			if(!jobs[0].done) return bad;	// 1
 
 			jobs[0].start(-2);
 
-			if(jobs[0].done) {error = true; return;}	// 1
+			if(jobs[0].done) return bad;	// 1
 
 			jobs[1].start(-1);
 
-			if(jobs[0].done) {error = true; return;}	// 1
-			if(jobs[1].done) {error = true; return;}	// 1
+			if(jobs[0].done) return bad;	// 1
+			if(jobs[1].done) return bad;	// 1
 
 			jobs[2].start(3);
 
-			if(!jobs[2].done) {error = true; return;}	// 3
-			if(!jobs[0].done) {error = true; return;}	// 1
-			if(!jobs[1].done) {error = true; return;}	// 0
+			if(!jobs[2].done) return bad;	// 3
+			if(!jobs[0].done) return bad;	// 1
+			if(!jobs[1].done) return bad;	// 0
+
+			return ok;
 		}
 	} task;
 
@@ -249,35 +222,34 @@ TEST(IoSemaphoreChannel) {
 
 TEST(IoChannelComposite) {
 	struct Task: Base, public TestTask<Task> {
-		bool error = false;
-		void run() {
+		bool run() {
 			CompositeJob jobs[3];
 
 			jobs[0].start(-2, 0);
 			jobs[1].start(-1, 0);
 			jobs[2].start(1, 0);
 
-			if(jobs[0].stage != 0) {error = true; return;}
-			if(jobs[1].stage != 0) {error = true; return;}
-			if(jobs[2].stage != 1) {error = true; return;}
+			if(jobs[0].stage != 0) return bad;
+			if(jobs[1].stage != 0) return bad;
+			if(jobs[2].stage != 1) return bad;
 
 			process.counter = 1;
 
 			Os::sleep(10);
 
-			if(jobs[2].stage != 2) {error = true; return;}
+			if(jobs[2].stage != 2) return bad;
 
 			jobs[2].start(1, 0);
 
-			if(jobs[0].stage != 1) {error = true; return;}
-			if(jobs[2].stage != 1) {error = true; return;}
+			if(jobs[0].stage != 1) return bad;
+			if(jobs[2].stage != 1) return bad;
 
 			process.counter = 2;
 
 			Os::sleep(10);
 
-			if(jobs[0].stage != 2) {error = true; return;}
-			if(jobs[2].stage != 2) {error = true; return;}
+			if(jobs[0].stage != 2) return bad;
+			if(jobs[2].stage != 2) return bad;
 
 			process.counter = 100;
 
@@ -285,7 +257,9 @@ TEST(IoChannelComposite) {
 
 			Os::sleep(10);
 
-			if(jobs[1].stage != 2) {error = true; return;}
+			if(jobs[1].stage != 2) return bad;
+
+			return ok;
 		}
 	} task;
 
@@ -298,13 +272,14 @@ TEST(IoChannelComposite) {
 
 TEST(IoChannelCompositeTimeout) {
     struct Task: Base, public TestTask<Task> {
-        bool error = false;
-        void run() {
+        bool run() {
             CompositeJob job;
 
             job.start(1, 10);
 
             while(!job.timedOut) {}
+
+			return ok;
         }
     } task;
 

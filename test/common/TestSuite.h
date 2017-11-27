@@ -35,18 +35,24 @@ class TestSuite {
 		}
 	} output;
 
-	static struct Calibrator: TestTask<Calibrator>{
+	static struct Calibrator: OsRr::Task {
 	    inline void run() {
 	        CommonTestUtils::calibrate();
+	    }
+
+	    inline void start() {
+	    	this->OsRr::Task::template start<Calibrator, &Calibrator::run>(StackPool::get(), testStackSize);
 	    }
 	} calibrator;
 
 public:
+
 	static int runTests(uintptr_t tickFreq) {
 		CommonTestUtils::startParam = tickFreq;
 
 		calibrator.start();
 		CommonTestUtils::start();
+		StackPool::clear();
 
 		OsTestPlugin plugin;
 		pet::TestRunner::installPlugin(&plugin);

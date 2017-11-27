@@ -27,18 +27,20 @@ namespace {
 	char trace[32] = {'\0',}, * volatile tp = trace;
 
 	struct T0: public TestTask<T0, OsRt4> {
-		void run() {
+		bool run() {
 			*tp++ = 'a';
 			OsRt4::sleep(30);
 			*tp++ = 'h';
 			m2.lock();
 			*tp++ = 'k';
 			m2.unlock();
+
+			return ok;
 		}
 	} t0;
 
 	struct T1: public TestTask<T1, OsRt4> {
-		void run() {
+		bool run() {
 			*tp++ = 'b';
 			OsRt4::sleep(20);
 			*tp++ = 'g';
@@ -48,22 +50,26 @@ namespace {
 			m2.unlock();
 			*tp++ = 'l';
 			m1.unlock();
+
+			return ok;
 		}
 	} t1;
 
 	struct T2: public TestTask<T2, OsRt4> {
 		bool done = false;
-		void run() {
+		bool run() {
 			*tp++ = 'c';
 			OsRt4::sleep(10);
 			*tp++ = 'f';
 			CommonTestUtils::busyWorkMs(50);
 			*tp++ = 'm';
+
+			return ok;
 		}
 	} t2;
 
 	struct T3: public TestTask<T3, OsRt4> {
-		void run() {
+		bool run() {
 			*tp++ = 'd';
 			m1.lock();
 			*tp++ = 'e';
@@ -71,6 +77,8 @@ namespace {
 			*tp++ = 'i';
 			m1.unlock();
 			*tp++ = 'n';
+
+			return ok;
 		}
 	} t3;
 }

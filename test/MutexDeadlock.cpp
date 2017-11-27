@@ -25,20 +25,24 @@ namespace {
 	typename Os::Mutex m1, m2;
 
 	struct Task1: public TestTask<Task1> {
-		void run() {
+		bool run() {
 			m1.lock();
 			Os::yield();
 			m2.lock();
 			while(true);
+
+			return ok;
 		}
 	} t1;
 
 	struct Task2: public TestTask<Task2> {
-		void run() {
+		bool run() {
 			m2.lock();
 			Os::yield();
 			m1.lock();
 			while(true);
+
+			return ok;
 		}
 	} t2;
 

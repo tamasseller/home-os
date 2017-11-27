@@ -22,50 +22,47 @@
 namespace {
 	static typename OsRr::BinarySemaphore sem;
 
-	bool error = false;
-
 	struct T12: public TestTask<T12> {
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < 50; i++) {
+		bool run() {
+			for(int i = 0; i < 10; i++) {
 				sem.wait();
 
-				if(sem.wait(0)) {
-					error = true;
-					return;
-				}
-
-				if(sem.wait(10)) {
-					error = true;
-					return;
-				}
+				if(sem.wait(0)) return bad;
+				if(sem.wait(10)) return bad;
 
 				counter++;
 				sem.notifyFromTask();
 			}
+
+			return ok;
 		}
 	} t1, t2;
 
 	struct T3: public TestTask<T3> {
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < 500; i++) {
+		bool run() {
+			for(int i = 0; i < 100; i++) {
 				while(!sem.wait(1));
 				sem.notifyFromTask();
 				counter++;
 			}
+
+			return ok;
 		}
 	} t3;
 
 	struct T4: public TestTask<T4> {
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < 500; i++) {
+		bool run() {
+			for(int i = 0; i < 100; i++) {
 				while(!sem.wait(0));
 				OsRr::sleep(1);
 				sem.notifyFromTask();
 				counter++;
 			}
+
+			return ok;
 		}
 	} t4;
 }
@@ -79,9 +76,8 @@ TEST(SemaphoreTimeout) {
 
 	CommonTestUtils::start();
 
-	CHECK(!error);
-	CHECK(t1.counter == 50);
-	CHECK(t2.counter == 50);
-	CHECK(t3.counter == 500);
-	CHECK(t4.counter == 500);
+	CHECK(!t1.error && t1.counter == 10);
+	CHECK(!t2.error && t2.counter == 10);
+	CHECK(!t3.error && t3.counter == 100);
+	CHECK(!t4.error && t4.counter == 100);
 }

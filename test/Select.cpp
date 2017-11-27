@@ -30,8 +30,8 @@ namespace {
 		Semaphore &sPendForward, &sSendForward;
 		Semaphore &sPendReverse, &sSendReverse;
 		int counter = 0;
-		void run() {
-			for(int i = 0; i < UINT16_MAX/3; i++) {
+		bool run() {
+			for(int i = 0; i < 4096/3; i++) {
 				auto ret = Os::select(&sPendForward, &sPendReverse);
 				if(ret == &sPendForward)
 					sSendForward.notifyFromTask();
@@ -42,6 +42,8 @@ namespace {
 
 				counter++;
 			}
+
+			return ok;
 		}
 
 		Task(Semaphore &sPendForward, Semaphore &sSendForward, Semaphore &sPendReverse, Semaphore &sSendReverse):
@@ -56,19 +58,20 @@ namespace {
 		t3(s23, s31, s13, s32);
 
 	Os::BinarySemaphore semTo;
-	bool error = false;
-	struct TaskTo: TestTask<TaskTo> {
-		void run() {
 
+	struct TaskTo: TestTask<TaskTo> {
+		bool run() {
 			if(Os::selectTimeout(0, &semTo) != &semTo)
-				error = true;
+				return bad;
 
 			if(Os::selectTimeout(0, &semTo) != nullptr)
-				error = true;
+				return bad;
 
 			for(int i=0; i<10; i++)
 				if(Os::selectTimeout(10, &semTo) != nullptr)
-					error = true;
+					return bad;
+
+			return ok;
 		}
 	} tTo;
 }
@@ -89,9 +92,9 @@ TEST(SelectPassaround)
 
 	CommonTestUtils::start();
 
-	CHECK(t1.counter == UINT16_MAX/3);
-	CHECK(t2.counter == UINT16_MAX/3);
-	CHECK(t3.counter == UINT16_MAX/3);
+	CHECK(!t1.error && t1.counter == 4096/3);
+	CHECK(!t2.error && t2.counter == 4096/3);
+	CHECK(!t3.error && t3.counter == 4096/3);
 }
 
 TEST(SelectTimeout)
@@ -101,5 +104,5 @@ TEST(SelectTimeout)
 
 	CommonTestUtils::start();
 
-	CHECK(!error);
+	CHECK(!tTo.error);
 }

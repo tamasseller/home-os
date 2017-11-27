@@ -25,9 +25,18 @@ typedef TestStackPool<testStackSize, testStackCount> StackPool;
 template<class Child, class Os=OsRr>
 struct TestTask: Os::Task
 {
+	static constexpr bool bad = true;
+	static constexpr bool ok = false;
+	bool error;
+
+	static inline void runTest(void* arg) {
+		Child* self = reinterpret_cast<Child*>(arg);
+		self->error = self->run();
+	}
+
     template<class... Args>
     void start(Args... args) {
-        Os::Task::template start<Child, &Child::run>(StackPool::get(), testStackSize, args...);
+        Os::Task::start(&TestTask::runTest, StackPool::get(), testStackSize, static_cast<Child*>(this), args...);
     }
 };
 

@@ -26,8 +26,9 @@ TEST_GROUP(Error) {};
 TEST(Error, InvalidSyscallArgumentSync)
 {
 	struct Task: public TestTask<Task> {
-		void run() {
+		bool run() {
 			reinterpret_cast<Os::Mutex*>(0xbadf00d0)->lock();
+			return ok;
 		}
 	} task;
 
@@ -43,9 +44,10 @@ TEST(Error, InvalidSyscallArgumentAsync)
 			reinterpret_cast<Os::CountingSemaphore*>(0xbadf00d0)->notifyFromInterrupt();
 		}
 
-		void run() {
+		bool run() {
 			CommonTestUtils::registerIrq(&frobnicator);
 			while(1);
+			return ok;
 		}
 	} task;
 
@@ -56,11 +58,12 @@ TEST(Error, InvalidSyscallArgumentAsync)
 TEST(Error, MutexNonOwnerUnlock)
 {
 	struct Task: public TestTask<Task> {
-		void run() {
+		bool run() {
 			Os::Mutex m;
 			m.init();
 			m.unlock();
 			while(1);
+			return ok;
 		}
 	} task;
 
@@ -71,9 +74,10 @@ TEST(Error, MutexNonOwnerUnlock)
 TEST(Error, TaskDelayTooBig)
 {
 	struct Task: public TestTask<Task> {
-		void run() {
+		bool run() {
 			Os::sleep((uintptr_t)-1);
 			while(1);
+			return ok;
 		}
 	} task;
 

@@ -22,7 +22,6 @@
 namespace {
 	OsRr::SharedAtomicList list;
 
-	bool error = false;
 	bool otherOnesDone = false;
 	uintptr_t argMax = 0;
 
@@ -39,7 +38,7 @@ namespace {
 	struct Task: public TestTask<Task> {
 		Element e1, e2, e3;
 
-		void run() {
+		bool run() {
 			auto combiner = [](uintptr_t old, uintptr_t &result){
 				result = old+1;
 				return true;
@@ -57,7 +56,7 @@ namespace {
 					x->work(arg);
 
 					if(!(e1.data >= e2.data && e2.data >= e3.data))
-						error = true;
+						return bad;
 
 					n++;
 				}
@@ -65,6 +64,8 @@ namespace {
 				if(n > 3)
 					otherOnesDone = true;
 			}
+
+			return ok;
 		}
 	} t1, t2;
 }
@@ -75,12 +76,13 @@ TEST(AtomicList) {
 
 	CommonTestUtils::start();
 
-	CHECK(!error);
 	CHECK(otherOnesDone);
 	CHECK(argMax == 1);
+	CHECK(!t1.error);
 	CHECK(t1.e1.data == UINT16_MAX-1);
 	CHECK(t1.e2.data == UINT16_MAX-1);
 	CHECK(t1.e3.data == UINT16_MAX-1);
+	CHECK(!t2.error);
 	CHECK(t2.e1.data == UINT16_MAX-1);
 	CHECK(t2.e2.data == UINT16_MAX-1);
 	CHECK(t2.e3.data == UINT16_MAX-1);
