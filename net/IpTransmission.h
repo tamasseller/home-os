@@ -76,12 +76,14 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Give up if number of retries exhausted.
 			 */
-			self->error = NetErrorStrings::unresolvedError;
+			self->error = NetErrorStrings::unresolved;
 			return false;
 		}
 
-		self->error = NetErrorStrings::unknownError;
+		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
+		self->error = NetErrorStrings::unknown;
 		return false;
+		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/**
@@ -106,8 +108,10 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 				return true;
 		}
 
-		self->error = NetErrorStrings::unknownError;
+		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
+		self->error = NetErrorStrings::unknown;
 		return false;
+		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/**
@@ -127,8 +131,10 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 				return true;
 		}
 
-		self->error = NetErrorStrings::unknownError;
+		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
+		self->error = NetErrorStrings::unknown;
 		return false;
+		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/**
@@ -163,9 +169,9 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			if(this->submit(hook, this->route->dev->getAllocator(), &IpTxJob::arpPacketAllocated, &this->poolParams))
 				return true;
 
-			error = NetErrorStrings::alreadyUsedError;
+			error = NetErrorStrings::alreadyUsed;
 		} else
-			error = NetErrorStrings::noRouteError;
+			error = NetErrorStrings::noRoute;
 
 		return false;
 	}
@@ -212,6 +218,10 @@ public:
 			return false;
 
 		return this->packet.copyIn(data, length);
+	}
+
+	inline const char* getError() {
+		return this->error;
 	}
 };
 

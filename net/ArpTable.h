@@ -87,7 +87,7 @@ public:
 			ret->finalize();
 		}
 
-		for(auto it = this->items.current(); it.current(); it.step()) {
+		for(auto it = this->items.iterator(); it.current(); it.step()) {
 			if(it.current()->ip == ip) {
 				this->jobDone(it.current());
 			}

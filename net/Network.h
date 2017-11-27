@@ -62,6 +62,8 @@ struct NetworkOptions {
 		class IpTransmission;
 
 		static inline void init() {
+		    state.~State();
+		    new(&state) State();
 			state.interfaces.init();
 		}
 
