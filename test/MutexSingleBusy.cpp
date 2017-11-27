@@ -19,11 +19,16 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
-	static OsRr::Mutex mutex;
-	static SharedData<16> data;
+TEST(SingleMutexBusy)
+{
+	OsRr::Mutex mutex;
+	SharedData<16> data;
 
 	struct T1: public TestTask<T1> {
+		OsRr::Mutex &mutex;
+		SharedData<16> &data;
+		inline T1(OsRr::Mutex &mutex, SharedData<16> &data): mutex(mutex), data(data) {}
+
 		bool run() {
 			for(int i = 0; i < 4096 - 20; i++) {
 				mutex.lock();
@@ -33,9 +38,13 @@ namespace {
 
 			return ok;
 		}
-	} t1;
+	} t1(mutex, data);
 
 	struct T2: public TestTask<T2> {
+		OsRr::Mutex &mutex;
+		SharedData<16> &data;
+		inline T2(OsRr::Mutex &mutex, SharedData<16> &data): mutex(mutex), data(data) {}
+
 		bool run() {
 			for(int i=0; i<10; i++) {
 				mutex.lock();
@@ -48,10 +57,8 @@ namespace {
 
 			return ok;
 		}
-	} t2;
-}
+	} t2(mutex, data);
 
-TEST(SingleMutexBusy) {
 	t1.start();
 	t2.start();
 	mutex.init();

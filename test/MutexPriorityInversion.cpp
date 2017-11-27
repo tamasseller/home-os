@@ -21,12 +21,17 @@
 
 #include "algorithm/Str.h"
 
-namespace {
+TEST(MutexPriorityInversion)
+{
 	typedef OsRt4::Mutex Mutex;
 	Mutex m1, m2;
 	char trace[32] = {'\0',}, * volatile tp = trace;
 
 	struct T0: public TestTask<T0, OsRt4> {
+		Mutex &m2;
+		char* volatile &tp;
+		inline T0(Mutex &m2, char* volatile &tp): m2(m2), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'a';
 			OsRt4::sleep(30);
@@ -37,9 +42,13 @@ namespace {
 
 			return ok;
 		}
-	} t0;
+	} t0(m2, tp);
 
 	struct T1: public TestTask<T1, OsRt4> {
+		Mutex &m1, &m2;
+		char* volatile &tp;
+		inline T1(Mutex &m1, Mutex &m2, char* volatile &tp): m1(m1), m2(m2), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'b';
 			OsRt4::sleep(20);
@@ -53,10 +62,12 @@ namespace {
 
 			return ok;
 		}
-	} t1;
+	} t1(m1, m2, tp);
 
 	struct T2: public TestTask<T2, OsRt4> {
-		bool done = false;
+		char* volatile &tp;
+		inline T2(char* volatile &tp): tp(tp) {}
+
 		bool run() {
 			*tp++ = 'c';
 			OsRt4::sleep(10);
@@ -66,9 +77,13 @@ namespace {
 
 			return ok;
 		}
-	} t2;
+	} t2(tp);
 
 	struct T3: public TestTask<T3, OsRt4> {
+		Mutex &m1;
+		char* volatile &tp;
+		inline T3(Mutex &m1, char* volatile &tp): m1(m1), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'd';
 			m1.lock();
@@ -80,11 +95,8 @@ namespace {
 
 			return ok;
 		}
-	} t3;
-}
+	} t3(m1, tp);
 
-TEST(MutexPriorityInversion)
-{
 	t0.start((uint8_t)0);
 	t1.start((uint8_t)1);
 	t2.start((uint8_t)2);

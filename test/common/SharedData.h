@@ -22,7 +22,7 @@
 
 template<uintptr_t size>
 class SharedData {
-    uint16_t data[size];
+    uint16_t data[size] = {0,};
     bool error = false;
 public:
     inline void update() {

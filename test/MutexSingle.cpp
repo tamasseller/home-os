@@ -19,15 +19,19 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
-	static OsRr::Mutex mutex;
-	static SharedData<16> data;
-	static constexpr auto nTasks = 3;
+TEST(SingleMutex) {
+	OsRr::Mutex mutex;
+	SharedData<16> data;
 
 	struct Task: public TestTask<Task> {
 		volatile int counter = -1;
+		OsRr::Mutex &mutex;
+		SharedData<16> &data;
+
+		inline Task(OsRr::Mutex &mutex, SharedData<16> &data): mutex(mutex), data(data) {}
+
 		bool run() {
-			for(counter = 0; counter < 4096/nTasks; counter++) {
+			for(counter = 0; counter < 1024; counter++) {
 				mutex.lock();
 				mutex.lock(); 		// recursive relocking
 				data.update();
@@ -37,16 +41,16 @@ namespace {
 
 			return ok;
 		}
-	} t[nTasks];
-}
+	} t[] = {Task(mutex, data), Task(mutex, data), Task(mutex, data)};
 
-TEST(SingleMutex) {
-	for(auto i = 0; i<nTasks; i++)
+	static constexpr auto nTasks = sizeof(t)/sizeof(t[0]);
+
+	for(auto i = 0u; i<nTasks; i++)
 		t[i].start();
 
 	mutex.init();
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(4096/nTasks*nTasks));
+	CHECK(data.check(1024*nTasks));
 }

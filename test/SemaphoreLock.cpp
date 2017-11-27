@@ -19,15 +19,19 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
-	static typename OsRr::BinarySemaphore sem;
-	static SharedData<16> data;
-
-	static constexpr auto nTasks = 4;
+TEST(SemaphoreLock) {
+	typename OsRr::BinarySemaphore sem;
+	SharedData<16> data;
 
 	struct Task: public TestTask<Task> {
+		typename OsRr::BinarySemaphore &sem;
+		SharedData<16> &data;
+
+		inline Task(typename OsRr::BinarySemaphore &sem, SharedData<16> &data): sem(sem), data(data) {}
+
+
 		bool run() {
-			for(int i = 0; i < 4096/nTasks; i++) {
+			for(int i = 0; i < 1024; i++) {
 				sem.wait();
 				data.update();
 				sem.notifyFromTask();
@@ -35,16 +39,16 @@ namespace {
 
 			return Task::TestTask::ok;
 		}
-	} t[nTasks];
-}
+	} t[] = {Task(sem, data), Task(sem, data), Task(sem, data), Task(sem, data)};
 
-TEST(SemaphoreLock) {
-	for(unsigned int i=0; i<sizeof(t)/sizeof(t[0]); i++)
+	static constexpr auto nTasks = sizeof(t)/sizeof(t[0]);
+
+	for(unsigned int i=0; i<nTasks ; i++)
 		t[i].start();
 
 	sem.init(true);
 
 	CommonTestUtils::start();
 
-	CHECK(data.check(4096/nTasks*nTasks));
+	CHECK(data.check(1024*nTasks));
 }

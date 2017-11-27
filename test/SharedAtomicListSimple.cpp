@@ -19,14 +19,13 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
+TEST(AtomicList) {
 	OsRr::SharedAtomicList list;
-
-	bool otherOnesDone = false;
-	uintptr_t argMax = 0;
 
 	struct Element: OsRr::SharedAtomicList::Element {
 		uintptr_t data = 0;
+		uintptr_t argMax = 0;
+
 		void work(uintptr_t arg) {
 			if(argMax < arg)
 				argMax = arg;
@@ -37,6 +36,9 @@ namespace {
 
 	struct Task: public TestTask<Task> {
 		Element e1, e2, e3;
+		bool otherOnesDone = false;
+		OsRr::SharedAtomicList &list;
+		inline Task(OsRr::SharedAtomicList &list): list(list) {}
 
 		bool run() {
 			auto combiner = [](uintptr_t old, uintptr_t &result){
@@ -67,17 +69,16 @@ namespace {
 
 			return ok;
 		}
-	} t1, t2;
-}
+	} t1(list), t2(list);
 
-TEST(AtomicList) {
 	t1.start();
 	t2.start();
 
 	CommonTestUtils::start();
 
-	CHECK(otherOnesDone);
-	CHECK(argMax == 1);
+	CHECK(t1.otherOnesDone || t2.otherOnesDone);
+	CHECK(t1.e1.argMax == 1 && t1.e2.argMax == 1 && t1.e3.argMax == 1);
+	CHECK(t2.e1.argMax == 1 && t2.e2.argMax == 1 && t2.e3.argMax == 1);
 	CHECK(!t1.error);
 	CHECK(t1.e1.data == UINT16_MAX-1);
 	CHECK(t1.e2.data == UINT16_MAX-1);

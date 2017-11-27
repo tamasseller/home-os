@@ -21,10 +21,11 @@
 
 using Os = OsRr;
 
-namespace {
+TEST(SelectPassaround)
+{
 	typedef typename Os::BinarySemaphore Semaphore;
-	static Semaphore s12, s23, s31;
-	static Semaphore s13, s32, s21;
+	Semaphore s12, s23, s31;
+	Semaphore s13, s32, s21;
 
 	struct Task: public TestTask<Task> {
 		Semaphore &sPendForward, &sSendForward;
@@ -57,27 +58,6 @@ namespace {
 		t2(s12, s23, s32, s21),
 		t3(s23, s31, s13, s32);
 
-	Os::BinarySemaphore semTo;
-
-	struct TaskTo: TestTask<TaskTo> {
-		bool run() {
-			if(Os::selectTimeout(0, &semTo) != &semTo)
-				return bad;
-
-			if(Os::selectTimeout(0, &semTo) != nullptr)
-				return bad;
-
-			for(int i=0; i<10; i++)
-				if(Os::selectTimeout(10, &semTo) != nullptr)
-					return bad;
-
-			return ok;
-		}
-	} tTo;
-}
-
-TEST(SelectPassaround)
-{
 	s12.init(true);
 	s23.init(false);
 	s31.init(false);
@@ -99,10 +79,29 @@ TEST(SelectPassaround)
 
 TEST(SelectTimeout)
 {
-	semTo.init(true);
-	tTo.start();
+	struct Task: TestTask<Task> {
+		Os::BinarySemaphore sem;
+
+		bool run() {
+			sem.init(true);
+
+			if(Os::selectTimeout(0, &sem) != &sem)
+				return bad;
+
+			if(Os::selectTimeout(0, &sem) != nullptr)
+				return bad;
+
+			for(int i=0; i<3; i++)
+				if(Os::selectTimeout(10, &sem) != nullptr)
+					return bad;
+
+			return ok;
+		}
+	} t;
+
+	t.start();
 
 	CommonTestUtils::start();
 
-	CHECK(!tTo.error);
+	CHECK(!t.error);
 }

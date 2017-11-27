@@ -20,12 +20,13 @@
 #include "common/CommonTestUtils.h"
 
 namespace {
-	static typename OsRrPrio::CountingSemaphore sem;
-
-	bool error = false;
+	typename OsRrPrio::CountingSemaphore sem;
 
 	struct Task: public TestTask<Task, OsRrPrio> {
 		int counter = 0;
+
+		typename OsRrPrio::CountingSemaphore &sem;
+		inline Task(typename OsRrPrio::CountingSemaphore &sem): sem(sem) {}
 
 		bool run() {
 			for(int i = 0; i < 15; i++) {
@@ -35,7 +36,7 @@ namespace {
 
 			return ok;
 		}
-	} t1, t2;
+	} t1(sem), t2(sem);
 
 	int irqCounter = 0;
 
@@ -58,8 +59,7 @@ TEST(SemaphoreCounting) {
 	CommonTestUtils::registerIrq(irq);
 	CommonTestUtils::start<OsRrPrio>();
 
-	CHECK(!error);
-	CHECK(t1.counter == 15);
-	CHECK(t2.counter == 15);
+	CHECK(!t1.error && t1.counter == 15);
+	CHECK(!t2.error && t2.counter == 15);
 	CHECK(irqCounter == 10);
 }

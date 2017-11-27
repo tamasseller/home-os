@@ -21,13 +21,17 @@
 
 #include "algorithm/Str.h"
 
-namespace {
-	static OsRrPrio::Mutex mutex;
-	static OsRrPrio::BinarySemaphore sem;
+TEST(MutexVsSelect)
+{
+	OsRrPrio::Mutex mutex;
+	OsRrPrio::BinarySemaphore sem;
 	char trace[32] = {'\0',}, * volatile tp = trace;
 
 	struct T1: public TestTask<T1, OsRrPrio> {
-		volatile int counter = -1;
+		OsRrPrio::Mutex &mutex;
+		char * volatile &tp;
+		inline T1(OsRrPrio::Mutex &mutex, char * volatile &tp): mutex(mutex), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'a';
 			OsRrPrio::sleep(10);
@@ -39,10 +43,13 @@ namespace {
 
 			return ok;
 		}
-	} t1;
+	} t1(mutex, tp);
 
 	struct T2: public TestTask<T2, OsRrPrio> {
-		volatile int counter = -1;
+		OsRrPrio::BinarySemaphore &sem;
+		char * volatile &tp;
+		inline T2(OsRrPrio::BinarySemaphore &sem, char * volatile &tp): sem(sem), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'b';
 			OsRrPrio::select(&sem);
@@ -50,10 +57,14 @@ namespace {
 
 			return ok;
 		}
-	} t2;
+	} t2(sem, tp);
 
 	struct T3: public TestTask<T3, OsRrPrio> {
-		volatile int counter = -1;
+		OsRrPrio::Mutex &mutex;
+		OsRrPrio::BinarySemaphore &sem;
+		char * volatile &tp;
+		inline T3(OsRrPrio::Mutex &mutex, OsRrPrio::BinarySemaphore &sem, char * volatile &tp): mutex(mutex), sem(sem), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'c';
 			mutex.lock();
@@ -65,10 +76,13 @@ namespace {
 
 			return ok;
 		}
-	} t3;
+	} t3(mutex, sem, tp);
 
 	struct T4: public TestTask<T4, OsRrPrio> {
-		volatile int counter = -1;
+		OsRrPrio::BinarySemaphore &sem;
+		char * volatile &tp;
+		inline T4(OsRrPrio::BinarySemaphore &sem, char * volatile &tp): sem(sem), tp(tp) {}
+
 		bool run() {
 			*tp++ = 'e';
 			OsRrPrio::sleep(20);
@@ -80,10 +94,8 @@ namespace {
 
 			return ok;
 		}
-	} t4;
-}
+	} t4(sem, tp);
 
-TEST(MutexVsSelect) {
 	t1.start(0);
 	t2.start(1);
 	t3.start(2);

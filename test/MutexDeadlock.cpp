@@ -21,10 +21,13 @@
 
 using Os=OsRr;
 
-namespace {
-	typename Os::Mutex m1, m2;
+TEST(MutexDeadlock) {
+	Os::Mutex m1, m2;
 
 	struct Task1: public TestTask<Task1> {
+		Os::Mutex &m1, &m2;
+		inline Task1(Os::Mutex &m1, Os::Mutex &m2): m1(m1), m2(m2) {}
+
 		bool run() {
 			m1.lock();
 			Os::yield();
@@ -33,9 +36,12 @@ namespace {
 
 			return ok;
 		}
-	} t1;
+	} t1(m1, m2);
 
 	struct Task2: public TestTask<Task2> {
+		Os::Mutex &m1, &m2;
+		inline Task2(Os::Mutex &m1, Os::Mutex &m2): m1(m1), m2(m2) {}
+
 		bool run() {
 			m2.lock();
 			Os::yield();
@@ -44,11 +50,8 @@ namespace {
 
 			return ok;
 		}
-	} t2;
+	} t2(m1, m2);
 
-}
-
-TEST(MutexDeadlock) {
 	m1.init();
 	m2.init();
 	t1.start();

@@ -19,21 +19,23 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
+TEST(Sleep) {
 	constexpr auto expectedRunTime = 105;
 	constexpr auto allowedErrorPercent = 1;
 
 	constexpr auto minRuntime = expectedRunTime * (100 - allowedErrorPercent) / 100;
 	constexpr auto maxRuntime = expectedRunTime * (100 + allowedErrorPercent) / 100;
 
-	template<int time>
-	struct Task: public TestTask<Task<time>> {
+	struct Task: public TestTask<Task> {
 		typename OsRr::TickType taskDiff;
+
+		unsigned int time;
+		inline Task(unsigned int time): time(time) {}
 
 		bool run() {
 			auto taskStart = OsRr::getTick();
 
-			for(int i = 0; i < (expectedRunTime+time-1)/time; i++) {
+			for(auto i = 0u; i < (expectedRunTime+time-1)/time; i++) {
 				auto start = OsRr::getTick();
 
 				OsRr::sleep(time);
@@ -50,23 +52,13 @@ namespace {
 		}
 	};
 
-	Task<3> t1, t2;
-	Task<5> t3, t4;
-	Task<7> t5;
-}
+	Task t[] = {Task(3), Task(3), Task(5), Task(5), Task(7)};
 
-TEST(Sleep) {
-	t1.start();
-	t2.start();
-	t3.start();
-	t4.start();
-	t5.start();
+	for(auto i = 0u; i<sizeof(t)/sizeof(t[0]); i++)
+		t[i].start();
 
 	CommonTestUtils::start();
 
-	CHECK(!t1.error && minRuntime < t1.taskDiff && t1.taskDiff < maxRuntime);
-	CHECK(!t2.error && minRuntime < t2.taskDiff && t2.taskDiff < maxRuntime);
-	CHECK(!t3.error && minRuntime < t3.taskDiff && t3.taskDiff < maxRuntime);
-	CHECK(!t4.error && minRuntime < t4.taskDiff && t4.taskDiff < maxRuntime);
-	CHECK(!t5.error && minRuntime < t5.taskDiff && t5.taskDiff < maxRuntime);
+	for(auto i = 0u; i<sizeof(t)/sizeof(t[0]); i++)
+		CHECK(!t[i].error && minRuntime < t[i].taskDiff && t[i].taskDiff < maxRuntime);
 }

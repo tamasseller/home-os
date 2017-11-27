@@ -23,18 +23,38 @@ namespace {
 
 template<class Os>
 class Test {
-	struct T1: public TestTask<T1, Os> { bool done = false; bool started = false; bool run(); };
-	struct T2: public TestTask<T2, Os> { bool done = false; bool started = false; bool run(); };
-	struct T3: public TestTask<T3, Os> { bool done = false; bool started = false; bool run(); };
+	struct T1;
+	struct T2;
+	struct T3;
+	struct T1: public TestTask<T1, Os> {
+		bool done = false, started = false;
+		T1 &t1, &t2; T2 &t3; T3 &t4, &t5;
+		inline T1(T1 &t1, T1 &t2, T2 &t3, T3 &t4, T3 &t5): t1(t1), t2(t2), t3(t3), t4(t4), t5(t5) {}
+		bool run();
+	};
 
-	static T1 t1;
-	static T1 t2;
-	static T2 t3;
-	static T3 t4;
-	static T3 t5;
+	struct T2: public TestTask<T2, Os> {
+		bool done = false, started = false;
+		T1 &t1, &t2; T2 &t3; T3 &t4, &t5;
+		inline T2(T1 &t1, T1 &t2, T2 &t3, T3 &t4, T3 &t5): t1(t1), t2(t2), t3(t3), t4(t4), t5(t5) {}
+		bool run();
+	};
+
+	struct T3: public TestTask<T3, Os> {
+		bool done = false, started = false;
+		T1 &t1, &t2; T2 &t3; T3 &t4, &t5;
+		inline T3(T1 &t1, T1 &t2, T2 &t3, T3 &t4, T3 &t5): t1(t1), t2(t2), t3(t3), t4(t4), t5(t5) {}
+		bool run();
+	};
+
+	T1 t1 = T1(t1, t2, t3, t4, t5);
+	T1 t2 = T1(t1, t2, t3, t4, t5);
+	T2 t3 = T2(t1, t2, t3, t4, t5);
+	T3 t4 = T3(t1, t2, t3, t4, t5);
+	T3 t5 = T3(t1, t2, t3, t4, t5);
 
 public:
-	static void work() {
+	void work() {
 		t1.start((uint8_t)0);
 		t2.start((uint8_t)0);
 		t3.start((uint8_t)1);
@@ -50,21 +70,6 @@ public:
 		CHECK(!t5.error && t5.done);
 	}
 };
-
-template<class Os>
-typename Test<Os>::T1 Test<Os>::t1;
-
-template<class Os>
-typename Test<Os>::T1 Test<Os>::t2;
-
-template<class Os>
-typename Test<Os>::T2 Test<Os>::t3;
-
-template<class Os>
-typename Test<Os>::T3 Test<Os>::t4;
-
-template<class Os>
-typename Test<Os>::T3 Test<Os>::t5;
 
 template<class Os>
 bool Test<Os>::T1::run() {
@@ -105,9 +110,9 @@ bool Test<Os>::T3::run() {
 }
 
 TEST(PolicyRoundRobinPrio) {
-	Test<OsRrPrio>::work();
+	Test<OsRrPrio>().work();
 }
 
 TEST(PolicyRealtimePrio) {
-	Test<OsRt4>::work();
+	Test<OsRt4>().work();
 }

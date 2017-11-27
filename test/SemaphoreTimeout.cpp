@@ -19,11 +19,16 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace {
-	static typename OsRr::BinarySemaphore sem;
+TEST(SemaphoreTimeout)
+{
+	OsRr::BinarySemaphore sem;
+
 
 	struct T12: public TestTask<T12> {
 		int counter = 0;
+		OsRr::BinarySemaphore &sem;
+		inline T12(OsRr::BinarySemaphore &sem): sem(sem) {}
+
 		bool run() {
 			for(int i = 0; i < 10; i++) {
 				sem.wait();
@@ -37,10 +42,13 @@ namespace {
 
 			return ok;
 		}
-	} t1, t2;
+	} t1(sem), t2(sem);
 
 	struct T3: public TestTask<T3> {
 		int counter = 0;
+		OsRr::BinarySemaphore &sem;
+		inline T3(OsRr::BinarySemaphore &sem): sem(sem) {}
+
 		bool run() {
 			for(int i = 0; i < 100; i++) {
 				while(!sem.wait(1));
@@ -50,10 +58,13 @@ namespace {
 
 			return ok;
 		}
-	} t3;
+	} t3(sem);
 
 	struct T4: public TestTask<T4> {
 		int counter = 0;
+		OsRr::BinarySemaphore &sem;
+		inline T4(OsRr::BinarySemaphore &sem): sem(sem) {}
+
 		bool run() {
 			for(int i = 0; i < 100; i++) {
 				while(!sem.wait(0));
@@ -64,10 +75,8 @@ namespace {
 
 			return ok;
 		}
-	} t4;
-}
+	} t4(sem);
 
-TEST(SemaphoreTimeout) {
 	t1.start();
 	t2.start();
 	t3.start();

@@ -19,11 +19,11 @@
 
 #include "common/CommonTestUtils.h"
 
-namespace SemaphorePassaround {
+TEST_GROUP(SemaphorePassaround) {
 	typedef typename OsRr::BinarySemaphore Semaphore;
-	static SharedData<16> data;
 
 	struct Task: public TestTask<Task> {
+		SharedData<16> &data;
 		Semaphore &sPend, &sSend;
 		int counter = 0;
 		bool to;
@@ -43,7 +43,7 @@ namespace SemaphorePassaround {
 			return ok;
 		}
 
-		Task(Semaphore &sPend, Semaphore &sSend): sPend(sPend), sSend(sSend) {}
+		Task(SharedData<16> &data, Semaphore &sPend, Semaphore &sSend): data(data), sPend(sPend), sSend(sSend) {}
 
 		void start(bool to) {
 			counter = 0;
@@ -51,23 +51,13 @@ namespace SemaphorePassaround {
 			TestTask::start();
 		}
 	};
-}
+};
 
-namespace SemaphorePassaroundCtx1 {
-	static SemaphorePassaround::Semaphore s1, s2, s3;
-	SemaphorePassaround::Task t1(s1, s2), t2(s2, s3), t3(s3, s1);
-}
-
-namespace SemaphorePassaroundCtx2 {
-	static SemaphorePassaround::Semaphore s1, s2, s3;
-	SemaphorePassaround::Task t1(s1, s2), t2(s2, s3), t3(s3, s1);
-}
-
-
-TEST(SemaphorePassaround)
+TEST(SemaphorePassaround, WithoutTimeout)
 {
-	using namespace SemaphorePassaround;
-	using namespace SemaphorePassaroundCtx1;
+	Semaphore s1, s2, s3;
+	SharedData<16> data;
+	Task t1(data, s1, s2), t2(data, s2, s3), t3(data, s3, s1);
 
 	data.reset();
 	t1.start(false);
@@ -86,10 +76,11 @@ TEST(SemaphorePassaround)
 }
 
 
-TEST(SemaphorePassaroundWithTimeout)
+TEST(SemaphorePassaround, WithTimeout)
 {
-	using namespace SemaphorePassaround;
-	using namespace SemaphorePassaroundCtx2;
+	Semaphore s1, s2, s3;
+	SharedData<16> data;
+	Task t1(data, s1, s2), t2(data, s2, s3), t3(data, s3, s1);
 
 	data.reset();
 	t1.start(true);
