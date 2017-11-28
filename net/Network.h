@@ -12,14 +12,15 @@
 
 #include "BufferPool.h"
 #include "SharedTable.h"
-#include "Packet.h"
 #include "AddressIp4.h"
 #include "AddressEthernet.h"
 #include "NetErrorStrings.h"
+#include "Packet.h"
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
 	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
+	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
 	template<class... Members> struct Set {
@@ -31,6 +32,7 @@ struct NetworkOptions {
 		typedef Scheduler Os;
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
+		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
@@ -61,6 +63,9 @@ struct NetworkOptions {
 
 		class IpTransmission;
 
+		static inline constexpr uint32_t correctEndian(uint32_t);
+		static inline constexpr uint16_t correctEndian(uint16_t);
+
 		static inline void init() {
 		    state.~State();
 		    new(&state) State();
@@ -86,5 +91,6 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "IpTransmission.h"
 #include "Routing.h"
 #include "TxPacket.h"
+#include "Endian.h"
 
 #endif /* NETWORK_H_ */

@@ -15,12 +15,19 @@
 template<class S, class... Args>
 class Network<S, Args...>::Interface {
 	friend class Network<S, Args...>;
-	virtual typename Os::IoChannel *getAllocator() = 0;
+
 	virtual typename Os::IoChannel *getSender() = 0;
+
+	virtual const AddressEthernet& getAddress() = 0;
+
+	virtual void* allocateBuffers(size_t size) = 0;
+	virtual bool requestAllocation(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, BufferPoolIoData<Os>* data) = 0;
+	virtual const typename Packet::Operations *getStandardPacketOperations() = 0;
+
 	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
 	virtual ArpEntry* resolveAddress(const AddressIp4&) = 0;
 	virtual void releaseAddress(ArpEntry*) = 0;
-	virtual const typename Packet::Operations *getStandardPacketOperations() = 0;
+
 
 };
 
@@ -31,15 +38,22 @@ class Network<S, Args...>::TxBinder: public Interface {
 
 	class Sender;
 	Sender sender;
-
 	ArpTable<If::arpCacheEntries> resolver;
-
-	virtual typename Os::IoChannel *getAllocator() override final {
-		return &If::allocator;
-	}
 
 	virtual typename Os::IoChannel *getSender() override final {
 		return &sender;
+	}
+
+	virtual const AddressEthernet& getAddress() {
+		return If::ethernetAddress;
+	}
+
+	virtual void* allocateBuffers(size_t size) override final {
+		return If::allocator.allocateDirect(size);
+	}
+
+	virtual bool requestAllocation(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, BufferPoolIoData<Os>* data) override final {
+		return item->submit(hook, &If::allocator, callback, data);
 	}
 
 	virtual ArpEntry* resolveAddress(const AddressIp4& ip) override final {

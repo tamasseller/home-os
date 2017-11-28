@@ -22,6 +22,10 @@ class Network<S, Args...>::Route {
 public:
 	inline Route(AddressIp4 net, uint8_t mask, AddressIp4 src, Interface* dev, uint8_t metric = 0):
 	    net(net), src(src), dev(dev), mask(mask), metric(metric) {}
+
+	inline const AddressIp4 &getSource() {
+		return src;
+	}
 };
 
 template<class S, class... Args>

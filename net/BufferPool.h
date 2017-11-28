@@ -126,8 +126,12 @@ private:
 		return ret;
 	}
 
+	inline constexpr size_t sizeToBlocks(size_t size) {
+		return (size + blockDataSize - 1) / blockDataSize;
+	}
+
 	inline bool tryToSatisfy(IoData* data) {
-		const size_t nBlocksToAlloc = (data->size + blockDataSize - 1) / blockDataSize;
+		const size_t nBlocksToAlloc = sizeToBlocks(data->size);
 
 		if(Header* first = allocate(nBlocksToAlloc)) {
 			data->first = static_cast<Block*>(first);
@@ -199,6 +203,14 @@ public:
 		blocks[nBlocks - 1].next = nullptr;
 
 		BufferPool::IoChannelBase::init();
+	}
+
+	inline Block *allocateDirect(size_t size)
+	{
+		if(items.iterator().current())
+			return nullptr;
+
+		return static_cast<Block*>(allocate(sizeToBlocks(size)));
 	}
 
 	inline void reclaim(Block *first) {

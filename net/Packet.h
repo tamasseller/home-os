@@ -86,6 +86,10 @@ struct Packet
 		return true;
 	}
 
+	bool copyIn32(uint32_t data) {
+		return copyIn((const char*)&data, 4); // TODO optimize
+	}
+
 	Chunk nextChunk() {
 		return ops->nextChunk(this);
 	}

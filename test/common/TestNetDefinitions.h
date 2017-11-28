@@ -11,7 +11,9 @@
 #include "CommonTestUtils.h"
 #include "Network.h"
 
-template<int id = 0>
+#include "1test/Mock.h"
+
+template<uint8_t id = 0>
 class DummyIf {
 	static constexpr size_t txBufferCount = 64;
 	static constexpr size_t txBufferSize = 64;
@@ -50,27 +52,35 @@ class DummyIf {
 		}
 	};
 
+	static constexpr AddressEthernet mac = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, id);
+
 public:
 	static constexpr size_t arpReqTimeout = 100;
-	static constexpr OsRr::IoChannel& allocator = pools.txPool;
+	static constexpr auto& allocator = pools.txPool;
+	static constexpr auto& ethernetAddress = mac;
 	static constexpr auto& standardPacketOperations = ChunkedPacket<TxChunkInfo>::operations;
 	inline static void enableTxIrq();
 	inline static void disableTxIrq() {}
 	inline static void init() { pools.txPool.init(pools.txStorage); }
 };
 
-template<int id>
+template<uint8_t id>
 typename DummyIf<id>::Pools DummyIf<id>::pools;
+
+template<uint8_t id>
+constexpr AddressEthernet DummyIf<id>::mac;
 
 using Net = Network<OsRr,
 		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf<0>>>,
 		NetworkOptions::ArpRequestRetry<3>
 >;
 
-template<int id>
+template<uint8_t id>
 inline void DummyIf<id>::enableTxIrq() {
 	auto x = Net::getIf<DummyIf<id>>()->getTxInfoProvider();
 	while(auto p = x->getCurrentPacket()) {
+		/*for(p.get)
+		MOCK(DummyIf)::CALL(tx).withParam(id).withParam();*/
 		x->packetTransmitted();
 	}
 }
