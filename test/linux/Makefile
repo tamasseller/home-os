@@ -67,9 +67,11 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
+SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 endif
 
-SOURCES += $(ROOT)/test/NetIpTransmission.cpp
+SOURCES += $(ROOT)/test/NetSharedTable.cpp
+#SOURCES += $(ROOT)/test/NetBufferPool.cpp
 
 # Testing utilities.
 

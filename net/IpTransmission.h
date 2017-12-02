@@ -30,7 +30,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	};
 
 	union {
-		BufferPoolIoData<Os> poolParams;
+		typename State::Pool::IoData poolParams;
 		TxPacket packet;
 	};
 
@@ -43,13 +43,13 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 	/* TODO + header size */
 	inline AsyncResult allocateBuffers(typename Os::IoJob::Hook hook, size_t size, typename Os::IoJob::Callback callback) {
-		if(void *ret = route->dev->allocateBuffers(size)) {
+		if(void *ret = state.pool.allocateDirect(size)) {
 			poolParams.first = ret;
 			return callback(this, Os::IoJob::Result::Done, hook) ? AsyncResult::Later: AsyncResult::Done;
 		}
 
 		poolParams.size = size;
-		return route->dev->requestAllocation(hook, this, callback, &poolParams) ? AsyncResult::Later : AsyncResult::Error;
+		return this->submit(hook, state.pool, callback, &poolParams) ? AsyncResult::Later : AsyncResult::Error;
 	}
 
 	static bool allocated(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {

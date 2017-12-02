@@ -20,15 +20,9 @@ class Network<S, Args...>::Interface {
 
 	virtual const AddressEthernet& getAddress() = 0;
 
-	virtual void* allocateBuffers(size_t size) = 0;
-	virtual bool requestAllocation(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, BufferPoolIoData<Os>* data) = 0;
-	virtual const typename Packet::Operations *getStandardPacketOperations() = 0;
-
 	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
 	virtual ArpEntry* resolveAddress(const AddressIp4&) = 0;
 	virtual void releaseAddress(ArpEntry*) = 0;
-
-
 };
 
 template<class S, class... Args>
@@ -48,14 +42,6 @@ class Network<S, Args...>::TxBinder: public Interface {
 		return If::ethernetAddress;
 	}
 
-	virtual void* allocateBuffers(size_t size) override final {
-		return If::allocator.allocateDirect(size);
-	}
-
-	virtual bool requestAllocation(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, BufferPoolIoData<Os>* data) override final {
-		return item->submit(hook, &If::allocator, callback, data);
-	}
-
 	virtual ArpEntry* resolveAddress(const AddressIp4& ip) override final {
 		return resolver.lookUp(ip);
 	}
@@ -66,10 +52,6 @@ class Network<S, Args...>::TxBinder: public Interface {
 
 	virtual void releaseAddress(ArpEntry* entry) override final {
 		resolver.free(entry);
-	}
-
-	virtual const typename Packet::Operations *getStandardPacketOperations() override final {
-		return &If::standardPacketOperations;
 	}
 
 	void init() {

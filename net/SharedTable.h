@@ -20,36 +20,12 @@
 #ifndef SHAREDTABLE_H_
 #define SHAREDTABLE_H_
 
+#include "DataContainer.h"
+
 template<class Os, class Data, size_t nItems>
-struct SharedTable {
-        class DataContainer {
-            struct Hax: Data {
-                static void* operator new(size_t, void* r) {
-                    return r;
-                }
-            };
-
-            char data[sizeof(Data)] alignas(Data);
-        public:
-            template<class... C>
-            void init(C... c) {
-                new(data) Hax(c...);
-            }
-
-            void destroy() {
-                reinterpret_cast<Hax*>(data)->~Hax();
-            }
-
-            Data* operator->() {
-                return static_cast<Data*>(reinterpret_cast<Hax*>(data));
-            }
-
-            Data* getData() {
-                return reinterpret_cast<Hax*>(data);
-            }
-        };
-
-        class Entry: Os::template Atomic<uintptr_t>, public DataContainer {
+struct SharedTable
+{
+        class Entry: Os::template Atomic<uintptr_t>, DataContainer<Data> {
             friend class SharedTable;
 
             static constexpr uintptr_t validFlag = (uintptr_t)1 << (sizeof(uintptr_t) * 8 - 1);
@@ -87,12 +63,8 @@ struct SharedTable {
             Entry() = default;
 
         public:
-            inline DataContainer& operator->() {
-                return *static_cast<DataContainer*>(this);
-            }
-
             inline Data& access() {
-                return *(static_cast<DataContainer*>(this)->getData());
+                return *(static_cast<DataContainer<Data>*>(this)->getData());
             }
 
             inline void erase() {
@@ -127,6 +99,8 @@ struct SharedTable {
             inline bool isValid() {
                 return ((uintptr_t)getFlags()) & validFlag;
             }
+
+            using DataContainer<Data>::init;
         };
 
     private:
@@ -135,7 +109,7 @@ struct SharedTable {
 
     public:
         static inline Entry* entryFromData(Data* data) {
-        	return static_cast<Entry*>(reinterpret_cast<DataContainer*>(data));
+        	return static_cast<Entry*>(reinterpret_cast<DataContainer<Data>*>(data));
         }
 
         template<class C>
@@ -147,19 +121,20 @@ struct SharedTable {
                 if(!empty){
                     if(entry->takeIfValidOrEmpty()) {
                         if(entry->isValid()) {
-                            if(c(entry->getData())) {
+                            if(c(&entry->access())) {
                                 if(empty)
                                     empty->release();
 
                                 return entry;
-                            }
+                            } else
+                                entry->release();
                         } else {
                             empty = entry;
                         }
                     }
                 } else {
                     if(entry->takeIfValid()) {
-                        if(c(entry->getData())) {
+                        if(c(&entry->access())) {
                             if(empty)
                                 empty->release();
 
@@ -182,7 +157,7 @@ struct SharedTable {
 
             for(Entry* entry = entries; entry < entries + nItems; entry++) {
                 if(entry->takeIfValid()) {
-                    if(uintptr_t newMetric = c(entry->getData())) {
+                    if(uintptr_t newMetric = c(&entry->access())) {
                         if(newMetric > metric) {
                             if(best)
                                 best->release();
@@ -204,7 +179,7 @@ struct SharedTable {
         {
             for(Entry* entry = entries; entry < entries + nItems; entry++) {
                 if(entry->takeIfValid()) {
-                    if(c(entry->getData()))
+                    if(c(&entry->access()))
                         return entry;
 
                     entry->release();

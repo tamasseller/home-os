@@ -41,7 +41,7 @@ public:
 	        return false;
 	    }
 
-	    *entry->getData() = route;
+	    entry->access() = route;
 	    entry->finalize();
 		return true;
 	}
@@ -55,7 +55,7 @@ public:
 	    if(!entry)
 	        return nullptr;
 
-	    return entry->getData();
+	    return &entry->access();
 	}
 
 	inline void releaseRoute(Route* route) {

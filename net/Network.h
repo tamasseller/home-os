@@ -15,11 +15,12 @@
 #include "AddressIp4.h"
 #include "AddressEthernet.h"
 #include "NetErrorStrings.h"
-#include "Packet.h"
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
 	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
+	PET_CONFIG_VALUE(BufferSize, size_t);
+	PET_CONFIG_VALUE(BufferCount, size_t);
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
@@ -33,6 +34,8 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
+		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
+		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
@@ -55,21 +58,29 @@ struct NetworkOptions {
 		static struct State {
 			Ifs<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
+			typedef BufferPool<OsRr, bufferCount, bufferSize> Pool;
+			Pool pool;
 		} state;
 
 		class IpTxJob;
 
 	public:
+		typedef typename State::Pool::Storage Buffers;
+
+		class Packet;
+		class PacketWriter;
+		class PacketReader;
 
 		class IpTransmission;
 
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);
 
-		static inline void init() {
+		static inline void init(Buffers &buffers) {
 		    state.~State();
 		    new(&state) State();
 			state.interfaces.init();
+			state.pool(buffers);
 		}
 
 		static inline bool addRoute(const Route& route) {
@@ -86,11 +97,12 @@ typename NetworkOptions::Configurable<S, Args...>::State NetworkOptions::Configu
 template<class S, class... Args>
 using Network = NetworkOptions::Configurable<S, Args...>;
 
+#include "Packet.h"
+#include "Endian.h"
+#include "Routing.h"
 #include "ArpTable.h"
+#include "TxPacket.h"
 #include "Interfaces.h"
 #include "IpTransmission.h"
-#include "Routing.h"
-#include "TxPacket.h"
-#include "Endian.h"
 
 #endif /* NETWORK_H_ */

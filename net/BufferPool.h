@@ -20,57 +20,78 @@
 #ifndef BUFFERPOOL_H_
 #define BUFFERPOOL_H_
 
-template<class Header>
-static inline Header* &trivialNextAccessor(Header* header) {
-	return header->next;
-}
-
-struct TrivialHeader {
-	TrivialHeader* next;
-};
-
-template<class Os>
-class BufferPoolIoData: public Os::IoJob::Data {
-	template<class, size_t, size_t, class Header, Header* &(*Next)(Header*)> class BufferPool;
-	friend pet::LinkedList<BufferPoolIoData>;
-	BufferPoolIoData* next;
-public:
-	union {
-		size_t size;
-		void* first;
-	};
-};
-
-template<class Os, size_t nBlocks, size_t blockDataSize, class Header = TrivialHeader, Header* &(*accessNext)(Header* header) = &trivialNextAccessor<Header>>
-class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockDataSize, Header, accessNext>>, Os::Event
+template<class Os, size_t nBlocks, size_t blockSize, size_t alignment>
+class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockSize>>, Os::Event
 {
 	friend class BufferPool::IoChannelBase;
 
+	union Block {
+		char data[blockSize] alignas(alignment);
+		union Block* next;
+	};
 public:
-	using IoData = BufferPoolIoData<Os>;
 
-	struct Block: Header {
-		 char data[blockDataSize] alignas(Header);
+	class Allocator {
+	public:
+		template<class T>
+		T* get() {
 
-		 Header* &getNext() {
-			 return accessNext(this);
-		 }
+		}
 	};
 
+	class Deallocator {
+		Block first;
+		Block **nextOfLast;
+		size_t n;
+	public:
+		void take(void*);
+
+		inline void deallocate(BufferPool* pool) {
+
+		}
+	};
+
+	/**
+	 * Allocation request parameters.
+	 */
+	class IoData: public Os::IoJob::Data {
+		template<class, size_t, size_t, class Header, Header* &(*Next)(Header*)> class BufferPool;
+		friend pet::LinkedList<IoData>;
+		IoData* next;
+	public:
+		union {
+			size_t size;
+			Allocator allocator;
+		};
+	};
+
+	/**
+	 * Definition of the storage area.
+	 *
+	 * Can be used to indirectly supply the storage area to be operated on,
+	 * by the application to specify special attributes on the declaration.
+	 */
 	typedef Block Storage[nBlocks];
 
 private:
 	template<class Value> using Atomic = typename Os::template Atomic<Value>;
 
+	/**
+	 * Number of free blocks.
+	 */
 	Atomic<size_t> nFree;
-	Atomic<Header*> head;
+
+	/**
+	 * The first one in the chain of free blocks.
+	 */
+	Atomic<Block*> head;
 	pet::LinkedList<IoData> items;
 
-	inline Header* take() {
-		Header* ret;
+	inline Block* take() {
+		Block* ret;
 
-		head([&ret](Header* old, Header* &result){
-			result = accessNext(old);
+		head([&ret](Block* old, Block* &result){
+			result = old->getNext();
 			ret = old;
 			return true;
 		});
@@ -78,10 +99,10 @@ private:
 		return ret;
 	}
 
-	inline void put(Header* b, Header** nextOfLast) {
-		head([b, nextOfLast](Header* old, Header* &result){
-			*nextOfLast = old;
-			result = b;
+	inline void put(Block* first, Block* last) {
+		head([first, last](Block* old, Block* &result){
+			last->setNext(old);
+			result = first;
 			return true;
 		});
 	}
@@ -107,34 +128,34 @@ private:
 		});
 	}
 
-	inline Header* allocate(size_t n)
+	inline Block* allocate(size_t n)
 	{
-		Header* ret = nullptr;
+		Block* ret = nullptr;
 
 		if(reserve(n)){
-			Header* last = ret = take();
+			Block* last = ret = take();
 
 			while(--n) {
-				Header* next = take();
-				accessNext(last) = next;
+				Block* next = take();
+				last->setNextNonNull(next);
 				last = next;
 			}
 
-			accessNext(last) = nullptr;
+			last->terminate();
 		}
 
 		return ret;
 	}
 
-	inline constexpr size_t sizeToBlocks(size_t size) {
-		return (size + blockDataSize - 1) / blockDataSize;
+	static inline constexpr size_t sizeToBlocks(size_t size) {
+		return (size + sizeof(Block::bytes)- 1) / sizeof(Block::bytes);
 	}
 
 	inline bool tryToSatisfy(IoData* data) {
 		const size_t nBlocksToAlloc = sizeToBlocks(data->size);
 
-		if(Header* first = allocate(nBlocksToAlloc)) {
-			data->first = static_cast<Block*>(first);
+		if(Block* first = allocate(nBlocksToAlloc)) {
+			data->first = first;
 			this->jobDone(data);
 			return true;
 		}
@@ -198,9 +219,9 @@ public:
 		head = blocks;
 
 		for(size_t i = 0; i < nBlocks - 1; i++)
-			blocks[i].next = &blocks[i+1];
+			blocks[i].setNext(&blocks[i+1]);
 
-		blocks[nBlocks - 1].next = nullptr;
+		blocks[nBlocks - 1].terminate();
 
 		BufferPool::IoChannelBase::init();
 	}
@@ -210,22 +231,19 @@ public:
 		if(items.iterator().current())
 			return nullptr;
 
-		return static_cast<Block*>(allocate(sizeToBlocks(size)));
+		return allocate(sizeToBlocks(size));
 	}
 
 	inline void reclaim(Block *first) {
-		size_t n = 0;
-		Header** nextOfLast;
+		size_t n = 1;
 
-		for(Header* b = first;; b = accessNext(b)) {
+		Block* last = first;
+		while(Block *next = last->getNext()) {
 			n++;
-			if(!accessNext(b)) {
-				nextOfLast = &accessNext(b);
-				break;
-			}
+			last = next;
 		}
 
-		put(first, nextOfLast);
+		put(first, last);
 		unReserve(n);
 
 		if(this->hasJob())

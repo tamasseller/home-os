@@ -29,12 +29,25 @@
 
 using Os = OsRr;
 
+namespace {
+	int ctorDtorCount;
+}
+
 TEST_GROUP(NetSharedTable) {
-    struct Kv {int k, v;};
+    struct Kv {
+    	int k, v;
+    	inline Kv() {ctorDtorCount++;}
+    	inline ~Kv() {ctorDtorCount--;}
+    };
 
     struct KvTable: private SharedTable<Os, Kv, 16> {
         inline typename SharedTable<Os, Kv, 16>::Entry* openOrCreate(int k) {
-            return this->SharedTable<Os, Kv, 16>::findOrAllocate([k](Kv* e){ return e->k == k;});
+            auto ret = this->SharedTable<Os, Kv, 16>::findOrAllocate([k](Kv* e){ return e->k == k;});
+
+            if(!ret->isValid())
+            	ret->init();
+
+            return ret;
         }
 
         inline bool set(int k, int v) {
@@ -44,8 +57,8 @@ TEST_GROUP(NetSharedTable) {
                     return false;
                 }
 
-                (*x)->k = k;
-                (*x)->v = v;
+                x->access().k = k;
+                x->access().v = v;
                 x->finalize();
                 return true;
             }
@@ -53,7 +66,7 @@ TEST_GROUP(NetSharedTable) {
 
         inline int get(int k) {
             if(auto *x = this->SharedTable<Os, Kv, 16>::find([k](Kv* e){ return e->k == k;})) {
-                int v = (*x)->v;
+                int v = x->access().v;
                 x->release();
                 return v;
             }
@@ -70,7 +83,7 @@ TEST_GROUP(NetSharedTable) {
             int ret = -1;
 
             if(auto *x = this->SharedTable<Os, Kv, 16>::findBest([](Kv* e){ return e->k;})) {
-                ret = (*x)->k;
+                ret = x->access().k;
                 x->release();
             }
 
@@ -84,27 +97,41 @@ TEST(NetSharedTable, Simple)
 {
     KvTable uut;
 
+    ctorDtorCount = 0;
+
     CHECK(uut.get(1) == -1);
+
+    CHECK(ctorDtorCount == 0);
+
     uut.set(1, 2);
+
+    CHECK(ctorDtorCount == 1);
+
     CHECK(uut.get(1) == 2);
+
+    ctorDtorCount = 0;
 }
 
 TEST(NetSharedTable, CreateCollision)
 {
     KvTable uut;
+    ctorDtorCount = 0;
 
     auto* x = uut.openOrCreate(1);
+    CHECK(ctorDtorCount == 1);
     auto* y = uut.openOrCreate(1);
+    CHECK(ctorDtorCount == 2);
     CHECK(x);
     CHECK(y);
     CHECK(x != y);
     CHECK(!x->isValid());
     CHECK(!y->isValid());
 
-    (*x)->k = 1;
+    x->access().k = 1;
     x->finalize();
 
     auto* z = uut.openOrCreate(1);
+    CHECK(ctorDtorCount == 2);
     CHECK(z == x);
     CHECK(z->isValid());
 }
@@ -112,59 +139,76 @@ TEST(NetSharedTable, CreateCollision)
 TEST(NetSharedTable, DeleteReuse)
 {
     KvTable uut;
+    ctorDtorCount = 0;
 
     auto* x = uut.openOrCreate(1);
-    (*x)->k = 1;
+    CHECK(ctorDtorCount == 1);
+    x->access().k = 1;
     x->finalize();
 
     auto* y = uut.openOrCreate(1);
+    CHECK(ctorDtorCount == 1);
     CHECK(y == x);
     y->erase();
 
+    CHECK(ctorDtorCount == 0);
+
     auto* z = uut.openOrCreate(2);
     CHECK(z == x);
+
+    CHECK(ctorDtorCount == 1);
 }
 
 TEST(NetSharedTable, OpenDeleteCollision)
 {
     KvTable uut;
+    ctorDtorCount = 0;
 
     auto* x = uut.openOrCreate(1);
-    (*x)->k = 1;
+    CHECK(ctorDtorCount == 1);
+    x->access().k = 1;
     x->finalize();
 
     auto* y = uut.openOrCreate(1);
+    CHECK(ctorDtorCount == 1);
 
     auto* z = uut.openOrCreate(1);
     z->erase();
+    CHECK(ctorDtorCount == 1);
 
     auto* u = uut.openOrCreate(1);
-
+    CHECK(ctorDtorCount == 2);
     CHECK(u != y);
 
     auto* v = uut.openOrCreate(2);
+    CHECK(ctorDtorCount == 3);
     CHECK(v != y);
 }
 
 TEST(NetSharedTable, FindBest)
 {
     KvTable uut;
+    ctorDtorCount = 0;
 
     CHECK(uut.highestKey() == -1);
 
     uut.set(2, 1);
+    CHECK(ctorDtorCount == 1);
 
     CHECK(uut.highestKey() == 2);
 
     uut.set(1, 1);
+    CHECK(ctorDtorCount == 2);
 
     CHECK(uut.highestKey() == 2);
 
     uut.remove(2);
+    CHECK(ctorDtorCount == 1);
 
     CHECK(uut.highestKey() == 1);
 
     uut.set(3, 1);
+    CHECK(ctorDtorCount == 2);
 
     CHECK(uut.highestKey() == 3);
 }

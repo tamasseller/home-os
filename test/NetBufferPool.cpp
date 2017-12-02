@@ -24,13 +24,13 @@
 using Os = OsRr;
 
 TEST_GROUP(NetBufferPool) {
-	typedef BufferPool<Os, 10, 1> Pool;
+	typedef BufferPool<Os, 10, 4 + dataSize> Pool;
 
 	class PoolJob: public Os::IoJob, Pool::IoData {
 		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
 			if(result == Os::IoJob::Result::Done) {
 				auto self = static_cast<PoolJob*>(item);
-				self->result = static_cast<Pool::Block*>(self->first);
+				self->result = self->first;
 			}
 
 			return false;
@@ -57,17 +57,17 @@ TEST(NetBufferPool, Simple) {
 			pool.init(storage);
 
 			PoolJob jobs[3];
-			jobs[0].start(pool, 3);
+			jobs[0].start(pool, 3 * dataSize);
 
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4);
+			jobs[1].start(pool, 4 * dataSize);
 
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 5);
+			jobs[2].start(pool, 5 * dataSize);
 
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
@@ -95,19 +95,19 @@ TEST(NetBufferPool, Ordering) {
 			PoolJob jobs[4];
 			pool.init(storage);
 
-			jobs[0].start(pool, 5);
+			jobs[0].start(pool, 5 * dataSize);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5);
+			jobs[1].start(pool, 5 * dataSize);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6);
+			jobs[2].start(pool, 6 * dataSize);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4);
+			jobs[3].start(pool, 4 * dataSize);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
@@ -139,19 +139,19 @@ TEST(NetBufferPool, Cancelation) {
 			PoolJob jobs[4];
 			pool.init(storage);
 
-			jobs[0].start(pool, 5);
+			jobs[0].start(pool, 5 * dataSize);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5);
+			jobs[1].start(pool, 5 * dataSize);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6);
+			jobs[2].start(pool, 6 * dataSize);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4);
+			jobs[3].start(pool, 4 * dataSize);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 

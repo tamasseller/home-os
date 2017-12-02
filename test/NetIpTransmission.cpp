@@ -9,15 +9,18 @@
 
 TEST_GROUP(NetIpTransmission) {
 	template<bool addRoute, bool addArp, class Task>
-	void work(Task& task) {
+	void work(Task& task)
+	{
 		task.start();
-		Net::init();
+		Net::init(NetBuffers<Net>::buffers);
+
 		if(addRoute) {
 			Net::addRoute(Net::Route(
 					AddressIp4::make(10, 10, 10, 0), 8,
 					AddressIp4::make(10, 10, 10, 10), Net::getIf<DummyIf<0>>())
 			);
 		}
+
 		if(addArp) {
 			Net::getIf<DummyIf<0>>()->getArpCache()->set(
 					AddressIp4::make(10, 10, 10, 1),
@@ -25,6 +28,7 @@ TEST_GROUP(NetIpTransmission) {
 					INTPTR_MAX-1
 			);
 		}
+
 		CommonTestUtils::start();
 		CHECK(!task.error);
 	}
