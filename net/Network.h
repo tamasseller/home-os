@@ -65,6 +65,7 @@ struct NetworkOptions {
 		class Packet;
 		class PacketAssembler;
 		class PacketDisassembler;
+		template <class> class PacketWriterBase;
 		class PacketBuilder;
 		class PacketTransmissionRequest;
 		typedef BufferPool<OsRr, bufferCount, Block> Pool;

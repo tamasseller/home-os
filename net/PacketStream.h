@@ -9,8 +9,10 @@
 #define PACKETSTREAM_H_
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketStream: PacketDisassembler
+class Network<S, Args...>::PacketStream: PacketDisassembler, public PacketWriterBase<PacketStream>
 {
+	friend class PacketStream::PacketWriterBase;
+
 	char *data, *limit;
 
 	constexpr inline uint16_t spaceLeft() const {
@@ -68,6 +70,23 @@ public:
 		}
 
 		return done;
+	}
+
+	inline bool skipAhead(uint16_t length)
+	{
+		while (length) {
+			if(spaceLeft() >= length) {
+				data += length;
+				break;
+			} else {
+				length = static_cast<uint16_t>(length - spaceLeft());
+
+				if(!takeNext())
+					return false;
+			}
+		}
+
+		return true;
 	}
 
 	inline bool atEop() {

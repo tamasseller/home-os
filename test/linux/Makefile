@@ -75,7 +75,6 @@ endif
 
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
-
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp

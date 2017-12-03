@@ -22,11 +22,15 @@ TEST_GROUP(NetIpTransmission) {
 	static void expectIp() {
 		DummyIf<0>::expectN(1,
 			/*            dst                 |                src                | etherType */
-			0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00
+			0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+			0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
+			/* source IP address  | destination IP address */
+			0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
 			/* TBD */
+			'f', 'o', 'o', 'b', 'a', 'r'
 		);
 	}
-
 
 	template<bool addRoute, bool addArp, class Task>
 	void work(Task& task)
@@ -89,8 +93,6 @@ TEST(NetIpTransmission, Unresolved) {
 			if(tx.getError() != NetErrorStrings::unresolved)
 				return bad;
 
-			tx.fill("foobar", 6);
-			tx.send(254);
 			return ok;
 		}
 	} task;
@@ -123,8 +125,11 @@ TEST(NetIpTransmission, Resolved) {
 			if(tx.getError())
 				return bad;
 
-/*			tx.fill("foobar", 6);
-			tx.send(254);*/
+			tx.fill("foobar", 6);
+
+			expectIp();
+
+			tx.send(254);
 			return ok;
 		}
 	} task;
@@ -147,8 +152,11 @@ TEST(NetIpTransmission, Successful) {
 			if(tx.getError())
 				return bad;
 
-/*			tx.fill("foobar", 6);
-			tx.send(254);*/
+			tx.fill("foobar", 6);
+
+			expectIp();
+
+			tx.send(254);
 			return ok;
 		}
 	} task;

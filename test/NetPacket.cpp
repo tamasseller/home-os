@@ -292,3 +292,67 @@ TEST(NetPacket, HalfWordOverlap) {
 	work(task);
 }
 
+TEST(NetPacket, SimplePatch) {
+	struct Task: TaskBase<Task> {
+		bool run() {
+			init(2);
+			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
+			builder.done();
+
+			NetworkTestAccessor::PacketStream modifier;
+			modifier.init(builder);
+
+			if(modifier.copyIn(world, strlen(world)) != strlen(world))
+					return bad;
+
+			if(checkDirectStreamContent(world) != ok)
+				return bad;
+
+			return ok;
+		}
+	} task;
+
+	work(task);
+}
+
+TEST(NetPacket, ComplexPatch) {
+	struct Task: TaskBase<Task> {
+		bool run() {
+			init(2);
+
+			builder.write8(123);
+
+			for(int i=0; i<27; i++)
+				if(!builder.write32(i)) return bad;
+
+			builder.done();
+
+			NetworkTestAccessor::PacketStream modifier;
+			modifier.init(builder);
+
+			if(modifier.read8() != 123) return bad;
+
+			for(int i=0; i<9; i++) {
+				if(modifier.read32() != (3u * i)) return bad;
+				if(!modifier.write32(3 * i)) return bad;
+				if(!modifier.skipAhead(4)) return bad;
+			}
+
+			NetworkTestAccessor::PacketStream reader;
+			reader.init(builder);
+
+			if(reader.read8() != 123) return bad;
+
+			for(int i=0; i<9; i++) {
+				if(reader.read32() != (3u * i)) return bad;
+				if(reader.read32() != (3u * i)) return bad;
+				if(reader.read32() != (3u * i + 2u)) return bad;
+			}
+
+			return ok;
+		}
+	} task;
+
+	work(task);
+}
+

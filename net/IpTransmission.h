@@ -101,7 +101,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			0x00, 0x00,		// length
 			0x00, 0x00,		// fragment identification
 			0x40, 0x00,		// flags + fragment offset
-			0x40,			// time-to-live
+			0x00,			// time-to-live
 			0x00,			// protocol
 			0x00, 0x00		// checksum
 	};
@@ -116,8 +116,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 	static const size_t ipHeaderSize = 20;
 	static const size_t arpReqSize = 28;
-	static const uint16_t etherTypeArp = correctEndian(static_cast<uint16_t>(0x0806));
-	static const uint16_t etherTypeIp = correctEndian(static_cast<uint16_t>(0x0800));
+	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
+	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
 
 	/*
 	 * Data fields that store information during the various steps of the process.
@@ -434,8 +434,66 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		packet.stage3.packet.init(copy);
 
 		InetChecksumDigester checksum;
-		PacketDisassembler disasm;
-		disasm.init(packet.stage3.packet);
+		PacketDisassembler disassembler;
+		disassembler.init(packet.stage3.packet);
+
+		size_t length = 0;
+		size_t skip = transmission.stage23.device->getHeaderSize();
+
+		size_t headerLength = ipHeaderSize;
+
+		do {
+			Chunk chunk = disassembler.getCurrentChunk();
+
+			if(chunk.length() >= skip) {
+				length = chunk.length() - skip;
+
+				if(length >= headerLength) {
+					checksum.consume(chunk.start + skip, headerLength, length & 1);
+					headerLength = 0;
+				} else {
+					checksum.consume(chunk.start + skip, length, length & 1);
+					headerLength -= length;
+				}
+				break;
+			} else
+				skip -= chunk.length();
+		}while(disassembler.advance());
+
+		while(headerLength != 0 && disassembler.advance()) {
+			Chunk chunk = disassembler.getCurrentChunk();
+
+			if(chunk.length() >= headerLength) {
+				checksum.consume(chunk.start, headerLength, length & 1);
+				headerLength = 0;
+			} else {
+				checksum.consume(chunk.start, chunk.length(), length & 1);
+				headerLength -= chunk.length();
+			}
+
+			length += chunk.length();
+		};
+
+		while(disassembler.advance()) {
+			Chunk chunk = disassembler.getCurrentChunk();
+			length += chunk.length();
+		};
+
+		checksum.patch(0, correctEndian(static_cast<uint16_t>(length)));
+		uint16_t ttlProto;
+		reinterpret_cast<uint8_t*>(&ttlProto)[0] = ttl;
+		reinterpret_cast<uint8_t*>(&ttlProto)[1] = protocol;
+		checksum.patch(0, static_cast<uint16_t>(ttlProto));
+
+		PacketStream modifier;
+		modifier.init(packet.stage3.packet);
+
+		modifier.skipAhead(static_cast<uint16_t>(transmission.stage23.device->getHeaderSize() + lengthOffset));
+		modifier.write16(static_cast<uint16_t>(length));
+		modifier.skipAhead(skipBetweenLengthAndTtl);
+		modifier.copyIn(reinterpret_cast<char*>(&ttlProto), 2);
+		uint16_t chk = checksum.result();
+		modifier.copyIn(reinterpret_cast<char*>(&chk), 2);
 
 		return this->submit(hook, this->transmission.stage23.device->getSender(), &IpTxJob::sent, &this->packet.stage3.packet);
 	}
@@ -461,14 +519,14 @@ public:
 		return this->start(protocol, ttl);
 	}
 
-	inline bool fill(const char* data, size_t length) {
+	inline bool fill(const char* data, uint16_t length) {
 		if(this->shouldWait())
 			this->wait();
 
 		if(this->error)
 			return false;
 
-		return false; //this->packet.copyIn(data, length);
+		return this->packet.stage2.packet.copyIn(data, length);
 	}
 
 	inline const char* getError() {
