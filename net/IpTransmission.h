@@ -8,7 +8,7 @@
 #ifndef IPTRANSMISSION_H_
 #define IPTRANSMISSION_H_
 
-// <sender mac>, <sender ip>, <target mac>, <target ip>,
+#include "InetChecksumDigester.h"
 
 /**
  * Multi-operation composite I/O job object for sending a simple "raw"
@@ -107,7 +107,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	};
 
 	static constexpr size_t lengthOffset = 2;
-	static constexpr size_t protocolOffset = 9;
+	static constexpr size_t skipBetweenLengthAndTtl = 4;
 
 	static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
 	static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
@@ -230,17 +230,23 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		auto route = self->transmission.stage1.route;
 		Interface* dev = route->dev;
 		state.routingTable.releaseRoute(route);
-		self->transmission.stage23.device = dev;
 
 		if(result != Os::IoJob::Result::Done) {
 			// assert(result == Os::IoJob::Result::Canceled);
 			self->error = NetErrorStrings::genericCancel;
 		} else {
 			auto allocator = self->packet.stage1.poolParams.allocator;
-			const uint32_t senderIpNetOrder = correctEndian(route->getSource().addr);
-			const uint32_t targetIpNetOrder = correctEndian(self->transmission.stage1.dst.addr);
-			const AddressEthernet &senderMac = route->dev->getAddress();
+			const uint32_t sourceIp = route->getSource().addr;
+			const uint32_t targetIp = self->transmission.stage1.dst.addr;
 			auto &packet = self->packet.stage2.packet;
+
+			packet.init(allocator);
+			route->dev->fillHeader(self->transmission.stage1.arp.mac, etherTypeIp, packet);
+			packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble));
+			packet.write32(sourceIp);
+			packet.write32(targetIp);
+
+			self->transmission.stage23.device = dev;
 		}
 
 		return false;
@@ -324,8 +330,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		if(result == Os::IoJob::Result::Done) {
 			auto allocator = self->packet.stage1.poolParams.allocator;
 			auto route = self->transmission.stage1.route;
-			const uint32_t senderIpNetOrder = route->getSource().addr;
-			const uint32_t targetIpNetOrder = self->transmission.stage1.dst.addr;
+			const uint32_t senderIp = route->getSource().addr;
+			const uint32_t targetIp = self->transmission.stage1.dst.addr;
 			const AddressEthernet &senderMac = route->dev->getAddress();
 			auto &packet = self->packet.stage2.packet;
 
@@ -333,9 +339,9 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			route->dev->fillHeader(broadcastMac, etherTypeArp, packet);
 			packet.copyIn(arpRequestPreamble, sizeof(arpRequestPreamble));
 			packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
-			packet.write32(senderIpNetOrder);
+			packet.write32(senderIp);
 			packet.copyIn(reinterpret_cast<const char*>(&zeroMac.bytes[0]), 6);
-			packet.write32(targetIpNetOrder);
+			packet.write32(targetIp);
 			packet.done();
 
 			Packet copy = self->packet.stage2.packet;
@@ -422,7 +428,15 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		return false;
 	}
 
-	inline bool start(typename Os::IoJob::Hook hook = 0) {
+	inline bool start(uint8_t protocol, uint8_t ttl, typename Os::IoJob::Hook hook = 0) {
+		packet.stage2.packet.done();
+		Packet copy = packet.stage2.packet;
+		packet.stage3.packet.init(copy);
+
+		InetChecksumDigester checksum;
+		PacketDisassembler disasm;
+		disasm.init(packet.stage3.packet);
+
 		return this->submit(hook, this->transmission.stage23.device->getSender(), &IpTxJob::sent, &this->packet.stage3.packet);
 	}
 };
@@ -437,14 +451,14 @@ public:
 		return this->start(dst, inLineSize, indirectCount);
 	}
 
-	inline bool send() {
+	inline bool send(uint8_t protocol, uint8_t ttl = 64) {
 		if(this->shouldWait())
 			this->wait();
 
 		if(this->error)
 			return false;
 
-		return this->start();
+		return this->start(protocol, ttl);
 	}
 
 	inline bool fill(const char* data, size_t length) {

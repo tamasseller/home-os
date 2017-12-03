@@ -22,11 +22,8 @@ TEST_GROUP(NetIpTransmission) {
 	static void expectIp() {
 		DummyIf<0>::expectN(1,
 			/*            dst                 |                src                | etherType */
-			0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
-			/* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
-			0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00,
-			/*      sender IP     |          target MAC               |       target IP       */
-			0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x01
+			0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00
+			/* TBD */
 		);
 	}
 
@@ -93,7 +90,7 @@ TEST(NetIpTransmission, Unresolved) {
 				return bad;
 
 			tx.fill("foobar", 6);
-			tx.send();
+			tx.send(254);
 			return ok;
 		}
 	} task;
@@ -127,7 +124,7 @@ TEST(NetIpTransmission, Resolved) {
 				return bad;
 
 /*			tx.fill("foobar", 6);
-			tx.send();*/
+			tx.send(254);*/
 			return ok;
 		}
 	} task;
@@ -151,7 +148,7 @@ TEST(NetIpTransmission, Successful) {
 				return bad;
 
 /*			tx.fill("foobar", 6);
-			tx.send();*/
+			tx.send(254);*/
 			return ok;
 		}
 	} task;
