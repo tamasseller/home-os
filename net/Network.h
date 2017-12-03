@@ -30,7 +30,9 @@ struct NetworkOptions {
 
 	template<class Scheduler, class... Options>
 	class Configurable {
+		friend class NetworkTestAccessor;
 		typedef Scheduler Os;
+
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
@@ -39,10 +41,14 @@ struct NetworkOptions {
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
+		static_assert(bufferCount < 32768, "Too many blocks requested");
+		static_assert(bufferSize < 16384, "Pool blocks are too big");
 
 	public:
 		class Interface;
 		class Route;
+
+		class PacketStream;
 
 	private:
 		template<class> class TxBinder;
@@ -53,23 +59,26 @@ struct NetworkOptions {
 		template<size_t> class ArpTable;
 
 		class RoutingTable;
-		class TxPacket;
+
+		struct Chunk;
+		class Block;
+		class Packet;
+		class PacketAssembler;
+		class PacketDisassembler;
+		class PacketBuilder;
+		class PacketTransmissionRequest;
+		typedef BufferPool<OsRr, bufferCount, Block> Pool;
 
 		static struct State {
 			Ifs<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
-			typedef BufferPool<OsRr, bufferCount, bufferSize> Pool;
 			Pool pool;
 		} state;
 
 		class IpTxJob;
 
 	public:
-		typedef typename State::Pool::Storage Buffers;
-
-		class Packet;
-		class PacketWriter;
-		class PacketReader;
+		typedef typename Pool::Storage Buffers;
 
 		class IpTransmission;
 
@@ -80,7 +89,7 @@ struct NetworkOptions {
 		    state.~State();
 		    new(&state) State();
 			state.interfaces.init();
-			state.pool(buffers);
+			state.pool.init(buffers);
 		}
 
 		static inline bool addRoute(const Route& route) {
@@ -98,10 +107,11 @@ template<class S, class... Args>
 using Network = NetworkOptions::Configurable<S, Args...>;
 
 #include "Packet.h"
+#include "PacketBuilder.h"
+#include "PacketStream.h"
 #include "Endian.h"
 #include "Routing.h"
 #include "ArpTable.h"
-#include "TxPacket.h"
 #include "Interfaces.h"
 #include "IpTransmission.h"
 

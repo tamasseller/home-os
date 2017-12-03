@@ -24,13 +24,24 @@
 using Os = OsRr;
 
 TEST_GROUP(NetBufferPool) {
-	typedef BufferPool<Os, 10, 4 + dataSize> Pool;
+	struct Dummy {
+		Dummy* next;
+	};
+
+	typedef BufferPool<Os, 10, Dummy> Pool;
 
 	class PoolJob: public Os::IoJob, Pool::IoData {
 		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
 			if(result == Os::IoJob::Result::Done) {
 				auto self = static_cast<PoolJob*>(item);
-				self->result = self->first;
+				Dummy* current = self->result = self->allocator.get();
+
+				while(Dummy* next = self->allocator.get()) {
+					current->next = next;
+					current = next;
+				}
+
+				current->next = nullptr;
 			}
 
 			return false;
@@ -43,8 +54,20 @@ TEST_GROUP(NetBufferPool) {
 			return submit(hook, &pool, &PoolJob::writeResult, this);
 		}
 
-		Pool::Block* volatile result;
+		Dummy* volatile result;
 		inline PoolJob(): result(nullptr) {}
+
+		void destroy(Pool &pool) {
+			Pool::Deallocator deallocator(result);
+
+			for(Dummy* current = result->next; current;) {
+				Dummy* next = current->next;
+				deallocator.take(current);
+				current = next;
+			}
+
+			deallocator.deallocate(&pool);
+		}
 	};
 };
 
@@ -57,22 +80,22 @@ TEST(NetBufferPool, Simple) {
 			pool.init(storage);
 
 			PoolJob jobs[3];
-			jobs[0].start(pool, 3 * dataSize);
+			jobs[0].start(pool, 3);
 
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4 * dataSize);
+			jobs[1].start(pool, 4);
 
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 5 * dataSize);
+			jobs[2].start(pool, 5);
 
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			pool.reclaim(jobs[0].result);
+			jobs[0].destroy(pool);
 
 			Os::sleep(1);
 			if(jobs[2].result == nullptr) return bad;
@@ -95,28 +118,28 @@ TEST(NetBufferPool, Ordering) {
 			PoolJob jobs[4];
 			pool.init(storage);
 
-			jobs[0].start(pool, 5 * dataSize);
+			jobs[0].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5 * dataSize);
+			jobs[1].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6 * dataSize);
+			jobs[2].start(pool, 6);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4 * dataSize);
+			jobs[3].start(pool, 4);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
-			pool.reclaim(jobs[0].result);
+			jobs[0].destroy(pool);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 			if(jobs[3].result != nullptr) return bad;
 
-			pool.reclaim(jobs[1].result);
+			jobs[1].destroy(pool);
 			Os::sleep(1);
 			if(jobs[2].result == nullptr) return bad;
 			if(jobs[3].result == nullptr) return bad;
@@ -139,23 +162,23 @@ TEST(NetBufferPool, Cancelation) {
 			PoolJob jobs[4];
 			pool.init(storage);
 
-			jobs[0].start(pool, 5 * dataSize);
+			jobs[0].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5 * dataSize);
+			jobs[1].start(pool, 5);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6 * dataSize);
+			jobs[2].start(pool, 6);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4 * dataSize);
+			jobs[3].start(pool, 4);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
-			pool.reclaim(jobs[0].result);
+			jobs[0].destroy(pool);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 			if(jobs[3].result != nullptr) return bad;

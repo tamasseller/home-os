@@ -10,45 +10,60 @@
 
 #include "Network.h"
 
-template<>
-class Block {
-	friend class BufferPool;
+template<class S, class... Args>
+struct Network<S, Args...>::Chunk {
+	char *start, *end;
 
+	inline size_t length() {
+		return end-start;
+	}
+};
+
+
+template<class S, class... Args>
+class Network<S, Args...>::Block {
 public:
 	/**
 	 * Optional destructor for indirect blocks.
 	 */
-	typedef void (*Destructor)(void*, char*, char*);
+	typedef void (*Destructor)(void*, char*, size_t);
 
 private:
 
 	/*
 	 * Helper types.
+	 *
+	 * The initial state indicates that:
+	 *
+	 *  - The block is in-line type, with no data yet,
+	 *  - There is no next block, but
+	 *  - The current one is not the end of the packet.
+	 *
+	 * This intermediate state is changed by the PacketWriter either by
+	 * adding more blocks or flagging the block as the last one of the packet.
 	 */
 	struct Header {
-		int16_t nextOffset;
+		int16_t nextOffset = 0;
 		uint16_t sizeAndFlags = 0;
 	};
 
 	struct IndirectEntry {
 		void *user;
 		char *start;
-		size_t size;
+		uint16_t size;
 		Destructor destructor;
 	};
 
 	/*
 	 * Constant definitions
 	 */
-	static constexpr size_t dataSize = sizeof(Block) - sizeof(Header);
+public:
+	static constexpr size_t dataSize = bufferSize - sizeof(Header);
+
+private:
 	static constexpr uint16_t endOfPacket = 0x8000;
 
-	/*
-	 * Helper header structure
-	 */
-	static_assert(nBlocks < 32768, "Too many blocks requested");
-	static_assert(blockSize < 16384, "Pool blocks are too big");
-	static_assert(dataSize >= sizeof(Entry), "Pool blocks are too small");
+	static_assert(dataSize >= sizeof(IndirectEntry), "Pool blocks are too small");
 
 	/*
 	 * Data members.
@@ -58,7 +73,7 @@ private:
 
 	union {
 		/// In-line data storage area.
-		char bytes[blockSize - sizeof(Header)];
+		char bytes[dataSize];
 
 		/// Indirect data storage (with optional destructor).
 		IndirectEntry entry;
@@ -80,9 +95,9 @@ public:
 	/**
 	 * Set the next block.
 	 *
-	 * The next block must be inside the pool.
+	 * The next block must be inside the pool and can not be null.
 	 */
-	inline void setNextNonNull(Block *block) {
+	inline void setNext(Block *block) {
 		header.nextOffset = static_cast<uint16_t>(block - this);
 	}
 
@@ -97,43 +112,23 @@ public:
 	}
 
 	/**
-	 * Get the size of the stored data.
+	 * Get the size of the stored in-line data.
 	 */
-	inline uint16_t getSize() {
-		if((header.sizeAndFlags & endOfPacket) != 0)
-			return header.sizeAndFlags & ~endOfPacket;
-		else
-			return entry.size;
+	inline uint16_t getSize() const {
+		return header.sizeAndFlags & static_cast<uint16_t>(~endOfPacket);
 	}
 
 	/**
 	 * Set the size of the contained data (implies in-line storage).
 	 */
 	inline void setSize(uint16_t size) {
-		header.sizeAndFlags = (header.sizeAndFlags & endOfPacket) | (size & endOfPacket);
-	}
-
-	/**
-	 * Check whether the block contains the data in-line or an indirect reference to it.
-	 */
-	inline bool isIndirect() {
-		return (header.sizeAndFlags & ~endOfPacket) == 0;
-	}
-
-	/**
-	 * Set the indirect content.
-	 */
-	inline void setIndirect(char *start, size_t size, Destructor destructor = nullptr, void *user = nullptr) {
-		entry.user = user;
-		entry.start = start;
-		entry.size = size;
-		entry.destructor = destructor;
+		header.sizeAndFlags = (header.sizeAndFlags & endOfPacket) | (size & static_cast<uint16_t>(~endOfPacket));
 	}
 
 	/**
 	 * Check if this block is flagged as the end of a packet.
 	 */
-	inline bool isEndOfPacket() {
+	inline bool isEndOfPacket() const {
 		return header.sizeAndFlags & endOfPacket;
 	}
 
@@ -141,80 +136,128 @@ public:
 	 * Set or reset the end of packet flag.
 	 */
 	inline void setEndOfPacket(bool x) {
-		header.sizeAndFlags = x ? (header.sizeAndFlags | endOfPacket) : (header.sizeAndFlags & ~endOfPacket);
+		header.sizeAndFlags = static_cast<uint16_t>(x ? (header.sizeAndFlags | endOfPacket) : (header.sizeAndFlags & ~endOfPacket));
 	}
 
 	/**
 	 * Get the pointer to the data (in-line or indirect).
 	 */
-	inline char* data() {
-		if((header.sizeAndFlags & endOfPacket) != 0)
-			return &bytes[0];
-		else
-			return entry.start;
+	inline char* getData() {
+		return &bytes[0];
 	}
 
-	/**
-	 * Call the destructor if it is an indirect block and there is one.
-	 */
-	inline void dispose() {
-		if(isIndirect()) {
-			if(entry.destructor) {
-				entry.destructor(entry.user, entry.start, entry.size);
-			}
-		}
+	inline char* getIndirectData() {
+		return entry.start;
+	}
+
+	inline uint16_t getIndirectSize() {
+		return entry.size;
+	}
+
+	inline void callIndirectDestructor() {
+		if(entry.destructor)
+			entry.destructor(entry.user, entry.start, entry.size);
 	}
 };
-
 
 template<class S, class... Args>
 class Network<S, Args...>::Packet
 {
 	friend Network<S, Args...>;
+	Block* first;
 
-	typename State::Pool::Block* first;
+public:
+	void init(Block* first) {
+		this->first = first;
+	}
+
+	void dispose() {
+		// TODO
+	}
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketWriter
+class Network<S, Args...>::PacketAssembler: public Packet
 {
-	friend Network<S, Args...>;
-	Packet& packet;
+protected:
+	Block* current;
 
 public:
-	inline bool copyIn(const char* data, size_t dataLength) {
-	/*	while(dataLength) {
-			Chunk chunk = nextChunk();
-			const size_t length = chunk.length();
+	inline void addBlock(Block* next) {
+		current->setNext(next);
+		current = next;
+	}
 
-			if(!length)
-				return false;
+	inline void init(Block* first) {
+		Packet::init(first);
+		current = first;
+	}
 
-			if(length < dataLength) {
-				memcpy((void*)chunk.begin(), data, length);
-				dataLength -= length;
-				data += length;
-				leaveAt(dataLength);
-			} else {
-				memcpy((void*)chunk.begin(), data, dataLength);
-				leaveAt(dataLength);
-				break;
-			}
-		}*/
+	inline void done() {
+		current->setEndOfPacket(true);
+		current->terminate();
+	}
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::PacketDisassembler
+{
+protected:
+	Block* current;
+
+private:
+	bool moveToNextBlock() {
+		if(Block* next = current->getNext())
+			current = next;
+		else
+			return false;
 
 		return true;
 	}
 
-	inline bool copyIn32(uint32_t data) {
-		return copyIn((const char*)&data, 4); // TODO optimize
+	inline bool isCurrentIndirect() {
+		return current->getSize() == 0x7fff;
+	}
+
+public:
+	inline void init(const Packet& p) {
+		current = p.first;
+	}
+
+	inline bool advance() {
+		if(current->isEndOfPacket())
+			return false;
+
+		return moveToNextBlock();
+	}
+
+	inline bool moveToNextPacket() {
+		// assert(current->isEndOfPacket());
+		return moveToNextBlock();
+	}
+
+	inline Chunk getCurrentChunk() {
+		char *start, *limit;
+
+		if(isCurrentIndirect()) {
+			start = current->getIndirectData();
+			limit = start + current->getIndirectSize();
+		} else {
+			start = current->getData();
+			limit = start + current->getSize();
+		}
+
+		return Chunk{start, limit};
 	}
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketReader
-{
+struct Network<S, Args...>::PacketTransmissionRequest: Packet, Os::IoJob::Data {
+	PacketTransmissionRequest 	*next;
 
+	void init(const Packet& packet) {
+		*static_cast<Packet*>(this) = packet;
+	}
 };
-
 
 #endif /* PACKET_H_ */

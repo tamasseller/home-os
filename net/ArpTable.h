@@ -15,7 +15,7 @@ struct Network<S, Args...>::ArpEntry {
     friend class Network<S, Args...>;
 	AddressIp4 ip;
 	AddressEthernet mac;
-	uintptr_t timeout;
+	uint16_t timeout;
 };
 
 template<class S, class... Args>
@@ -25,7 +25,7 @@ class Network<S, Args...>::ArpTableIoData: public Os::IoJob::Data {
 public:
 	union {
 		AddressIp4 ip;
-		ArpEntry* entry;
+		AddressEthernet mac;
 	};
 };
 
@@ -48,8 +48,7 @@ class Network<S, Args...>::ArpTable:
 	{
 		ArpTableIoData* data = static_cast<ArpTableIoData*>(job);
 
-		if(auto entry = lookUp(data->ip)) {
-			data->entry = entry;
+		if(lookUp(data->ip, data->mac)) {
 			this->jobDone(data);
 			return true;
 		}
@@ -63,32 +62,31 @@ class Network<S, Args...>::ArpTable:
 	}
 
 public:
-	inline ArpEntry* lookUp(AddressIp4 ip) {
-		if(auto x = this->find([ip](const ArpEntry* entry){return entry->ip == ip;}))
-			return x->getData();
+	inline bool lookUp(AddressIp4 ip, AddressEthernet& mac) {
+		if(auto x = this->find([ip](const ArpEntry* entry){return entry->ip == ip;})) {
+			mac = x->access().mac;
+			return true;
+		}
 
-		return nullptr;
+		return false;
 	}
 
-	inline void free(ArpEntry* entry) {
-		ArpTable::SharedTable::entryFromData(entry)->release();
-	}
-
-	inline void set(AddressIp4 ip, const AddressEthernet &mac, uintptr_t timeout) {
+	inline void set(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout) {
 		if(auto ret = this->findOrAllocate([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			if(ret->isValid()) {
 				ret->release();
 				return;
 			}
 
-			ret->getData()->timeout = timeout;
-			ret->getData()->ip = ip;
-			ret->getData()->mac = mac;
+			ret->access().ip = ip;
+			ret->access().mac = mac;
+			ret->access().timeout = timeout;
 			ret->finalize();
 		}
 
 		for(auto it = this->items.iterator(); it.current(); it.step()) {
 			if(it.current()->ip == ip) {
+				it.current()->mac = mac;
 				this->jobDone(it.current());
 			}
 		}

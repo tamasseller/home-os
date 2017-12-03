@@ -24,6 +24,21 @@ public:
 	inline static void enableTxIrq();
 	inline static void disableTxIrq() {}
 	inline static void init() {}
+
+	template<class... C>
+	static inline void expectN(size_t n, C... c) {
+		const uint8_t input[] = {static_cast<uint8_t>(c)...};
+		const uint8_t *p = input;
+		size_t l = sizeof...(c);
+
+		uint32_t sum = 0;
+		while(l--)
+			sum += *p++;
+
+		while(n--)
+			MOCK(DummyIf)::EXPECT(tx).withParam(id).withParam(sum);
+	}
+
 };
 
 template<uint8_t id>
@@ -45,11 +60,28 @@ typename Net::Buffers NetBuffers<Net>::buffers;
 template<uint8_t id>
 inline void DummyIf<id>::enableTxIrq() {
 	auto x = Net::getIf<DummyIf<id>>()->getTxInfoProvider();
-	while(auto p = x->getCurrentPacket()) {
-		/*for(p.get)
-		MOCK(DummyIf)::CALL(tx).withParam(id).withParam();*/
+	while(Net::PacketTransmissionRequest* p = x->getCurrentPacket()) {
+		Net::PacketStream packet;
+		packet.init(*p);
+
+		uint32_t sum = 0;
+		while(!packet.atEop())
+			sum += packet.read8();
+
+		MOCK(DummyIf)::CALL(tx).withParam(id).withParam(sum);
 		x->packetTransmitted();
 	}
 }
+
+struct NetworkTestAccessor: Net {
+	static constexpr auto &pool = Net::state.pool;
+	using Net::Pool;
+	using Net::Chunk;
+	using Net::Block;
+	using Net::Packet;
+	using Net::PacketAssembler;
+	using Net::PacketDisassembler;
+	using Net::PacketBuilder;
+};
 
 #endif /* TESTNETDEFINITIONS_H_ */

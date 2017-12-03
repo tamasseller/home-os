@@ -10,62 +10,238 @@
 
 // <sender mac>, <sender ip>, <target mac>, <target ip>,
 
+/**
+ * Multi-operation composite I/O job object for sending a simple "raw"
+ * IP packet to a unicast destination.
+ *
+ * This object implements two asynchronous operations that must be invoked
+ * in turns, and the user data filled in between, thus there are three
+ * stages that the object goes through for every packet sent:
+ *
+ *  1. Preparation of a new packet: address lookup and buffer allocation.
+ *  2. User data input: using in-line data copied from used objects or
+ *     indirect data referring the data objects of the user (with optional
+ *     life-cycle management support).
+ *  3. Transmission of the packet.
+ *
+ * The first operation requires the user to specify the destination address and
+ * the maximal size for the packet. The packet size has to be specified in order
+ * to avoid deadlocks on simultaneous buffer allocations: the buffers needed to
+ * store the specified maximal amount of data are allocated in advance, if the
+ * allocation request can not be completed immediately, then the I/O job is scheduled
+ * for asynchronous execution. The whole operation comprises of the following steps:
+ *
+ *   1. Route lookup and link layer address lookup:
+ *
+ *     - A suitable route is looked up, if not found and the default route is
+ *       configured it is used throughout following the steps.
+ *     - The resolution of the cached link layer address attempted using the ARP
+ *       cache for the interface.
+ *     - Buffers are allocated for the next operation, which depending on whether a
+ *       matching entry is found in the ARP table or not, can either be:
+ *
+ *         b. For known destination: filling in link and initial IP headers (step 5).
+ *         a. Otherwise: construction and sending of the ARP request packet (step 2).
+ *
+ *       These operations may or may not be completed immediately depending on the
+ *       current buffer availability, in either case the handler for the completion
+ *       is invoked with identical parameters (ie. it does not know if it is called
+ *       directly or as an asynchronous callback).
+ *
+ *   2. Transmission of the ARP request: when the buffer allocation is complete, the
+ *      contents of the request packet are generated. Then the packet is sent out over
+ *      the interface selected in step 1.
+ *
+ *   3. Releasing of the request packet buffers: after the request is sent the buffers
+ *      used to hold the request packet are freed up, in the hope that if the
+ *      destination really exists on the network, then it will probably catch the
+ *      message for at first go, so it won't be needed again.
+ *
+ *   4. Waiting for ARP reply: the next step is bound to the resolution of the
+ *      requested address, but a timeout for this operation is also specified:
+ *
+ *      - If the lookup is successful allocate buffers for the user data as in step1,
+ *        and after that completes progress to step 5.
+ *      - If timed out, steps 2-4 are repeated, by first allocating new buffers
+ *        for the request packet. This repeated re-transmission is done only
+ *        a limited number of times specified by the _ArpRequestRetry_ parameter.
+ *      - Fail if the re-transmission is done too many times.
+ *
+ *   5. Filling the headers: link layer and IP headers are filled with their
+ *      initial values, the checksum field is left zero.
+ *
+ *  After completing the initial, preparation operation the user can add its own
+ *  business data into the packet that is stored in the buffers allocated during
+ *  the preparation operation. All of the methods provided for this activity are
+ *  synchronous and non-blocking.
+ *
+ *  When the user is finished with filling in the data, the second, finalizing
+ *  asynchronous operation is invoked on the object which:
+ *
+ *    1. Finalizes and queues the packet:
+ *
+ *         - Frees up leftover buffers, that where not used for storing user content.
+ *         - Calculates writes the final packet length and calculates the checksum of
+ *           the IP header, if the interface does not provide hardware off-loading
+ *           for that.
+ *         - Queues the packet for transmission.
+ *
+ *    2. Buffer release: after the packet has been transmitted the packet contents are
+ *       no longer required to be kept, thus are freed up and reclaimed by the pool.
+ */
 template<class S, class... Args>
 struct Network<S, Args...>::IpTxJob: Os::IoJob {
+	friend class Os::IoChannel;
+	/*
+	 * Constant packet pieces and parameters for well-known management protocols.
+	 */
+	static constexpr const char initialIpPreamble[12] = {
+			0x45,			// ver + ihl
+			0x00,			// dscp + ecn
+			0x00, 0x00,		// length
+			0x00, 0x00,		// fragment identification
+			0x40, 0x00,		// flags + fragment offset
+			0x40,			// time-to-live
+			0x00,			// protocol
+			0x00, 0x00		// checksum
+	};
+
+	static constexpr size_t lengthOffset = 2;
+	static constexpr size_t protocolOffset = 9;
+
 	static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
 	static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
-	static constexpr const char zeroMac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	static constexpr AddressEthernet broadcastMac = AddressEthernet::make(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+	static constexpr AddressEthernet zeroMac = AddressEthernet::make(0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
-	static const size_t arpReqSize = 28;
 	static const size_t ipHeaderSize = 20;
+	static const size_t arpReqSize = 28;
+	static const uint16_t etherTypeArp = correctEndian(static_cast<uint16_t>(0x0806));
+	static const uint16_t etherTypeIp = correctEndian(static_cast<uint16_t>(0x0800));
 
-	friend class Os::IoChannel;
-	AddressIp4 dst;
-	size_t length;
+	/*
+	 * Data fields that store information during the various steps of the process.
+	 */
 	const char* error;
 
 	union {
-		Route* route;
-		Interface* device;
-	};
+		struct {
+			/**
+			 * The route the packed is to be sent over.
+			 *
+			 * It is used only until the headers are constructed, provides:
+			 *
+			 *  - The network interface that is used for:
+			 *    - Querying the associated ARP cache.
+			 *    - Sending the packet in stage 3.
+			 *  - The source address to be specified in the IP header.
+			 */
+			Route* route;
+
+			/**
+			 * Destination IP address.
+			 */
+			AddressIp4 dst;
+
+			/**
+			 * ARP resolution request and reply holder, provides the
+			 * destination MAC address after the resolution is done.
+			 */
+			ArpTableIoData arp;
+
+			/**
+			 * ARP retry counter.
+			 */
+			uint8_t retry;
+
+			/**
+			 * Number of blocks to be allocated for user data.
+			 */
+			uint8_t nBlocks;
+		} stage1;
+
+
+		struct {
+			/**
+			 * The device over which the packet is sent.
+			 *
+			 * It is used after the headers are done but before the
+			 * packet is sent (stage 2, 3).
+			 */
+			Interface* device;
+		} stage23;
+	} transmission;
 
 	union {
-		typename State::Pool::IoData poolParams;
-		TxPacket packet;
-	};
+		/**
+		 * Packet information used during the first stage.
+		 */
+		struct {
+			/**
+			 * Buffer pool request and reply holder, it holds the allocator
+			 * used for the header and data assembly.
+			 */
+			typename Pool::IoData poolParams;
+		} stage1;
 
-	ArpTableIoData arp;
-	uint8_t retry;
+		/**
+		 * Packet information used during the second stage.
+		 */
+		struct {
+			/**
+			 * The assembled packet, filled with the headers at the end of
+			 * stage 1 and during stage 2, the packet is also patched at the
+			 * start of stage 3 with the size and possibly the checksum.
+			 */
+			PacketBuilder packet;
+		} stage2;
+
+		/**
+		 * Packet data used during the third, final stage.
+		 */
+		struct {
+			/**
+			 * The final queueable packet, that is made from _stage12.packet_.
+			 * during stage 3.
+			 */
+			PacketTransmissionRequest packet;
+		} stage3;
+	} packet;
 
 	enum class AsyncResult {
 		Done, Later, Error
 	};
 
-	/* TODO + header size */
 	inline AsyncResult allocateBuffers(typename Os::IoJob::Hook hook, size_t size, typename Os::IoJob::Callback callback) {
-		if(void *ret = state.pool.allocateDirect(size)) {
-			poolParams.first = ret;
+		/* TODO + header size */
+
+		auto ret = state.pool.allocateDirect(size);
+		if(ret.hasMore()) {
+			packet.stage1.poolParams.allocator = ret;
 			return callback(this, Os::IoJob::Result::Done, hook) ? AsyncResult::Later: AsyncResult::Done;
 		}
 
-		poolParams.size = size;
-		return this->submit(hook, state.pool, callback, &poolParams) ? AsyncResult::Later : AsyncResult::Error;
+		packet.stage1.poolParams.size = size;
+		return this->submit(hook, &state.pool, callback, &packet.stage1.poolParams) ? AsyncResult::Later : AsyncResult::Error;
 	}
 
 	static bool allocated(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
 		auto self = static_cast<IpTxJob*>(item);
+		auto route = self->transmission.stage1.route;
+		Interface* dev = route->dev;
+		state.routingTable.releaseRoute(route);
+		self->transmission.stage23.device = dev;
 
-		if(result == Os::IoJob::Result::Done) {
-			void* firstBlock = self->poolParams.first;
-			self->packet.init(firstBlock, 0, self->route->dev->getStandardPacketOperations());
+		if(result != Os::IoJob::Result::Done) {
+			// assert(result == Os::IoJob::Result::Canceled);
+			self->error = NetErrorStrings::genericCancel;
+		} else {
+			auto allocator = self->packet.stage1.poolParams.allocator;
+			const uint32_t senderIpNetOrder = correctEndian(route->getSource().addr);
+			const uint32_t targetIpNetOrder = correctEndian(self->transmission.stage1.dst.addr);
+			const AddressEthernet &senderMac = route->dev->getAddress();
+			auto &packet = self->packet.stage2.packet;
 		}
-
-		// TODO fill headers.
-
-		Interface* dev = self->route->dev;
-		state.routingTable.releaseRoute(self->route);
-		self->device = dev;
-		self->device->releaseAddress(self->arp.entry);
 
 		return false;
 	}
@@ -81,16 +257,17 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Allocate buffer for the business packet.
 			 */
-			AsyncResult ret = self->allocateBuffers(hook, self->length /* TODO + header size */, &IpTxJob::allocated);
+			AsyncResult ret = self->allocateBuffers(hook, self->transmission.stage1.nBlocks/* TODO + header size */, &IpTxJob::allocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
 
-		} else if(self->retry--){
+		} else if(self->transmission.stage1.retry--){
 			/*
 			 * Restart arp query packet generation and sending.
 			 */
-			AsyncResult ret = self->allocateBuffers(hook, arpReqSize, &IpTxJob::arpPacketAllocated);
+			const auto size = (arpReqSize + self->transmission.stage1.route->dev->getHeaderSize() + bufferSize - 1) / bufferSize;
+			AsyncResult ret = self->allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
@@ -118,16 +295,16 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 		if(result == Os::IoJob::Result::Done) {
 			/*
-			 * Dispose of the arp request packet in the hope that the request is not needed to
+			 * Dispose of the ARP request packet in the hope that the request is not needed to
 			 * be repeated (and even if it needs to be, avoid sitting on resources while waiting).
 			 */
-			self->packet.dispose();
+			self->packet.stage3.packet.dispose();
 
 			/*
 			 * Wait for the required address.
 			 */
-			self->arp.ip = self->dst;
-			if(self->route->dev->requestResolution(hook, self, &IpTxJob::addressResolved, &self->arp))
+			self->transmission.stage1.arp.ip = self->transmission.stage1.dst;
+			if(self->transmission.stage1.route->dev->requestResolution(hook, self, &IpTxJob::addressResolved, &self->transmission.stage1.arp))
 				return true;
 		}
 
@@ -145,21 +322,26 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		IpTxJob* self = static_cast<IpTxJob*>(item);
 
 		if(result == Os::IoJob::Result::Done) {
-			void* firstBlock = self->poolParams.first;
-			self->packet.init(firstBlock, 0, self->route->dev->getStandardPacketOperations());
+			auto allocator = self->packet.stage1.poolParams.allocator;
+			auto route = self->transmission.stage1.route;
+			const uint32_t senderIpNetOrder = route->getSource().addr;
+			const uint32_t targetIpNetOrder = self->transmission.stage1.dst.addr;
+			const AddressEthernet &senderMac = route->dev->getAddress();
+			auto &packet = self->packet.stage2.packet;
 
-			self->packet.copyIn(arpReplyPreamble, sizeof(arpReplyPreamble));
-			const AddressEthernet &senderMac = self->route->dev->getAddress();
-			uint32_t senderIpNetOrder = correctEndian(self->route->getSource().addr);
-			uint32_t targetIpNetOrder = correctEndian(self->dst.addr);
-			self->packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
-			self->packet.copyIn32(senderIpNetOrder);
-			self->packet.copyIn(zeroMac, 6);
-			self->packet.copyIn32(targetIpNetOrder);
+			packet.init(allocator);
+			route->dev->fillHeader(broadcastMac, etherTypeArp, packet);
+			packet.copyIn(arpRequestPreamble, sizeof(arpRequestPreamble));
+			packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
+			packet.write32(senderIpNetOrder);
+			packet.copyIn(reinterpret_cast<const char*>(&zeroMac.bytes[0]), 6);
+			packet.write32(targetIpNetOrder);
+			packet.done();
 
-			// TODO fill arp query
+			Packet copy = self->packet.stage2.packet;
+			self->packet.stage3.packet.init(copy);
 
-			if(self->submit(hook, self->route->dev->getSender(), &IpTxJob::arpPacketSent, &self->packet))
+			if(self->submit(hook, route->dev->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
 				return true;
 		}
 
@@ -172,7 +354,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	/**
 	 * Initiate the packet preparation sequence.
 	 */
-	inline bool start(AddressIp4 dst, size_t length, typename Os::IoJob::Hook hook = 0)
+	inline bool start(AddressIp4 dst, size_t inLineSize, size_t indirectCount, typename Os::IoJob::Hook hook = 0)
 	{
 		error = nullptr;
 
@@ -180,16 +362,36 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		 * Find the right network and save arguments.
 		 */
 		if(auto route = state.routingTable.findRoute(dst)) {
-			this->route = route;
-			this->dst = dst;
-			this->length = length;
+			this->transmission.stage1.route = route;
+			this->transmission.stage1.dst = dst;
+
+			inLineSize += ipHeaderSize; /* TODO + link header size */
+			/*
+			 * The final number of buffers is determined not only by the amount of in-line data
+			 * but also the indirect data references. If in-line and indirect buffers are used
+			 * on after the other, the indirect one cause the previous in-line to not be filled
+			 * completely, so the tightest upper limit on the number of buffers consists of the
+			 * two buffers for each indirect plus the minimal number of buffers that can host
+			 * the in-line data minus one byte for each indirect one, because in the worst case
+			 * an in-line buffer preceding an indirect one contains a single byte.
+			 *
+			 * |some in-| -> |line dat| -> |a_______| -> | | -> |some oth| -> |er data_|
+			 *                                 ^          |
+			 *                                 |          |
+			 * Truncated block (one byte wc) --/          |
+			 *                ___________________________/ \____________________________
+			 *               /                                                          \
+			 *               | arbitrary length user data accessed through by reference |
+			 */
+			this->transmission.stage1.nBlocks = static_cast<uint8_t>(
+					(inLineSize - indirectCount + bufferSize - 1) / bufferSize +
+					2 * indirectCount);
 
 			/*
 			 * Try to find the L2 address from the device cache, if found short
 			 * circuit the ARP querying and cut-through to the completion of it.
 			 */
-			if(ArpEntry* entry = this->route->dev->resolveAddress(dst)) {
-				this->arp.entry = entry;
+			if(route->dev->resolveAddress(dst, this->transmission.stage1.arp.mac)) {
 				addressResolved(this, Os::IoJob::Result::Done, hook);
 				return true;
 			}
@@ -197,8 +399,9 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
-			this->retry = arpRequestRetry;
-			if(allocateBuffers(hook, arpReqSize, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
+			this->transmission.stage1.retry = arpRequestRetry;
+			const auto size = (arpReqSize + transmission.stage1.route->dev->getHeaderSize() + bufferSize - 1) / bufferSize;
+			if(allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
 
 			/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
@@ -215,23 +418,23 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	 */
 	static bool sent(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
 		auto self = static_cast<IpTxJob*>(item);
-		self->packet.dispose();
+		self->packet.stage3.packet.dispose();
 		return false;
 	}
 
 	inline bool start(typename Os::IoJob::Hook hook = 0) {
-		return this->submit(hook, this->device->getSender(), &IpTxJob::sent, &packet);
+		return this->submit(hook, this->transmission.stage23.device->getSender(), &IpTxJob::sent, &this->packet.stage3.packet);
 	}
 };
 
 template<class S, class... Args>
 class Network<S, Args...>::IpTransmission: public Os::template IoRequest<IpTxJob> {
 public:
-	inline bool prepare(AddressIp4 dst, size_t size) {
+	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0) {
 		if(this->shouldWait())
 			this->wait();
 
-		return this->start(dst, size);
+		return this->start(dst, inLineSize, indirectCount);
 	}
 
 	inline bool send() {
@@ -251,7 +454,7 @@ public:
 		if(this->error)
 			return false;
 
-		return this->packet.copyIn(data, length);
+		return false; //this->packet.copyIn(data, length);
 	}
 
 	inline const char* getError() {
@@ -260,13 +463,18 @@ public:
 };
 
 template<class S, class... Args>
+constexpr const char Network<S, Args...>::IpTxJob::initialIpPreamble[];
+
+template<class S, class... Args>
 constexpr const char Network<S, Args...>::IpTxJob::arpRequestPreamble[];
 
 template<class S, class... Args>
 constexpr const char Network<S, Args...>::IpTxJob::arpReplyPreamble[];
 
 template<class S, class... Args>
-constexpr const char Network<S, Args...>::IpTxJob::zeroMac[];
+constexpr AddressEthernet Network<S, Args...>::IpTxJob::broadcastMac;
 
+template<class S, class... Args>
+constexpr AddressEthernet Network<S, Args...>::IpTxJob::zeroMac;
 
 #endif /* IPTRANSMISSION_H_ */

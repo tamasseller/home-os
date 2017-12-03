@@ -8,6 +8,29 @@
 #include "common/TestNetDefinitions.h"
 
 TEST_GROUP(NetIpTransmission) {
+	static void expectArpReq(size_t n) {
+		DummyIf<0>::expectN(n,
+			/*            dst                 |                src                | etherType */
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x06,
+			/* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+			0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00,
+			/*      sender IP     |          target MAC               |       target IP       */
+			0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x01
+		);
+	}
+
+	static void expectIp() {
+		DummyIf<0>::expectN(1,
+			/*            dst                 |                src                | etherType */
+			0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+			/* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+			0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00,
+			/*      sender IP     |          target MAC               |       target IP       */
+			0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x01
+		);
+	}
+
+
 	template<bool addRoute, bool addArp, class Task>
 	void work(Task& task)
 	{
@@ -25,7 +48,7 @@ TEST_GROUP(NetIpTransmission) {
 			Net::getIf<DummyIf<0>>()->getArpCache()->set(
 					AddressIp4::make(10, 10, 10, 1),
 					AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
-					INTPTR_MAX-1
+					32767
 			);
 		}
 
@@ -58,6 +81,9 @@ TEST(NetIpTransmission, Unresolved) {
 		bool run() {
 			Net::IpTransmission tx;
 			tx.init();
+
+			expectArpReq(4);
+
 			if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
 				return bad;
 
@@ -80,6 +106,9 @@ TEST(NetIpTransmission, Resolved) {
 		bool run() {
 			Net::IpTransmission tx;
 			tx.init();
+
+			expectArpReq(1);
+
 			if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
 				return bad;
 
@@ -89,7 +118,7 @@ TEST(NetIpTransmission, Resolved) {
 			Net::getIf<DummyIf<0>>()->getArpCache()->set(
 					AddressIp4::make(10, 10, 10, 1),
 					AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
-					INTPTR_MAX-1
+					32768
 			);
 
 			tx.wait();

@@ -16,13 +16,15 @@ template<class S, class... Args>
 class Network<S, Args...>::Interface {
 	friend class Network<S, Args...>;
 
-	virtual typename Os::IoChannel *getSender() = 0;
+	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
+	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
 
 	virtual const AddressEthernet& getAddress() = 0;
 
-	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
-	virtual ArpEntry* resolveAddress(const AddressIp4&) = 0;
-	virtual void releaseAddress(ArpEntry*) = 0;
+	virtual size_t getHeaderSize() = 0;
+	virtual void fillHeader(const AddressEthernet& dst, uint16_t etherType, PacketBuilder&) = 0;
+
+	virtual typename Os::IoChannel *getSender() = 0;
 };
 
 template<class S, class... Args>
@@ -42,16 +44,22 @@ class Network<S, Args...>::TxBinder: public Interface {
 		return If::ethernetAddress;
 	}
 
-	virtual ArpEntry* resolveAddress(const AddressIp4& ip) override final {
-		return resolver.lookUp(ip);
+	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) override final {
+		return resolver.lookUp(ip, mac);
 	}
 
 	virtual bool requestResolution(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, ArpTableIoData* data) override final {
 		return item->submitTimeout(hook, &resolver, If::arpReqTimeout, callback, data);
 	}
 
-	virtual void releaseAddress(ArpEntry* entry) override final {
-		resolver.free(entry);
+	virtual size_t getHeaderSize() override final {
+		return 14;
+	}
+
+	virtual void fillHeader(const AddressEthernet& dst, uint16_t etherType, PacketBuilder& packet) override final {
+		packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6);
+		packet.copyIn(reinterpret_cast<const char*>(If::ethernetAddress.bytes), 6);
+		packet.write16(etherType);
 	}
 
 	void init() {
@@ -105,15 +113,15 @@ class Network<S, Args...>::TxBinder<If>::Sender: Network<S, Args...>::Os::templa
 	friend class Sender::IoChannelBase;
 	friend class TxBinder;
 
-	TxPacket *currentPacket, *nextPacket;
-	pet::LinkedList<TxPacket> items;
+	PacketTransmissionRequest *currentPacket, *nextPacket;
+	pet::LinkedList<PacketTransmissionRequest> items;
 
 	void enableProcess() {If::enableTxIrq();}
 	void disableProcess() {If::disableTxIrq();}
 
 	bool addItem(typename Os::IoJob::Data* data)
 	{
-		TxPacket* p = static_cast<TxPacket*>(data);
+		auto* p = static_cast<PacketTransmissionRequest*>(data);
 
 		if(!currentPacket)
 			currentPacket = p;
@@ -137,7 +145,7 @@ class Network<S, Args...>::TxBinder<If>::Sender: Network<S, Args...>::Os::templa
 	}
 
 	bool removeCanceled(typename Os::IoJob::Data* data) {
-		return this->items.remove(static_cast<TxPacket*>(data));
+		return this->items.remove(static_cast<PacketTransmissionRequest*>(data));
 	}
 
 	bool hasJob() {
@@ -145,11 +153,11 @@ class Network<S, Args...>::TxBinder<If>::Sender: Network<S, Args...>::Os::templa
 	}
 
 public:
-	inline TxPacket* getCurrentPacket() {
+	inline PacketTransmissionRequest* getCurrentPacket() {
 		return currentPacket;
 	}
 
-	inline TxPacket* getNextPacket() {
+	inline PacketTransmissionRequest* getNextPacket() {
 		return nextPacket;
 	}
 

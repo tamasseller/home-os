@@ -20,34 +20,74 @@
 #ifndef BUFFERPOOL_H_
 #define BUFFERPOOL_H_
 
-template<class Os, size_t nBlocks, size_t blockSize, size_t alignment>
-class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, blockSize>>, Os::Event
+#include "DataContainer.h"
+
+template<class Os, size_t nBlocks, class Data>
+class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, Data>>, Os::Event
 {
 	friend class BufferPool::IoChannelBase;
 
 	union Block {
-		char data[blockSize] alignas(alignment);
+		DataContainer<Data> data;
 		union Block* next;
 	};
 public:
 
 	class Allocator {
-	public:
-		template<class T>
-		T* get() {
+		friend class BufferPool;
 
+		Block* first;
+	public:
+		template<class... C>
+		inline Data* get(C... c) {
+			if(Block* ret = first) {
+				first = first->next;
+				ret->data.init(c...);
+				return ret->data.getData();
+			}
+
+			return nullptr;
+		}
+
+		inline bool hasMore() {
+			return first != nullptr;
+		}
+
+		inline void freeSpare(BufferPool* pool)
+		{
+			if(Block *last = first) {
+				size_t n = 1;
+				while(last->next) {
+					last = last->next;
+					n++;
+				}
+
+				pool->reclaim(first, last, n);
+			}
 		}
 	};
 
 	class Deallocator {
-		Block first;
-		Block **nextOfLast;
+		Block *first, *last;
 		size_t n;
 	public:
-		void take(void*);
+		inline Deallocator(Data *data) {
+			Block* block = reinterpret_cast<Block*>(data);
+			block->data.destroy();
+			last = this->first = block;
+			n = 1;
+		}
+
+		inline void take(Data* data) {
+			Block* block = reinterpret_cast<Block*>(data);
+			block->data.destroy();
+			last->next = block;
+			last = block;
+			n++;
+		}
 
 		inline void deallocate(BufferPool* pool) {
-
+			pool->reclaim(first, last, n);
 		}
 	};
 
@@ -91,7 +131,7 @@ private:
 		Block* ret;
 
 		head([&ret](Block* old, Block* &result){
-			result = old->getNext();
+			result = old->next;
 			ret = old;
 			return true;
 		});
@@ -101,7 +141,7 @@ private:
 
 	inline void put(Block* first, Block* last) {
 		head([first, last](Block* old, Block* &result){
-			last->setNext(old);
+			last->next = old;
 			result = first;
 			return true;
 		});
@@ -137,30 +177,32 @@ private:
 
 			while(--n) {
 				Block* next = take();
-				last->setNextNonNull(next);
+				last->next = next;
 				last = next;
 			}
 
-			last->terminate();
+			last->next = nullptr;
 		}
 
 		return ret;
 	}
 
-	static inline constexpr size_t sizeToBlocks(size_t size) {
-		return (size + sizeof(Block::bytes)- 1) / sizeof(Block::bytes);
-	}
-
 	inline bool tryToSatisfy(IoData* data) {
-		const size_t nBlocksToAlloc = sizeToBlocks(data->size);
-
-		if(Block* first = allocate(nBlocksToAlloc)) {
-			data->first = first;
+		if(Block* first = allocate(data->size)) {
+			data->allocator.first = first;
 			this->jobDone(data);
 			return true;
 		}
 
 		return false;
+	}
+
+	inline void reclaim(Block *first, Block *last, size_t n) {
+		this->put(first, last);
+		this->unReserve(n);
+
+		if(this->hasJob())
+			Os::submitEvent(this);
 	}
 
 	static void blocksReclaimed(typename Os::Event* event, uintptr_t arg) {
@@ -214,45 +256,35 @@ private:
 	inline void disableProcess() {}
 
 public:
+	inline size_t statUsed() {
+		return nBlocks - nFree;
+	}
+
 	inline void init(Storage &blocks) {
 		nFree = nBlocks;
 		head = blocks;
 
 		for(size_t i = 0; i < nBlocks - 1; i++)
-			blocks[i].setNext(&blocks[i+1]);
+			blocks[i].next = &blocks[i+1];
 
-		blocks[nBlocks - 1].terminate();
+		blocks[nBlocks - 1].next = nullptr;
 
 		BufferPool::IoChannelBase::init();
 	}
 
-	inline Block *allocateDirect(size_t size)
+	inline Allocator allocateDirect(size_t size)
 	{
+		Allocator ret;
+
 		if(items.iterator().current())
-			return nullptr;
+			ret.first = nullptr;
+		else
+			ret.first = allocate(size);
 
-		return allocate(sizeToBlocks(size));
+		return ret;
 	}
-
-	inline void reclaim(Block *first) {
-		size_t n = 1;
-
-		Block* last = first;
-		while(Block *next = last->getNext()) {
-			n++;
-			last = next;
-		}
-
-		put(first, last);
-		unReserve(n);
-
-		if(this->hasJob())
-			Os::submitEvent(this);
-	};
 
 	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
-
-
 
 #endif /* BUFFERPOOL_H_ */
