@@ -338,6 +338,8 @@ TEST(NetPacket, ComplexPatch) {
 				if(!modifier.skipAhead(4)) return bad;
 			}
 
+			if(modifier.skipAhead(4)) return bad;
+
 			NetworkTestAccessor::PacketStream reader;
 			reader.init(builder);
 
@@ -354,5 +356,24 @@ TEST(NetPacket, ComplexPatch) {
 	} task;
 
 	work(task);
+}
+
+TEST(NetPacket, Indirect) {
+    struct Task: TaskBase<Task> {
+        bool run() {
+            init(5);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(hello, strlen(hello))) return bad;
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(world, strlen(hello))) return bad;
+            if(!builder.write8('|')) return bad;
+            builder.done();
+
+            return checkStreamContent("|hello|world|");
+        }
+    } task;
+
+    work(task);
 }
 

@@ -32,6 +32,21 @@ TEST_GROUP(NetIpTransmission) {
 		);
 	}
 
+	static void expectLongIp() {
+	        DummyIf<0>::expectN(1,
+	            /*            dst                 |                src                | etherType */
+	            0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+	            /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+	            0x45, 0x00, 0x00, 0x3f, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xa3,
+	            /* source IP address  | destination IP address */
+	            0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
+	            /* TBD */
+	            'T', 'h', 'e', ' ', 'q', 'u', 'i', 'c', 'k', ' ', 'b', 'r', 'o', 'w', 'n', ' ',
+	            'f', 'o', 'x', ' ', 'j', 'u', 'm', 'p', 's', ' ', 'o', 'v', 'e', 'r', ' ', 't',
+	            'h', 'e', ' ', 'l', 'a', 'z', 'y', ' ', 'd', 'o', 'g'
+	        );
+	    }
+
 	template<bool addRoute, bool addArp, class Task>
 	void work(Task& task)
 	{
@@ -125,18 +140,21 @@ TEST(NetIpTransmission, Resolved) {
 			if(tx.getError())
 				return bad;
 
-			tx.fill("foobar", 6);
+            if(tx.fill("foobar", 6) != 6)
+                return bad;
 
 			expectIp();
 
-			tx.send(254);
+            if(!tx.send(254))
+                return bad;
+
+			tx.wait();
 			return ok;
 		}
 	} task;
 
 	work<true, false>(task);
 }
-
 
 TEST(NetIpTransmission, Successful) {
 	struct Task: public TestTask<Task> {
@@ -152,14 +170,112 @@ TEST(NetIpTransmission, Successful) {
 			if(tx.getError())
 				return bad;
 
-			tx.fill("foobar", 6);
+			if(tx.fill("foobar", 6) != 6)
+			    return bad;
 
 			expectIp();
 
-			tx.send(254);
+			if(!tx.send(254))
+                return bad;
+
+			tx.wait();
 			return ok;
 		}
 	} task;
 
 	work<true, true>(task);
+}
+
+TEST(NetIpTransmission, Longer) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            Net::IpTransmission tx;
+            static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
+
+            tx.init();
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), strlen(text)))
+                return bad;
+
+            if(tx.shouldWait())
+                return bad;
+
+            if(tx.getError())
+                return bad;
+
+            if(tx.fill(text, strlen(text)) != strlen(text))
+                return bad;
+
+            expectLongIp();
+
+            if(!tx.send(254))
+                return bad;
+
+            tx.wait();
+
+            return ok;
+        }
+    } task;
+
+    work<true, true>(task);
+}
+
+TEST(NetIpTransmission, Multi) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            Net::IpTransmission tx;
+            static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
+
+            tx.init();
+
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                return bad;
+
+            if(tx.fill("foobar", 6) != 6)
+                return bad;
+
+            expectIp();
+            tx.send(254);
+
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), strlen(text)))
+                return bad;
+
+            if(tx.fill(text, strlen(text)) != strlen(text))
+                return bad;
+
+            expectLongIp();
+
+            if(!tx.send(254))
+                return bad;
+
+            return ok;
+        }
+    } task;
+
+    work<true, true>(task);
+}
+
+TEST(NetIpTransmission, Indirect) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            Net::IpTransmission tx;
+            static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
+
+            tx.init();
+
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0, 1))
+                return bad;
+
+            if(!tx.addIndirect(text, strlen(text)))
+                return bad;
+
+            expectLongIp();
+
+            if(!tx.send(254))
+                return bad;
+
+            return ok;
+        }
+    } task;
+
+    work<true, true>(task);
 }

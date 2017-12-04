@@ -66,7 +66,8 @@ class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketW
 	}
 
 	inline void finalizeCurrent() {
-		this->current->setSize(static_cast<uint16_t>(maxLength - spaceLeft()));
+	    if(data)
+	        this->current->setSize(static_cast<uint16_t>(maxLength - spaceLeft()));
 	}
 
 	inline bool takeNext() {
@@ -94,6 +95,25 @@ public:
 		PacketAssembler::done();
 		allocator.freeSpare(&state.pool);
 	}
+
+    inline bool addByReference(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr)
+    {
+        Block* block = this->current;
+
+        if(spaceLeft() != maxLength) {
+            if(Block* next = allocator.get()) {
+                finalizeCurrent();
+                PacketAssembler::addBlock(next);
+                block = next;
+            } else
+                return false;
+        }
+
+        block->setIndirect(data, length, destructor, userData);
+        this->data = this->limit = nullptr;
+        return true;
+    }
+
 };
 
 #endif /* PACKETBUILDER_H_ */

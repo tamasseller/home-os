@@ -48,10 +48,10 @@ private:
 	};
 
 	struct IndirectEntry {
-		void *user;
-		char *start;
+        Destructor destructor;
+        void *user;
+        const char *start;
 		uint16_t size;
-		Destructor destructor;
 	};
 
 	/*
@@ -146,13 +146,25 @@ public:
 		return &bytes[0];
 	}
 
-	inline char* getIndirectData() {
+	inline const char* getIndirectData() {
 		return entry.start;
 	}
 
 	inline uint16_t getIndirectSize() {
 		return entry.size;
 	}
+
+	inline void setIndirect(const char* data, uint16_t length, typename Block::Destructor destructor, void* userData) {
+	    entry.start = data;
+	    entry.size = length;
+	    entry.destructor = destructor;
+	    entry.user = userData;
+	    setSize(0x7fff);
+	}
+
+    inline bool isIndirect() {
+        return getSize() == 0x7fff;
+    }
 
 	inline void callIndirectDestructor() {
 		if(entry.destructor)
@@ -215,10 +227,6 @@ private:
 		return true;
 	}
 
-	inline bool isCurrentIndirect() {
-		return current->getSize() == 0x7fff;
-	}
-
 public:
 	inline void init(const Packet& p) {
 		current = p.first;
@@ -239,8 +247,8 @@ public:
 	inline Chunk getCurrentChunk() {
 		char *start, *limit;
 
-		if(isCurrentIndirect()) {
-			start = current->getIndirectData();
+		if(current->isIndirect()) {
+			start = const_cast<char*>(current->getIndirectData());
 			limit = start + current->getIndirectSize();
 		} else {
 			start = current->getData();

@@ -65,15 +65,13 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 # Networking related tests.
 
+endif
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetChecksum.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
-endif
-
-SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
 # Testing utilities.
 
@@ -130,7 +128,7 @@ CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
 CXXFLAGS += -fsanitize=undefined
 
-CXXFLAGS += -rdynamic								# Allows meaningful backrtaces 
+CXXFLAGS += -rdynamic								# Allows meaningful backtraces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
 
 LD = $(CXX) 

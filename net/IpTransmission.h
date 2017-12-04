@@ -119,6 +119,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
 	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
 
+	static const auto blockMaxPayload = Block::dataSize;
+
 	/*
 	 * Data fields that store information during the various steps of the process.
 	 */
@@ -272,7 +274,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Restart arp query packet generation and sending.
 			 */
-			const auto size = (arpReqSize + self->transmission.stage1.route->dev->getHeaderSize() + bufferSize - 1) / bufferSize;
+			const auto size = (arpReqSize + self->transmission.stage1.route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 			AsyncResult ret = self->allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated);
 
 			if(ret != AsyncResult::Error)
@@ -390,7 +392,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 *               | arbitrary length user data accessed through by reference |
 			 */
 			this->transmission.stage1.nBlocks = static_cast<uint8_t>(
-					(inLineSize - indirectCount + bufferSize - 1) / bufferSize +
+					(inLineSize - indirectCount + blockMaxPayload - 1) / blockMaxPayload +
 					2 * indirectCount);
 
 			/*
@@ -406,7 +408,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
 			this->transmission.stage1.retry = arpRequestRetry;
-			const auto size = (arpReqSize + transmission.stage1.route->dev->getHeaderSize() + bufferSize - 1) / bufferSize;
+			const auto size = (arpReqSize + transmission.stage1.route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 			if(allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
 
@@ -519,7 +521,7 @@ public:
 		return this->start(protocol, ttl);
 	}
 
-	inline bool fill(const char* data, uint16_t length) {
+	inline uint16_t fill(const char* data, uint16_t length) {
 		if(this->shouldWait())
 			this->wait();
 
@@ -528,6 +530,16 @@ public:
 
 		return this->packet.stage2.packet.copyIn(data, length);
 	}
+
+    inline bool addIndirect(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr) {
+        if(this->shouldWait())
+            this->wait();
+
+        if(this->error)
+            return false;
+
+        return this->packet.stage2.packet.addByReference(data, length, destructor, userData);
+    }
 
 	inline const char* getError() {
 		return this->error;

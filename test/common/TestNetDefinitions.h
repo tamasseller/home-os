@@ -33,7 +33,7 @@ public:
 
 		uint32_t sum = 0;
 		while(l--)
-			sum += *p++;
+			sum = 31 * sum + *p++;
 
 		while(n--)
 			MOCK(DummyIf)::EXPECT(tx).withParam(id).withParam(sum);
@@ -66,7 +66,7 @@ inline void DummyIf<id>::enableTxIrq() {
 
 		uint32_t sum = 0;
 		while(!packet.atEop())
-			sum += packet.read8();
+		    sum = 31 * sum + packet.read8();
 
 		MOCK(DummyIf)::CALL(tx).withParam(id).withParam(sum);
 		x->packetTransmitted();
