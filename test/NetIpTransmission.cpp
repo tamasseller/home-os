@@ -179,6 +179,9 @@ TEST(NetIpTransmission, Successful) {
                 return bad;
 
 			tx.wait();
+
+            if(NetworkTestAccessor::pool.statUsed()) return bad;
+
 			return ok;
 		}
 	} task;
@@ -211,6 +214,8 @@ TEST(NetIpTransmission, Longer) {
                 return bad;
 
             tx.wait();
+
+            if(NetworkTestAccessor::pool.statUsed()) return bad;
 
             return ok;
         }
@@ -247,6 +252,10 @@ TEST(NetIpTransmission, Multi) {
             if(!tx.send(254))
                 return bad;
 
+            tx.wait();
+
+            if(NetworkTestAccessor::pool.statUsed()) return bad;
+
             return ok;
         }
     } task;
@@ -272,6 +281,53 @@ TEST(NetIpTransmission, Indirect) {
 
             if(!tx.send(254))
                 return bad;
+
+            tx.wait();
+
+            if(NetworkTestAccessor::pool.statUsed()) return bad;
+
+            return ok;
+        }
+    } task;
+
+    work<true, true>(task);
+}
+
+TEST(NetIpTransmission, IndirectWithDestructor) {
+    static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
+
+    struct Task: public TestTask<Task> {
+
+        bool destroyed = false;
+
+
+        static void destroy(void* ptr, const char* data, uint16_t length) {
+            auto *self = reinterpret_cast<Task*>(ptr);
+
+            if(data == text && length == strlen(text))
+                self->destroyed = true;
+        }
+
+        bool run() {
+            Net::IpTransmission tx;
+
+            tx.init();
+
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0, 1))
+                return bad;
+
+            if(!tx.addIndirect(text, strlen(text), &Task::destroy, this))
+                return bad;
+
+            expectLongIp();
+
+            if(!tx.send(254))
+                return bad;
+
+            tx.wait();
+
+            if(NetworkTestAccessor::pool.statUsed()) return bad;
+            if(!destroyed) return bad;
 
             return ok;
         }

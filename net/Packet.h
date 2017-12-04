@@ -26,7 +26,7 @@ public:
 	/**
 	 * Optional destructor for indirect blocks.
 	 */
-	typedef void (*Destructor)(void*, char*, size_t);
+	typedef void (*Destructor)(void*, const char*, uint16_t);
 
 private:
 
@@ -184,7 +184,19 @@ public:
 	}
 
 	void dispose() {
-		// TODO
+        typename Pool::Deallocator deallocator(first);
+
+        for(Block* current = first->getNext(); current;) {
+            Block* next = current->getNext();
+
+            if(current->isIndirect())
+                current->callIndirectDestructor();
+
+            deallocator.take(current);
+            current = next;
+        }
+
+        deallocator.deallocate(&state.pool);
 	}
 };
 
