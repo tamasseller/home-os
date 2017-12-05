@@ -7,6 +7,9 @@
 
 #include "common/TestNetDefinitions.h"
 
+static const char c55[] = "0123456789012345678901234567890123456789012345678901234";
+static const char c57[] = "012345678901234567890123456789012345678901234567890123456";
+
 TEST_GROUP(NetPacket) {
 
 	template<class Child>
@@ -69,7 +72,32 @@ TEST_GROUP(NetPacket) {
 
 			return TaskBase::TestTask::ok;
 		}
+	};
 
+	typedef NetworkTestAccessor::PacketBuilder::PacketWriterBase Writer;
+	template<const char* padding, class Data, bool (Writer::* write)(Data), Data (NetworkTestAccessor::PacketStream::* read)()>
+	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {
+		static constexpr Data value1 = static_cast<Data>(0xb16b00b5);
+		static constexpr Data value2 = static_cast<Data>(0x600dc0de);
+
+		bool run() {
+			this->init(2);
+			if(this->builder.copyIn(padding, strlen(padding)) != strlen(padding)) return OverlapTask::bad;
+			if(!(this->builder.*write)(value1)) return OverlapTask::bad;
+			if(!(this->builder.*write)(value2)) return OverlapTask::bad;
+			this->builder.done();
+
+			NetworkTestAccessor::PacketStream reader;
+			reader.init(this->builder);
+
+			if(this->readAndCheck(reader, padding) == OverlapTask::bad)
+				return OverlapTask::bad;
+
+			if((reader.*read)() != value1) return OverlapTask::bad;
+			if((reader.*read)() != value2) return OverlapTask::bad;
+
+			return OverlapTask::ok;
+		}
 	};
 
 	template<class Task>
@@ -86,8 +114,6 @@ TEST_GROUP(NetPacket) {
 	static constexpr const char* lipsum =  "Lorem ipsum dolor sit amet, "
 			"consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.";
 	static constexpr const char* foobar = "foobar";
-	static constexpr const char* c55 = "0123456789012345678901234567890123456789012345678901234";
-	static constexpr const char* c57 = "012345678901234567890123456789012345678901234567890123456";
 };
 
 TEST(NetPacket, BuildSimple) {
@@ -242,56 +268,45 @@ TEST(NetPacket, WriteExhaust) {
 	work(task);
 }
 
-TEST(NetPacket, WordOverlap) {
-	struct Task: TaskBase<Task> {
-		bool run() {
-			init(2);
-			if(builder.copyIn(c55, strlen(c55)) != strlen(c55)) return bad;
-			if(!builder.write32(0xb16b00b5)) return bad;
-			if(!builder.write32(0x600dc0de)) return bad;
-			builder.done();
-
-			NetworkTestAccessor::PacketStream reader;
-			reader.init(builder);
-
-			if(readAndCheck(reader, c55) == bad)
-				return bad;
-
-			if(reader.read32() != 0xb16b00b5) return bad;
-			if(reader.read32() != 0x600dc0de) return bad;
-
-			return ok;
-		}
-	} task;
-
+TEST(NetPacket, WordOverlapNet) {
+	OverlapTask<
+			c55,
+			uint32_t,
+			&NetworkTestAccessor::PacketBuilder::write32net,
+			&NetworkTestAccessor::PacketStream::read32net
+	> task;
 	work(task);
 }
 
-TEST(NetPacket, HalfWordOverlap) {
-	struct Task: TaskBase<Task> {
-		bool run() {
-			init(2);
-			if(builder.copyIn(c57, strlen(c57)) != strlen(c57)) return bad;
-			if(!builder.write16(0xb16b)) return bad;
-			if(!builder.write16(0x00b5)) return bad;
-			builder.done();
-
-			NetworkTestAccessor::PacketStream reader;
-			reader.init(builder);
-
-			if(readAndCheck(reader, c57) == bad)
-				return bad;
-
-			if(reader.read16() != 0xb16b) return bad;
-			if(reader.read16() != 0x00b5) return bad;
-
-			return ok;
-		}
-	} task;
-
+TEST(NetPacket, HalfWordOverlapNet) {
+	OverlapTask<
+			c57,
+			uint16_t,
+			&NetworkTestAccessor::PacketBuilder::write16net,
+			&NetworkTestAccessor::PacketStream::read16net
+	> task;
 	work(task);
 }
 
+TEST(NetPacket, WordOverlapRawt) {
+	OverlapTask<
+			c55,
+			uint32_t,
+			&NetworkTestAccessor::PacketBuilder::write32raw,
+			&NetworkTestAccessor::PacketStream::read32raw
+	> task;
+	work(task);
+}
+
+TEST(NetPacket, HalfWordOverlapRaw) {
+	OverlapTask<
+			c57,
+			uint16_t,
+			&NetworkTestAccessor::PacketBuilder::write16raw,
+			&NetworkTestAccessor::PacketStream::read16raw
+	> task;
+	work(task);
+}
 TEST(NetPacket, SimplePatch) {
 	struct Task: TaskBase<Task> {
 		bool run() {
@@ -323,7 +338,7 @@ TEST(NetPacket, ComplexPatch) {
 			builder.write8(123);
 
 			for(int i=0; i<27; i++)
-				if(!builder.write32(i)) return bad;
+				if(!builder.write32net(i)) return bad;
 
 			builder.done();
 
@@ -333,8 +348,8 @@ TEST(NetPacket, ComplexPatch) {
 			if(modifier.read8() != 123) return bad;
 
 			for(int i=0; i<9; i++) {
-				if(modifier.read32() != (3u * i)) return bad;
-				if(!modifier.write32(3 * i)) return bad;
+				if(modifier.read32net() != (3u * i)) return bad;
+				if(!modifier.write32net(3 * i)) return bad;
 				if(!modifier.skipAhead(4)) return bad;
 			}
 
@@ -346,9 +361,9 @@ TEST(NetPacket, ComplexPatch) {
 			if(reader.read8() != 123) return bad;
 
 			for(int i=0; i<9; i++) {
-				if(reader.read32() != (3u * i)) return bad;
-				if(reader.read32() != (3u * i)) return bad;
-				if(reader.read32() != (3u * i + 2u)) return bad;
+				if(reader.read32net() != (3u * i)) return bad;
+				if(reader.read32net() != (3u * i)) return bad;
+				if(reader.read32net() != (3u * i + 2u)) return bad;
 			}
 
 			return ok;

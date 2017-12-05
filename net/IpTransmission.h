@@ -9,6 +9,7 @@
 #define IPTRANSMISSION_H_
 
 #include "InetChecksumDigester.h"
+#include "IpFixup.h"
 
 /**
  * Multi-operation composite I/O job object for sending a simple "raw"
@@ -95,29 +96,17 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	/*
 	 * Constant packet pieces and parameters for well-known management protocols.
 	 */
-	static constexpr const char initialIpPreamble[12] = {
-			0x45,			// ver + ihl
-			0x00,			// dscp + ecn
-			0x00, 0x00,		// length
-			0x00, 0x00,		// fragment identification
-			0x40, 0x00,		// flags + fragment offset
-			0x00,			// time-to-live
-			0x00,			// protocol
-			0x00, 0x00		// checksum
-	};
-
-	static constexpr size_t lengthOffset = 2;
-	static constexpr size_t skipBetweenLengthAndTtl = 4;
 
 	static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
 	static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
 	static constexpr AddressEthernet broadcastMac = AddressEthernet::make(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 	static constexpr AddressEthernet zeroMac = AddressEthernet::make(0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
-	static const size_t ipHeaderSize = 20;
+	static constexpr size_t ipHeaderSize = 20;
 	static const size_t arpReqSize = 28;
-	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
+
 	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
+	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
 
 	static const auto blockMaxPayload = Block::dataSize;
 
@@ -238,15 +227,19 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			self->error = NetErrorStrings::genericCancel;
 		} else {
 			auto allocator = self->packet.stage1.poolParams.allocator;
-			const uint32_t sourceIp = route->getSource().addr;
-			const uint32_t targetIp = self->transmission.stage1.dst.addr;
 			auto &packet = self->packet.stage2.packet;
 
 			packet.init(allocator);
-			route->dev->fillHeader(self->transmission.stage1.arp.mac, etherTypeIp, packet);
-			packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble));
-			packet.write32(sourceIp);
-			packet.write32(targetIp);
+
+			if(!route->dev->fillHeader(packet, self->transmission.stage1.arp.mac, etherTypeIp)) {
+				self->error = NetErrorStrings::unknown;
+				return false;
+			}
+
+			if(!fillInitialIpHeader(packet, route->getSource(), self->transmission.stage1.dst)) {
+				self->error = NetErrorStrings::unknown;
+				return false;
+			}
 
 			self->transmission.stage23.device = dev;
 		}
@@ -338,12 +331,12 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			auto &packet = self->packet.stage2.packet;
 
 			packet.init(allocator);
-			route->dev->fillHeader(broadcastMac, etherTypeArp, packet);
+			route->dev->fillHeader(packet, broadcastMac, etherTypeArp);
 			packet.copyIn(arpRequestPreamble, sizeof(arpRequestPreamble));
 			packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
-			packet.write32(senderIp);
+			packet.write32net(senderIp);
 			packet.copyIn(reinterpret_cast<const char*>(&zeroMac.bytes[0]), 6);
-			packet.write32(targetIp);
+			packet.write32net(targetIp);
 			packet.done();
 
 			Packet copy = self->packet.stage2.packet;
@@ -435,67 +428,30 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		Packet copy = packet.stage2.packet;
 		packet.stage3.packet.init(copy);
 
-		InetChecksumDigester checksum;
-		PacketDisassembler disassembler;
-		disassembler.init(packet.stage3.packet);
+		InetChecksumDigester headerChecksum;
+		DummyDigester payloadChecksum;
 
-		size_t length = 0;
-		size_t skip = transmission.stage23.device->getHeaderSize();
+		uint16_t length = headerFixupStepOne(
+				packet.stage3.packet,
+				ttl,
+				protocol,
+				transmission.stage23.device->getHeaderSize(),
+				ipHeaderSize,
+				headerChecksum,
+				payloadChecksum);
 
-		size_t headerLength = ipHeaderSize;
-
-		do {
-			Chunk chunk = disassembler.getCurrentChunk();
-
-			if(chunk.length() >= skip) {
-				length = chunk.length() - skip;
-
-				if(length >= headerLength) {
-					checksum.consume(chunk.start + skip, headerLength, length & 1);
-					headerLength = 0;
-				} else {
-					checksum.consume(chunk.start + skip, length, length & 1);
-					headerLength -= length;
-				}
-				break;
-			} else
-				skip -= chunk.length();
-		}while(disassembler.advance());
-
-		while(headerLength != 0 && disassembler.advance()) {
-			Chunk chunk = disassembler.getCurrentChunk();
-
-			if(chunk.length() >= headerLength) {
-				checksum.consume(chunk.start, headerLength, length & 1);
-				headerLength = 0;
-			} else {
-				checksum.consume(chunk.start, chunk.length(), length & 1);
-				headerLength -= chunk.length();
-			}
-
-			length += chunk.length();
-		};
-
-		while(disassembler.advance()) {
-			Chunk chunk = disassembler.getCurrentChunk();
-			length += chunk.length();
-		};
-
-		checksum.patch(0, correctEndian(static_cast<uint16_t>(length)));
-		uint16_t ttlProto;
-		reinterpret_cast<uint8_t*>(&ttlProto)[0] = ttl;
-		reinterpret_cast<uint8_t*>(&ttlProto)[1] = protocol;
-		checksum.patch(0, static_cast<uint16_t>(ttlProto));
+		if(length == (size_t)-1) {
+			error = NetErrorStrings::unknown;
+			return false;
+		}
 
 		PacketStream modifier;
 		modifier.init(packet.stage3.packet);
 
-		modifier.skipAhead(static_cast<uint16_t>(transmission.stage23.device->getHeaderSize() + lengthOffset));
-		modifier.write16(static_cast<uint16_t>(length));
-		modifier.skipAhead(skipBetweenLengthAndTtl);
-		modifier.copyIn(reinterpret_cast<char*>(&ttlProto), 2);
-		uint16_t chk = checksum.result();
-		modifier.copyIn(reinterpret_cast<char*>(&chk), 2);
+		if(!headerFixupStepTwo(modifier, transmission.stage23.device->getHeaderSize(), length, headerChecksum.result())) {
+			error = NetErrorStrings::unknown;
+			return false;
+		}
 
 		return this->submit(hook, this->transmission.stage23.device->getSender(), &IpTxJob::sent, &this->packet.stage3.packet);
 	}
@@ -545,9 +501,6 @@ public:
 		return this->error;
 	}
 };
-
-template<class S, class... Args>
-constexpr const char Network<S, Args...>::IpTxJob::initialIpPreamble[];
 
 template<class S, class... Args>
 constexpr const char Network<S, Args...>::IpTxJob::arpRequestPreamble[];

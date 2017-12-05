@@ -14,6 +14,7 @@
 #include "SharedTable.h"
 #include "AddressIp4.h"
 #include "AddressEthernet.h"
+#include "InetChecksumDigester.h"
 #include "NetErrorStrings.h"
 
 struct NetworkOptions {
@@ -77,6 +78,25 @@ struct NetworkOptions {
 		} state;
 
 		class IpTxJob;
+		class DummyDigester;
+
+		static bool fillInitialIpHeader(PacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
+
+		template<class HeaderDigester, class PayloadDigester>
+		static inline uint16_t headerFixupStepOne(
+				Packet packet,
+				uint8_t ttl,
+				uint8_t protocol,
+				size_t l2headerLength,
+				size_t ipHeaderLength,
+				HeaderDigester &headerChecksum,
+				PayloadDigester &payloadChecksum);
+
+		static inline bool headerFixupStepTwo(
+				PacketStream &modifier,
+				size_t l2HeaderSize,
+				uint16_t length,
+				uint16_t headerChecksum);
 
 	public:
 		typedef typename Pool::Storage Buffers;

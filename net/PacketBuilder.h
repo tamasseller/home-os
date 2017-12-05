@@ -36,18 +36,24 @@ public:
 		return done;
 	}
 
-	inline bool write32(uint32_t data) {
-		data = correctEndian(data);
+	inline bool write32raw(uint32_t data) {
 		return copyIn((const char*)&data, 4) == 4; // TODO optimize
 	}
 
-	inline bool write16(uint16_t data) {
-		data = correctEndian(data);
+	inline bool write16raw(uint16_t data) {
 		return copyIn((const char*)&data, 2) == 2; // TODO optimize
 	}
 
 	inline bool write8(uint16_t data) {
 		return copyIn((const char*)&data, 1) == 1; // TODO optimize
+	}
+
+	inline bool write32net(uint32_t data) {
+		return write32raw(correctEndian(data));
+	}
+
+	inline bool write16net(uint16_t data) {
+		return write16raw(correctEndian(data));
 	}
 };
 

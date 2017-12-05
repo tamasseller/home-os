@@ -104,7 +104,7 @@ public:
 		return ret;
 	}
 
-	inline uint16_t read16() {
+	inline uint16_t read16net() {
 		uint16_t ret;
 
 		if(spaceLeft() > 1) {
@@ -119,7 +119,7 @@ public:
 		return ret;
 	}
 
-	inline uint32_t read32() {
+	inline uint32_t read32net() {
 		uint32_t ret;
 
 		if(spaceLeft() > 3) {
@@ -134,6 +134,14 @@ public:
 		}
 
 		return ret;
+	}
+
+	inline uint16_t read16raw() {
+		return correctEndian(read16net());
+	}
+
+	inline uint32_t read32raw() {
+		return correctEndian(read32net());
 	}
 };
 

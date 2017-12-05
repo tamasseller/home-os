@@ -22,7 +22,7 @@ class Network<S, Args...>::Interface {
 	virtual const AddressEthernet& getAddress() = 0;
 
 	virtual size_t getHeaderSize() = 0;
-	virtual void fillHeader(const AddressEthernet& dst, uint16_t etherType, PacketBuilder&) = 0;
+	virtual bool fillHeader(PacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 
 	virtual typename Os::IoChannel *getSender() = 0;
 };
@@ -56,10 +56,18 @@ class Network<S, Args...>::TxBinder: public Interface {
 		return 14;
 	}
 
-	virtual void fillHeader(const AddressEthernet& dst, uint16_t etherType, PacketBuilder& packet) override final {
-		packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6);
-		packet.copyIn(reinterpret_cast<const char*>(If::ethernetAddress.bytes), 6);
-		packet.write16(etherType);
+	virtual bool fillHeader(PacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
+	{
+		if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
+			return false;
+
+		if(packet.copyIn(reinterpret_cast<const char*>(If::ethernetAddress.bytes), 6) != 6)
+			return false;
+
+		if(!packet.write16net(etherType))
+			return false;
+
+		return true;
 	}
 
 	void init() {
