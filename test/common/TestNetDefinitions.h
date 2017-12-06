@@ -45,7 +45,11 @@ template<uint8_t id>
 constexpr AddressEthernet DummyIf<id>::mac;
 
 using Net = Network<OsRr,
-		NetworkOptions::Interfaces<NetworkOptions::Set<DummyIf<0>>>,
+		NetworkOptions::Interfaces<
+		    NetworkOptions::Set<
+		        NetworkOptions::EthernetInterface<DummyIf<0>>
+            >
+        >,
 		NetworkOptions::ArpRequestRetry<3>
 >;
 
@@ -59,7 +63,7 @@ typename Net::Buffers NetBuffers<Net>::buffers;
 
 template<uint8_t id>
 inline void DummyIf<id>::enableTxIrq() {
-	auto x = Net::getIf<DummyIf<id>>()->getTxInfoProvider();
+	auto x = Net::geEthernetInterface<DummyIf<id>>()->getTxInfoProvider();
 	while(Net::PacketTransmissionRequest* p = x->getCurrentPacket()) {
 		Net::PacketStream packet;
 		packet.init(*p);

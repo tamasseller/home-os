@@ -28,74 +28,15 @@ class Network<S, Args...>::Interface {
 };
 
 template<class S, class... Args>
-template<class If>
-class Network<S, Args...>::TxBinder: public Interface {
-	friend class Network<S, Args...>;
-
-	class Sender;
-	Sender sender;
-	ArpTable<If::arpCacheEntries> resolver;
-
-	virtual typename Os::IoChannel *getSender() override final {
-		return &sender;
-	}
-
-	virtual const AddressEthernet& getAddress() {
-		return If::ethernetAddress;
-	}
-
-	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) override final {
-		return resolver.lookUp(ip, mac);
-	}
-
-	virtual bool requestResolution(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, ArpTableIoData* data) override final {
-		return item->submitTimeout(hook, &resolver, If::arpReqTimeout, callback, data);
-	}
-
-	virtual size_t getHeaderSize() override final {
-		return 14;
-	}
-
-	virtual bool fillHeader(PacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
-	{
-		if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
-			return false;
-
-		if(packet.copyIn(reinterpret_cast<const char*>(If::ethernetAddress.bytes), 6) != 6)
-			return false;
-
-		if(!packet.write16net(etherType))
-			return false;
-
-		return true;
-	}
-
-	void init() {
-		sender.init();
-		resolver.init();
-		If::init();
-	}
-
-public:
-	Sender *getTxInfoProvider() {
-		return &sender;
-	}
-
-	ArpTable<If::arpCacheEntries> *getArpCache() {
-		return &resolver;
-	}
-};
-
-template<class S, class... Args>
 template<class... Input>
-class Network<S, Args...>::Ifs<typename NetworkOptions::Set<Input...>, void>: public TxBinder<Input>... {
-    typedef void (*link)(Ifs* const ifs);
-    static void nop(Ifs* const ifs) {}
+class Network<S, Args...>::Interfaces<typename NetworkOptions::Set<Input...>, void>: public Input::template Wrapped<Network<S, Args...>>... {
+    typedef void (*link)(Interfaces* const ifs);
+    static void nop(Interfaces* const ifs) {}
 
     template<link rest, class C, class...>
 	struct Initializer {
-		static inline void init(Ifs* const ifs) {
-			static_cast<Network<S, Args...>::TxBinder<C>*>(ifs)->init();
+		static inline void init(Interfaces* const ifs) {
+			static_cast<typename C::template Wrapped<Network<S, Args...>>*>(ifs)->init();
 			rest(ifs);
 		}
 
@@ -104,74 +45,14 @@ class Network<S, Args...>::Ifs<typename NetworkOptions::Set<Input...>, void>: pu
 
 public:
 	void init() {
-        (pet::ApplyToPack<link, Initializer, &Ifs::nop, Input...>::value)(this);
+        (pet::ApplyToPack<link, Initializer, &Interfaces::nop, Input...>::value)(this);
 	}
 };
 
 template<class S, class... Args>
 template<class C>
-constexpr inline typename Network<S, Args...>::template TxBinder<C> *Network<S, Args...>::getIf() {
-	return static_cast<TxBinder<C>*>(&state.interfaces);
+constexpr inline typename Network<S, Args...>::template Ethernet<C> *Network<S, Args...>::geEthernetInterface() {
+	return static_cast<Ethernet<C>*>(&state.interfaces);
 }
-
-
-template<class S, class... Args>
-template<class If>
-class Network<S, Args...>::TxBinder<If>::Sender: Network<S, Args...>::Os::template IoChannelBase<Sender> {
-	friend class Sender::IoChannelBase;
-	friend class TxBinder;
-
-	PacketTransmissionRequest *currentPacket, *nextPacket;
-	pet::LinkedList<PacketTransmissionRequest> items;
-
-	void enableProcess() {If::enableTxIrq();}
-	void disableProcess() {If::disableTxIrq();}
-
-	bool addItem(typename Os::IoJob::Data* data)
-	{
-		auto* p = static_cast<PacketTransmissionRequest*>(data);
-
-		if(!currentPacket)
-			currentPacket = p;
-		else if(!nextPacket)
-			nextPacket = p;
-		else
-			return this->items.addBack(p);
-
-		return true;
-	}
-
-	bool removeItem(typename Os::IoJob::Data* data) {
-		Os::assert(data == currentPacket, "Invalid network packet queue state");
-		currentPacket = nextPacket;
-		auto it = items.iterator();
-
-		if((nextPacket = it.current()) != nullptr)
-			it.remove();
-
-		return true;
-	}
-
-	bool removeCanceled(typename Os::IoJob::Data* data) {
-		return this->items.remove(static_cast<PacketTransmissionRequest*>(data));
-	}
-
-	bool hasJob() {
-		return currentPacket != nullptr;
-	}
-
-public:
-	inline PacketTransmissionRequest* getCurrentPacket() {
-		return currentPacket;
-	}
-
-	inline PacketTransmissionRequest* getNextPacket() {
-		return nextPacket;
-	}
-
-	void packetTransmitted() {
-		this->jobDone(currentPacket);
-	}
-};
 
 #endif /* INTERFACES_H_ */

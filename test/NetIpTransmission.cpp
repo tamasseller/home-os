@@ -56,12 +56,12 @@ TEST_GROUP(NetIpTransmission) {
 		if(addRoute) {
 			Net::addRoute(Net::Route(
 					AddressIp4::make(10, 10, 10, 0), 8,
-					AddressIp4::make(10, 10, 10, 10), Net::getIf<DummyIf<0>>())
+					AddressIp4::make(10, 10, 10, 10), Net::geEthernetInterface<DummyIf<0>>())
 			);
 		}
 
 		if(addArp) {
-			Net::getIf<DummyIf<0>>()->getArpCache()->set(
+			Net::geEthernetInterface<DummyIf<0>>()->getArpCache()->set(
 					AddressIp4::make(10, 10, 10, 1),
 					AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
 					32767
@@ -129,7 +129,7 @@ TEST(NetIpTransmission, Resolved) {
 			if(!tx.shouldWait())
 				return bad;
 
-			Net::getIf<DummyIf<0>>()->getArpCache()->set(
+			Net::geEthernetInterface<DummyIf<0>>()->getArpCache()->set(
 					AddressIp4::make(10, 10, 10, 1),
 					AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
 					32768

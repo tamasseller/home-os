@@ -25,6 +25,10 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
+	template<class Driver> struct EthernetInterface {
+	        template<class Net> using Wrapped = typename Net::template Ethernet<Driver>;
+	};
+
 	template<class... Members> struct Set {
 		static constexpr size_t n = sizeof...(Members);
 	};
@@ -52,8 +56,8 @@ struct NetworkOptions {
 		class PacketStream;
 
 	private:
-		template<class> class TxBinder;
-		template<class, class = void> struct Ifs;
+		template<class> class Ethernet;
+		template<class, class = void> struct Interfaces;
 
 		class ArpEntry;
 		class ArpTableIoData;
@@ -72,7 +76,7 @@ struct NetworkOptions {
 		typedef BufferPool<OsRr, bufferCount, Block> Pool;
 
 		static struct State {
-			Ifs<IfsToBeUsed> interfaces;
+			Interfaces<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
 		} state;
@@ -117,7 +121,7 @@ struct NetworkOptions {
 		    return state.routingTable.add(route);
 		}
 
-		template<class C> constexpr static inline TxBinder<C> *getIf();
+		template<class C> constexpr static inline Ethernet<C> *geEthernetInterface();
 	};
 };
 
@@ -132,6 +136,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "PacketStream.h"
 #include "Endian.h"
 #include "Routing.h"
+#include "Ethernet.h"
 #include "ArpTable.h"
 #include "Interfaces.h"
 #include "IpTransmission.h"
