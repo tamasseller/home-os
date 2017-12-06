@@ -9,9 +9,11 @@
 
 template<class S, class... Args>
 template<class Driver>
-class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<Driver>, Interface> {
-
+class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<Driver>, Interface>
+{
+    friend class Ethernet::IoChannelBase;
     friend class Network<S, Args...>;
+    friend Driver;
 
     ArpTable<Driver::arpCacheEntries> resolver;
 
@@ -45,14 +47,6 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
         Ethernet::IoChannelBase::init();
         resolver.init();
         Driver::init();
-    }
-
-public:
-
-    inline Ethernet(): Ethernet::IoChannelBase(14) {}
-
-    ArpTable<Driver::arpCacheEntries> *getArpCache() {
-        return &resolver;
     }
 
     PacketTransmissionRequest *currentPacket, *nextPacket;
@@ -94,16 +88,23 @@ public:
         return currentPacket != nullptr;
     }
 
-    inline PacketTransmissionRequest* getCurrentPacket() {
+    inline PacketTransmissionRequest* getCurrentTxPacket() {
         return currentPacket;
     }
 
-    inline PacketTransmissionRequest* getNextPacket() {
+    inline PacketTransmissionRequest* getNextTxPacket() {
         return nextPacket;
     }
 
     void packetTransmitted() {
         this->jobDone(currentPacket);
+    }
+
+public:
+    inline Ethernet(): Ethernet::IoChannelBase(14) {}
+
+    ArpTable<Driver::arpCacheEntries> *getArpCache() {
+        return &resolver;
     }
 };
 

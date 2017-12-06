@@ -63,7 +63,7 @@ typename Net::Buffers NetBuffers<Net>::buffers;
 template<uint8_t id>
 inline void DummyIf<id>::enableTxIrq() {
 	auto x = Net::geEthernetInterface<DummyIf<id>>();
-	while(Net::PacketTransmissionRequest* p = x->getCurrentPacket()) {
+	while(Net::PacketTransmissionRequest* p = x->getCurrentTxPacket()) {
 		Net::PacketStream packet;
 		packet.init(*p);
 
