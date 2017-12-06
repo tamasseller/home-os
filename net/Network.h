@@ -76,6 +76,7 @@ struct NetworkOptions {
 		typedef BufferPool<OsRr, bufferCount, Block> Pool;
 
 		static struct State {
+            inline void* operator new(size_t, void* x) { return x; }
 			Interfaces<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;

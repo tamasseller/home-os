@@ -16,11 +16,10 @@
 template<uint8_t id = 0>
 class DummyIf {
 	static constexpr size_t arpCacheEntries = 8;
-	static constexpr AddressEthernet mac = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, id);
 
 public:
 	static constexpr size_t arpReqTimeout = 100;
-	static constexpr auto& ethernetAddress = mac;
+	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, id);
 	inline static void enableTxIrq();
 	inline static void disableTxIrq() {}
 	inline static void init() {}
@@ -42,7 +41,7 @@ public:
 };
 
 template<uint8_t id>
-constexpr AddressEthernet DummyIf<id>::mac;
+constexpr AddressEthernet DummyIf<id>::ethernetAddress;
 
 using Net = Network<OsRr,
 		NetworkOptions::Interfaces<
@@ -63,7 +62,7 @@ typename Net::Buffers NetBuffers<Net>::buffers;
 
 template<uint8_t id>
 inline void DummyIf<id>::enableTxIrq() {
-	auto x = Net::geEthernetInterface<DummyIf<id>>()->getTxInfoProvider();
+	auto x = Net::geEthernetInterface<DummyIf<id>>();
 	while(Net::PacketTransmissionRequest* p = x->getCurrentPacket()) {
 		Net::PacketStream packet;
 		packet.init(*p);

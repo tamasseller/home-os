@@ -9,18 +9,13 @@
 
 template<class S, class... Args>
 template<class Driver>
-class Network<S, Args...>::Ethernet: public Interface {
+class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<Driver>, Interface> {
+
     friend class Network<S, Args...>;
 
-    class Sender;
-    Sender sender;
     ArpTable<Driver::arpCacheEntries> resolver;
 
-    virtual typename Os::IoChannel *getSender() override final {
-        return &sender;
-    }
-
-    virtual const AddressEthernet& getAddress() {
+    virtual const AddressEthernet& getAddress() override final {
         return Driver::ethernetAddress;
     }
 
@@ -30,10 +25,6 @@ class Network<S, Args...>::Ethernet: public Interface {
 
     virtual bool requestResolution(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, ArpTableIoData* data) override final {
         return item->submitTimeout(hook, &resolver, Driver::arpReqTimeout, callback, data);
-    }
-
-    virtual size_t getHeaderSize() override final {
-        return 14;
     }
 
     virtual bool fillHeader(PacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
@@ -51,26 +42,18 @@ class Network<S, Args...>::Ethernet: public Interface {
     }
 
     void init() {
-        sender.init();
+        Ethernet::IoChannelBase::init();
         resolver.init();
         Driver::init();
     }
 
 public:
-    Sender *getTxInfoProvider() {
-        return &sender;
-    }
+
+    inline Ethernet(): Ethernet::IoChannelBase(14) {}
 
     ArpTable<Driver::arpCacheEntries> *getArpCache() {
         return &resolver;
     }
-};
-
-template<class S, class... Args>
-template<class Driver>
-class Network<S, Args...>::Ethernet<Driver>::Sender: Network<S, Args...>::Os::template IoChannelBase<Sender> {
-    friend class Sender::IoChannelBase;
-    friend class Ethernet;
 
     PacketTransmissionRequest *currentPacket, *nextPacket;
     pet::LinkedList<PacketTransmissionRequest> items;
@@ -111,7 +94,6 @@ class Network<S, Args...>::Ethernet<Driver>::Sender: Network<S, Args...>::Os::te
         return currentPacket != nullptr;
     }
 
-public:
     inline PacketTransmissionRequest* getCurrentPacket() {
         return currentPacket;
     }

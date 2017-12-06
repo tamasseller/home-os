@@ -4,6 +4,7 @@ ROOT = ../..
 PET = $(ROOT)/pet
 
 INCLUDE_DIRS += $(ROOT)
+INCLUDE_DIRS += $(ROOT)/net
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-m0
@@ -60,6 +61,15 @@ SOURCES += $(ROOT)/test/PolicyPrio.cpp
 SOURCES += $(ROOT)/test/Timeout.cpp
 SOURCES += $(ROOT)/test/IoChannel.cpp
 SOURCES += $(ROOT)/test/IoRequest.cpp
+
+
+# Networking related tests.
+
+SOURCES += $(ROOT)/test/NetSharedTable.cpp
+SOURCES += $(ROOT)/test/NetBufferPool.cpp
+SOURCES += $(ROOT)/test/NetPacket.cpp
+SOURCES += $(ROOT)/test/NetChecksum.cpp
+SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
 
 # Testing utilities.

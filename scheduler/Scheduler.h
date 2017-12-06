@@ -74,7 +74,8 @@ struct SchedulerOptions {
 		class CountingSemaphore;
 
 		class IoChannel;
-		template<class> class IoChannelBase;
+        class IoChannelCommon;
+		template<class, class = IoChannelCommon> class IoChannelBase;
 
 		class IoJob;
 		template<class> class IoRequest;
@@ -95,7 +96,6 @@ struct SchedulerOptions {
 		class WaitableSet;
 
 		class IoRequestCommon;
-		class IoChannelCommon;
 
 		class Policy;
 		template<ScalabilityHint, class = void> class SleeperBase;

@@ -59,8 +59,8 @@ public:
 
 
 template<class... Args>
-template<class Child>
-class Scheduler<Args...>::IoChannelBase: public IoChannelCommon {
+template<class Child, class Base>
+class Scheduler<Args...>::IoChannelBase: public Base {
 	friend class Scheduler<Args...>;
 	using RemoveResult = typename IoChannelCommon::RemoveResult;
 	using Data = typename IoJob::Data;
@@ -131,6 +131,11 @@ protected:
 
 		state.eventList.issue(data->job, typename IoJob::template OverwriteCombiner<IoJob::doneValue>());
 	}
+public:
+	template<class... C>
+	inline IoChannelBase(C... c): Base(c...) {}
+
+	inline IoChannelBase() = default;
 };
 
 }

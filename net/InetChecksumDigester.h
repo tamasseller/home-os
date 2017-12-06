@@ -8,9 +8,7 @@
 #ifndef INETCHECKSUMDIGESTER_H_
 #define INETCHECKSUMDIGESTER_H_
 
-#include <iostream>
 #include <string.h>
-#include <arpa/inet.h>
 
 class InetChecksumDigester {
 	uint32_t state = 0;
