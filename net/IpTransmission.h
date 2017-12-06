@@ -1,5 +1,5 @@
 /*
- * IpTransmission.h
+ * IpTransmitter.h
  *
  *  Created on: 2017.11.26.
  *      Author: tooma
@@ -184,7 +184,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * stage 1 and during stage 2, the packet is also patched at the
 			 * start of stage 3 with the size and possibly the checksum.
 			 */
-			PacketBuilder packet;
+			TxPacketBuilder packet;
 		} stage2;
 
 		/**
@@ -204,15 +204,18 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	};
 
 	inline AsyncResult allocateBuffers(typename Os::IoJob::Hook hook, size_t size, typename Os::IoJob::Callback callback) {
-		/* TODO + header size */
-
-		auto ret = state.pool.allocateDirect(size);
+		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
 		if(ret.hasMore()) {
 			packet.stage1.poolParams.allocator = ret;
 			return callback(this, Os::IoJob::Result::Done, hook) ? AsyncResult::Later: AsyncResult::Done;
 		}
 
-		packet.stage1.poolParams.size = size;
+		if(size > UINT16_MAX) {
+			error = NetErrorStrings::allocError;
+			return AsyncResult::Error;
+		}
+
+		packet.stage1.poolParams.request.size = static_cast<uint16_t>(size);
 		return this->submit(hook, &state.pool, callback, &packet.stage1.poolParams) ? AsyncResult::Later : AsyncResult::Error;
 	}
 
@@ -258,7 +261,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Allocate buffer for the business packet.
 			 */
-			AsyncResult ret = self->allocateBuffers(hook, self->transmission.stage1.nBlocks/* TODO + header size */, &IpTxJob::allocated);
+			AsyncResult ret = self->allocateBuffers(hook, self->transmission.stage1.nBlocks, &IpTxJob::allocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
@@ -299,7 +302,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * Dispose of the ARP request packet in the hope that the request is not needed to
 			 * be repeated (and even if it needs to be, avoid sitting on resources while waiting).
 			 */
-			self->packet.stage3.packet.dispose();
+			self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
 
 			/*
 			 * Wait for the required address.
@@ -366,7 +369,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			this->transmission.stage1.route = route;
 			this->transmission.stage1.dst = dst;
 
-			inLineSize += ipHeaderSize; /* TODO + link header size */
+			inLineSize += ipHeaderSize + route->dev->getHeaderSize();
 			/*
 			 * The final number of buffers is determined not only by the amount of in-line data
 			 * but also the indirect data references. If in-line and indirect buffers are used
@@ -401,7 +404,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
 			this->transmission.stage1.retry = arpRequestRetry;
-			const auto size = (arpReqSize + transmission.stage1.route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
+			const auto size = (arpReqSize + route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 			if(allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
 
@@ -419,7 +422,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	 */
 	static bool sent(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
 		auto self = static_cast<IpTxJob*>(item);
-		self->packet.stage3.packet.dispose();
+		self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
 		return false;
 	}
 
@@ -458,7 +461,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IpTransmission: public Os::template IoRequest<IpTxJob> {
+class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob> {
 public:
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0) {
 		if(this->shouldWait())

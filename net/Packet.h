@@ -183,6 +183,7 @@ public:
 		this->first = first;
 	}
 
+	template<typename Pool::Quota quota>
 	void dispose() {
         typename Pool::Deallocator deallocator(first);
 
@@ -196,7 +197,7 @@ public:
             current = next;
         }
 
-        deallocator.deallocate(&state.pool);
+        deallocator.template deallocate<quota>(&state.pool);
 	}
 };
 

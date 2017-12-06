@@ -21,7 +21,7 @@ class Network<S, Args...>::Interface: public Os::IoChannelCommon {
 public:
 	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
 	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
-	virtual bool fillHeader(PacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
+	virtual bool fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 
     virtual const AddressEthernet& getAddress() = 0;
 

@@ -15,7 +15,7 @@ struct Network<S, Args...>::DummyDigester {
 
 template<class S, class... Args>
 inline bool Network<S, Args...>::fillInitialIpHeader(
-		PacketBuilder &packet,
+		TxPacketBuilder &packet,
 		AddressIp4 srcIp,
 		AddressIp4 dstIp)
 {

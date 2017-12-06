@@ -58,7 +58,8 @@ public:
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketWriterBase<PacketBuilder>
+template<typename Network<S, Args...>::Pool::Quota quota>
+class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketWriterBase<PacketBuilder<quota>>
 {
 	friend class PacketBuilder::PacketWriterBase;
 
@@ -96,10 +97,11 @@ public:
 		limit = data + maxLength;
 	}
 
+
 	inline void done() {
 		finalizeCurrent();
 		PacketAssembler::done();
-		allocator.freeSpare(&state.pool);
+		allocator.template freeSpare<quota>(&state.pool);
 	}
 
     inline bool addByReference(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr)

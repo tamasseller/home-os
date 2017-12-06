@@ -68,7 +68,10 @@ class Scheduler<Args...>::IoChannelBase: public Base {
 	inline void enableProcess() {}
 	inline void disableProcess() {}
 	inline bool addItem(Data*);
-	inline bool removeItem(Data*);
+
+	inline bool removeItem(Data*);	// TODO check if still needed (or can be done by
+									// the user and removeCanceled is enough here)
+
 	inline bool removeCanceled(Data* data) {return static_cast<Child*>(this)->removeItem(data);}
 	inline bool hasJob();
 

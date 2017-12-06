@@ -29,7 +29,7 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
         return item->submitTimeout(hook, &resolver, Driver::arpReqTimeout, callback, data);
     }
 
-    virtual bool fillHeader(PacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
+    virtual bool fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
     {
         if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
             return false;

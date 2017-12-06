@@ -84,7 +84,8 @@ struct NetworkTestAccessor: Net {
 	using Net::Packet;
 	using Net::PacketAssembler;
 	using Net::PacketDisassembler;
-	using Net::PacketBuilder;
+	using Net::TxPacketBuilder;
+	using Net::RxPacketBuilder;
 };
 
 #endif /* TESTNETDEFINITIONS_H_ */

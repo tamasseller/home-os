@@ -71,9 +71,12 @@ struct NetworkOptions {
 		class PacketAssembler;
 		class PacketDisassembler;
 		template <class> class PacketWriterBase;
-		class PacketBuilder;
 		class PacketTransmissionRequest;
+
 		typedef BufferPool<OsRr, bufferCount, Block> Pool;
+		template<typename Pool::Quota> class PacketBuilder;
+		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
+		using RxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
 
 		static struct State {
             inline void* operator new(size_t, void* x) { return x; }
@@ -85,7 +88,7 @@ struct NetworkOptions {
 		class IpTxJob;
 		class DummyDigester;
 
-		static bool fillInitialIpHeader(PacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
+		static bool fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
 		template<class HeaderDigester, class PayloadDigester>
 		static inline uint16_t headerFixupStepOne(
@@ -106,7 +109,7 @@ struct NetworkOptions {
 	public:
 		typedef typename Pool::Storage Buffers;
 
-		class IpTransmission;
+		class IpTransmitter;
 
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);

@@ -14,10 +14,10 @@ TEST_GROUP(NetPacket) {
 
 	template<class Child>
 	struct TaskBase: TestTask<Child> {
-		NetworkTestAccessor::PacketBuilder builder;
+		NetworkTestAccessor::TxPacketBuilder builder;
 
 		void init(size_t n) {
-			builder.init(NetworkTestAccessor::pool.allocateDirect(n));
+			builder.init(NetworkTestAccessor::pool.allocateDirect<NetworkTestAccessor::Pool::Quota::Tx>(n));
 		}
 
 		bool readAndCheck(NetworkTestAccessor::PacketStream &reader, const char* str) {
@@ -74,7 +74,7 @@ TEST_GROUP(NetPacket) {
 		}
 	};
 
-	typedef NetworkTestAccessor::PacketBuilder::PacketWriterBase Writer;
+	typedef NetworkTestAccessor::TxPacketBuilder::PacketWriterBase Writer;
 	template<const char* padding, class Data, bool (Writer::* write)(Data), Data (NetworkTestAccessor::PacketStream::* read)()>
 	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {
 		static constexpr Data value1 = static_cast<Data>(0xb16b00b5);
@@ -179,8 +179,8 @@ TEST(NetPacket, FreeSpare) {
 
 	struct Task: TaskBase<Task> {
 		bool run() {
-			init(2);
-			if(NetworkTestAccessor::pool.statUsed() != 2) return bad;
+			init(4);
+			if(NetworkTestAccessor::pool.statUsed() != 4) return bad;
 			if(builder.copyIn(foobar, strlen(foobar)) != strlen(foobar)) return bad;
 
 			builder.done();
@@ -272,7 +272,7 @@ TEST(NetPacket, WordOverlapNet) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&NetworkTestAccessor::PacketBuilder::write32net,
+			&NetworkTestAccessor::TxPacketBuilder::write32net,
 			&NetworkTestAccessor::PacketStream::read32net
 	> task;
 	work(task);
@@ -282,7 +282,7 @@ TEST(NetPacket, HalfWordOverlapNet) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&NetworkTestAccessor::PacketBuilder::write16net,
+			&NetworkTestAccessor::TxPacketBuilder::write16net,
 			&NetworkTestAccessor::PacketStream::read16net
 	> task;
 	work(task);
@@ -292,7 +292,7 @@ TEST(NetPacket, WordOverlapRawt) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&NetworkTestAccessor::PacketBuilder::write32raw,
+			&NetworkTestAccessor::TxPacketBuilder::write32raw,
 			&NetworkTestAccessor::PacketStream::read32raw
 	> task;
 	work(task);
@@ -302,7 +302,7 @@ TEST(NetPacket, HalfWordOverlapRaw) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&NetworkTestAccessor::PacketBuilder::write16raw,
+			&NetworkTestAccessor::TxPacketBuilder::write16raw,
 			&NetworkTestAccessor::PacketStream::read16raw
 	> task;
 	work(task);

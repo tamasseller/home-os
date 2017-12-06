@@ -12,7 +12,6 @@ struct NetErrorStrings {
 	/*
 	 * ICMP originated
 	 */
-	static constexpr const char* unknown = "Shit happens";
 	static constexpr const char* netUnreach = "Network unreachable (ICMP) message received";
 	static constexpr const char* hostUnreach = "Host unreachable (ICMP) message received";
 	static constexpr const char* protocolUnreach = "Protocol unreachable (ICMP) message received";
@@ -24,11 +23,12 @@ struct NetErrorStrings {
 	 */
 	static constexpr const char* alreadyConnected = "The socket is already connected";
 	static constexpr const char* connectionReset = "Connection reset by peer";
-	static constexpr const char* outOfSegments = "No TCP segment descriptor available";
 
 	/*
 	 * Generic and management
 	 */
+	static constexpr const char* unknown = "Shit happens";
+	static constexpr const char* allocError = "Too many buffer blocks requested";
 	static constexpr const char* alreadyUsed = "The asynchronous control block is still being used";
 	static constexpr const char* noRoute = "There is no known route leading to the specified network";
 	static constexpr const char* unresolved = "The destination address could not be resolved (ARP)";

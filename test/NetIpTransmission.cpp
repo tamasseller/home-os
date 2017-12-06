@@ -1,5 +1,5 @@
 /*
- * NetIpTransmission.cpp
+ * NetIpTransmitter.cpp
  *
  *  Created on: 2017.11.19.
  *      Author: tooma
@@ -7,7 +7,7 @@
 
 #include "common/TestNetDefinitions.h"
 
-TEST_GROUP(NetIpTransmission) {
+TEST_GROUP(NetIpTransmitter) {
 	static void expectArpReq(size_t n) {
 		DummyIf<0>::expectN(n,
 			/*            dst                 |                src                | etherType */
@@ -73,10 +73,10 @@ TEST_GROUP(NetIpTransmission) {
 	}
 };
 
-TEST(NetIpTransmission, NoRoute) {
+TEST(NetIpTransmitter, NoRoute) {
 	struct Task: public TestTask<Task> {
 		bool run() {
-			Net::IpTransmission tx;
+			Net::IpTransmitter tx;
 			tx.init();
 			if(tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
 				return bad;
@@ -92,10 +92,10 @@ TEST(NetIpTransmission, NoRoute) {
 }
 
 
-TEST(NetIpTransmission, Unresolved) {
+TEST(NetIpTransmitter, Unresolved) {
 	struct Task: public TestTask<Task> {
 		bool run() {
-			Net::IpTransmission tx;
+			Net::IpTransmitter tx;
 			tx.init();
 
 			expectArpReq(4);
@@ -115,10 +115,10 @@ TEST(NetIpTransmission, Unresolved) {
 	work<true, false>(task);
 }
 
-TEST(NetIpTransmission, Resolved) {
+TEST(NetIpTransmitter, Resolved) {
 	struct Task: public TestTask<Task> {
 		bool run() {
-			Net::IpTransmission tx;
+			Net::IpTransmitter tx;
 			tx.init();
 
 			expectArpReq(1);
@@ -156,10 +156,10 @@ TEST(NetIpTransmission, Resolved) {
 	work<true, false>(task);
 }
 
-TEST(NetIpTransmission, Successful) {
+TEST(NetIpTransmitter, Successful) {
 	struct Task: public TestTask<Task> {
 		bool run() {
-			Net::IpTransmission tx;
+			Net::IpTransmitter tx;
 			tx.init();
 			if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
 				return bad;
@@ -189,10 +189,10 @@ TEST(NetIpTransmission, Successful) {
 	work<true, true>(task);
 }
 
-TEST(NetIpTransmission, Longer) {
+TEST(NetIpTransmitter, Longer) {
     struct Task: public TestTask<Task> {
         bool run() {
-            Net::IpTransmission tx;
+            Net::IpTransmitter tx;
             static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
             tx.init();
@@ -224,10 +224,10 @@ TEST(NetIpTransmission, Longer) {
     work<true, true>(task);
 }
 
-TEST(NetIpTransmission, Multi) {
+TEST(NetIpTransmitter, Multi) {
     struct Task: public TestTask<Task> {
         bool run() {
-            Net::IpTransmission tx;
+            Net::IpTransmitter tx;
             static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
             tx.init();
@@ -263,10 +263,10 @@ TEST(NetIpTransmission, Multi) {
     work<true, true>(task);
 }
 
-TEST(NetIpTransmission, Indirect) {
+TEST(NetIpTransmitter, Indirect) {
     struct Task: public TestTask<Task> {
         bool run() {
-            Net::IpTransmission tx;
+            Net::IpTransmitter tx;
             static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
             tx.init();
@@ -293,7 +293,7 @@ TEST(NetIpTransmission, Indirect) {
     work<true, true>(task);
 }
 
-TEST(NetIpTransmission, IndirectWithDestructor) {
+TEST(NetIpTransmitter, IndirectWithDestructor) {
     static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
     struct Task: public TestTask<Task> {
@@ -309,7 +309,7 @@ TEST(NetIpTransmission, IndirectWithDestructor) {
         }
 
         bool run() {
-            Net::IpTransmission tx;
+            Net::IpTransmitter tx;
 
             tx.init();
 
