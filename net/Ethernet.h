@@ -9,7 +9,7 @@
 
 template<class S, class... Args>
 template<class Driver>
-class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<Driver>, Interface>
+class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<Driver>, Interface>, public Driver
 {
     friend class Ethernet::IoChannelBase;
     friend class Network<S, Args...>;

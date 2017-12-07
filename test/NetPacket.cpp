@@ -10,17 +10,20 @@
 static const char c55[] = "0123456789012345678901234567890123456789012345678901234";
 static const char c57[] = "012345678901234567890123456789012345678901234567890123456";
 
+using Net = Net64;
+using Accessor = NetworkTestAccessor<Net>;
+
 TEST_GROUP(NetPacket) {
 
 	template<class Child>
 	struct TaskBase: TestTask<Child> {
-		NetworkTestAccessor::TxPacketBuilder builder;
+		Accessor::TxPacketBuilder builder;
 
 		void init(size_t n) {
-			builder.init(NetworkTestAccessor::pool.allocateDirect<NetworkTestAccessor::Pool::Quota::Tx>(n));
+			builder.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(n));
 		}
 
-		bool readAndCheck(NetworkTestAccessor::PacketStream &reader, const char* str) {
+		bool readAndCheck(Accessor::PacketStream &reader, const char* str) {
 			while(*str) {
 				if(reader.atEop()) return TaskBase::TestTask::bad;
 				if(reader.read8() != *str++) return TaskBase::TestTask::bad;
@@ -30,13 +33,13 @@ TEST_GROUP(NetPacket) {
 		}
 
 		bool checkStreamContent(const char* str) {
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(builder);
 			return readAndCheck(reader, str);
 		}
 
 		bool checkDirectStreamContent(const char* str) {
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(builder);
 
 			while(*str) {
@@ -52,7 +55,7 @@ TEST_GROUP(NetPacket) {
 		}
 
 		bool checkBlockContent(const char* str) {
-			NetworkTestAccessor::PacketDisassembler disassembler;
+			Accessor::PacketDisassembler disassembler;
 			disassembler.init(builder);
 
 			size_t length = strlen(str);
@@ -74,8 +77,8 @@ TEST_GROUP(NetPacket) {
 		}
 	};
 
-	typedef NetworkTestAccessor::TxPacketBuilder::PacketWriterBase Writer;
-	template<const char* padding, class Data, bool (Writer::* write)(Data), Data (NetworkTestAccessor::PacketStream::* read)()>
+	typedef Accessor::TxPacketBuilder::PacketWriterBase Writer;
+	template<const char* padding, class Data, bool (Writer::* write)(Data), Data (Accessor::PacketStream::* read)()>
 	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {
 		static constexpr Data value1 = static_cast<Data>(0xb16b00b5);
 		static constexpr Data value2 = static_cast<Data>(0x600dc0de);
@@ -87,7 +90,7 @@ TEST_GROUP(NetPacket) {
 			if(!(this->builder.*write)(value2)) return OverlapTask::bad;
 			this->builder.done();
 
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(this->builder);
 
 			if(this->readAndCheck(reader, padding) == OverlapTask::bad)
@@ -180,12 +183,12 @@ TEST(NetPacket, FreeSpare) {
 	struct Task: TaskBase<Task> {
 		bool run() {
 			init(4);
-			if(NetworkTestAccessor::pool.statUsed() != 4) return bad;
+			if(Accessor::pool.statUsed() != 4) return bad;
 			if(builder.copyIn(foobar, strlen(foobar)) != strlen(foobar)) return bad;
 
 			builder.done();
 
-			if(NetworkTestAccessor::pool.statUsed() != 1) return bad;
+			if(Accessor::pool.statUsed() != 1) return bad;
 
 			return checkStreamContent(foobar);
 		}
@@ -201,7 +204,7 @@ TEST(NetPacket, Overread) {
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 			builder.done();
 
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(builder);
 
 			char temp[strlen(hello)+2];
@@ -221,7 +224,7 @@ TEST(NetPacket, OverreadPartial) {
 			init(2);
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(builder);
 
 			char temp[strlen(hello)+2];
@@ -272,8 +275,8 @@ TEST(NetPacket, WordOverlapNet) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&NetworkTestAccessor::TxPacketBuilder::write32net,
-			&NetworkTestAccessor::PacketStream::read32net
+			&Accessor::TxPacketBuilder::write32net,
+			&Accessor::PacketStream::read32net
 	> task;
 	work(task);
 }
@@ -282,8 +285,8 @@ TEST(NetPacket, HalfWordOverlapNet) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&NetworkTestAccessor::TxPacketBuilder::write16net,
-			&NetworkTestAccessor::PacketStream::read16net
+			&Accessor::TxPacketBuilder::write16net,
+			&Accessor::PacketStream::read16net
 	> task;
 	work(task);
 }
@@ -292,8 +295,8 @@ TEST(NetPacket, WordOverlapRawt) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&NetworkTestAccessor::TxPacketBuilder::write32raw,
-			&NetworkTestAccessor::PacketStream::read32raw
+			&Accessor::TxPacketBuilder::write32raw,
+			&Accessor::PacketStream::read32raw
 	> task;
 	work(task);
 }
@@ -302,8 +305,8 @@ TEST(NetPacket, HalfWordOverlapRaw) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&NetworkTestAccessor::TxPacketBuilder::write16raw,
-			&NetworkTestAccessor::PacketStream::read16raw
+			&Accessor::TxPacketBuilder::write16raw,
+			&Accessor::PacketStream::read16raw
 	> task;
 	work(task);
 }
@@ -314,7 +317,7 @@ TEST(NetPacket, SimplePatch) {
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 			builder.done();
 
-			NetworkTestAccessor::PacketStream modifier;
+			Accessor::PacketStream modifier;
 			modifier.init(builder);
 
 			if(modifier.copyIn(world, strlen(world)) != strlen(world))
@@ -342,7 +345,7 @@ TEST(NetPacket, ComplexPatch) {
 
 			builder.done();
 
-			NetworkTestAccessor::PacketStream modifier;
+			Accessor::PacketStream modifier;
 			modifier.init(builder);
 
 			if(modifier.read8() != 123) return bad;
@@ -355,7 +358,7 @@ TEST(NetPacket, ComplexPatch) {
 
 			if(modifier.skipAhead(4)) return bad;
 
-			NetworkTestAccessor::PacketStream reader;
+			Accessor::PacketStream reader;
 			reader.init(builder);
 
 			if(reader.read8() != 123) return bad;

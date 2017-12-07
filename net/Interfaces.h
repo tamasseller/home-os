@@ -59,9 +59,10 @@ public:
 };
 
 template<class S, class... Args>
-template<class C>
-constexpr inline typename Network<S, Args...>::template Ethernet<C> *Network<S, Args...>::geEthernetInterface() {
-	return static_cast<Ethernet<C>*>(&state.interfaces);
+template<template<class> class Driver>
+constexpr inline typename Network<S, Args...>::template Ethernet<Driver<Network<S, Args...>>> *
+Network<S, Args...>::geEthernetInterface() {
+	return static_cast<Ethernet<Driver<Network<S, Args...>>>*>(&state.interfaces);
 }
 
 #endif /* INTERFACES_H_ */

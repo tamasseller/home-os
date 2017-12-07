@@ -25,8 +25,8 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
-	template<class Driver> struct EthernetInterface {
-	        template<class Net> using Wrapped = typename Net::template Ethernet<Driver>;
+	template<template<class> class Driver> struct EthernetInterface {
+	        template<class Net> using Wrapped = typename Net::template Ethernet<Driver<Net>>;
 	};
 
 	template<class... Members> struct Set {
@@ -35,7 +35,8 @@ struct NetworkOptions {
 
 	template<class Scheduler, class... Options>
 	class Configurable {
-		friend class NetworkTestAccessor;
+		template<class> friend class NetworkTestAccessor;
+		friend class NetworkOptions;
 		typedef Scheduler Os;
 
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
@@ -125,7 +126,7 @@ struct NetworkOptions {
 		    return state.routingTable.add(route);
 		}
 
-		template<class C> constexpr static inline Ethernet<C> *geEthernetInterface();
+		template<template<class> class Driver> constexpr static inline Ethernet<Driver<Configurable>> *geEthernetInterface();
 	};
 };
 

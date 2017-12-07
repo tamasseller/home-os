@@ -13,14 +13,11 @@
 
 #include "1test/Mock.h"
 
-template<uint8_t id = 0>
-class DummyIf {
-	static constexpr size_t arpCacheEntries = 8;
-
-public:
+template<class Net>
+struct DummyIf {
+    static constexpr size_t arpCacheEntries = 8;
 	static constexpr size_t arpReqTimeout = 100;
-	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, id);
-	inline static void enableTxIrq();
+	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
 	inline static void disableTxIrq() {}
 	inline static void init() {}
 
@@ -35,22 +32,36 @@ public:
 			sum = 31 * sum + *p++;
 
 		while(n--)
-			MOCK(DummyIf)::EXPECT(tx).withParam(id).withParam(sum);
+			MOCK(DummyIf)::EXPECT(tx).withParam(sum);
 	}
 
+	inline void enableTxIrq() {
+	    auto x = Net::template geEthernetInterface<DummyIf>();
+	    while(auto* p = x->getCurrentTxPacket()) {
+	        typename Net::PacketStream packet;
+	        packet.init(*p);
+
+	        uint32_t sum = 0;
+	        while(!packet.atEop())
+	            sum = 31 * sum + packet.read8();
+
+	        MOCK(DummyIf)::CALL(tx).withParam(sum);
+	        x->packetTransmitted();
+	    }
+	}
 };
 
-template<uint8_t id>
-constexpr AddressEthernet DummyIf<id>::ethernetAddress;
+template<class Net>
+constexpr AddressEthernet DummyIf<Net>::ethernetAddress;
 
-using Net = Network<OsRr,
-		NetworkOptions::Interfaces<
-		    NetworkOptions::Set<
-		        NetworkOptions::EthernetInterface<DummyIf<0>>
-            >
-        >,
-		NetworkOptions::ArpRequestRetry<3>
+using Ifs = NetworkOptions::Interfaces<
+    NetworkOptions::Set<
+        NetworkOptions::EthernetInterface<DummyIf>
+    >
 >;
+
+using Net64 = Network<OsRr, Ifs, NetworkOptions::BufferSize<64>>;
+using Net43 = Network<OsRr, Ifs, NetworkOptions::BufferSize<43>>;
 
 template<class Net>
 struct NetBuffers {
@@ -60,22 +71,7 @@ struct NetBuffers {
 template<class Net>
 typename Net::Buffers NetBuffers<Net>::buffers;
 
-template<uint8_t id>
-inline void DummyIf<id>::enableTxIrq() {
-	auto x = Net::geEthernetInterface<DummyIf<id>>();
-	while(Net::PacketTransmissionRequest* p = x->getCurrentTxPacket()) {
-		Net::PacketStream packet;
-		packet.init(*p);
-
-		uint32_t sum = 0;
-		while(!packet.atEop())
-		    sum = 31 * sum + packet.read8();
-
-		MOCK(DummyIf)::CALL(tx).withParam(id).withParam(sum);
-		x->packetTransmitted();
-	}
-}
-
+template<class Net>
 struct NetworkTestAccessor: Net {
 	static constexpr auto &pool = Net::state.pool;
 	using Net::Pool;
