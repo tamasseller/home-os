@@ -112,6 +112,48 @@ TEST(NetSharedTable, Simple)
     ctorDtorCount = 0;
 }
 
+TEST(NetSharedTable, ReleaseUnused)
+{
+    KvTable uut;
+
+    ctorDtorCount = 0;
+
+    auto x = uut.openOrCreate(1);
+
+    CHECK(ctorDtorCount == 1);
+
+    x->release();
+
+    CHECK(ctorDtorCount == 0);
+}
+
+TEST(NetSharedTable, FindAfterEmpty)
+{
+    KvTable uut;
+
+    ctorDtorCount = 0;
+
+    auto x = uut.openOrCreate(1);
+    uut.set(2, 345);
+    uut.set(3, 456);
+
+    CHECK(ctorDtorCount == 3);
+
+    x->release();
+
+    CHECK(ctorDtorCount == 2);
+
+    CHECK(uut.get(3) == 456);
+
+    CHECK(ctorDtorCount == 2);
+
+    auto z = uut.openOrCreate(2);
+    CHECK(z->access().v == 345);
+    z->erase();
+
+    CHECK(ctorDtorCount == 1);
+}
+
 TEST(NetSharedTable, CreateCollision)
 {
     KvTable uut;
@@ -207,8 +249,13 @@ TEST(NetSharedTable, FindBest)
 
     CHECK(uut.highestKey() == 1);
 
-    uut.set(3, 1);
+    uut.set(0, 1);
     CHECK(ctorDtorCount == 2);
+
+    CHECK(uut.highestKey() == 1);
+
+    uut.set(3, 1);
+    CHECK(ctorDtorCount == 3);
 
     CHECK(uut.highestKey() == 3);
 }

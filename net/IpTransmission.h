@@ -99,8 +99,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 	static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
 	static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
-	static constexpr AddressEthernet broadcastMac = AddressEthernet::make(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
-	static constexpr AddressEthernet zeroMac = AddressEthernet::make(0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
 	static constexpr size_t ipHeaderSize = 20;
 	static const size_t arpReqSize = 28;
@@ -203,6 +201,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		Done, Later, Error
 	};
 
+	template<bool resubmit>
 	inline AsyncResult allocateBuffers(typename Os::IoJob::Hook hook, size_t size, typename Os::IoJob::Callback callback) {
 		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
 		if(ret.hasMore()) {
@@ -216,7 +215,15 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		}
 
 		packet.stage1.poolParams.request.size = static_cast<uint16_t>(size);
-		return this->submit(hook, &state.pool, callback, &packet.stage1.poolParams) ? AsyncResult::Later : AsyncResult::Error;
+
+		bool x;
+
+		if(resubmit)
+			x = this->resubmit(hook, &state.pool, callback, &packet.stage1.poolParams);
+		else
+			x = this->submit(hook, &state.pool, callback, &packet.stage1.poolParams);
+
+		return x ? AsyncResult::Later : AsyncResult::Error;
 	}
 
 	static bool allocated(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook hook) {
@@ -261,7 +268,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Allocate buffer for the business packet.
 			 */
-			AsyncResult ret = self->allocateBuffers(hook, self->transmission.stage1.nBlocks, &IpTxJob::allocated);
+			AsyncResult ret = self->allocateBuffers<true>(hook, self->transmission.stage1.nBlocks, &IpTxJob::allocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
@@ -271,7 +278,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * Restart arp query packet generation and sending.
 			 */
 			const auto size = (arpReqSize + self->transmission.stage1.route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
-			AsyncResult ret = self->allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated);
+			AsyncResult ret = self->allocateBuffers<true>(hook, size, &IpTxJob::arpPacketAllocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
@@ -308,7 +315,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * Wait for the required address.
 			 */
 			self->transmission.stage1.arp.ip = self->transmission.stage1.dst;
-			if(self->transmission.stage1.route->dev->requestResolution(hook, self, &IpTxJob::addressResolved, &self->transmission.stage1.arp))
+			if(self->resubmit(hook, self->transmission.stage1.route->dev->getResolver(), &IpTxJob::addressResolved, &self->transmission.stage1.arp))
 				return true;
 		}
 
@@ -345,7 +352,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			Packet copy = self->packet.stage2.packet;
 			self->packet.stage3.packet.init(copy);
 
-			if(self->submit(hook, route->dev->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
+			if(self->resubmit(hook, route->dev->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
 				return true;
 		}
 
@@ -405,7 +412,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 */
 			this->transmission.stage1.retry = arpRequestRetry;
 			const auto size = (arpReqSize + route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
-			if(allocateBuffers(hook, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
+			if(allocateBuffers<false>(hook, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
 
 			/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
@@ -462,28 +469,27 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 template<class S, class... Args>
 class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob> {
-public:
-	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0) {
+	bool check() {
 		if(this->shouldWait())
 			this->wait();
 
+		return this->error == nullptr;
+	}
+public:
+	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0, size_t timeout = 100) {
+		check();
 		return this->start(dst, inLineSize, indirectCount);
 	}
 
 	inline bool send(uint8_t protocol, uint8_t ttl = 64) {
-		if(this->shouldWait())
-			this->wait();
-
-		if(this->error)
+		if(!check())
 			return false;
 
 		return this->start(protocol, ttl);
 	}
 
 	inline uint16_t fill(const char* data, uint16_t length) {
-		if(this->shouldWait())
-			this->wait();
-
+		check();
 		if(this->error)
 			return false;
 
@@ -510,11 +516,5 @@ constexpr const char Network<S, Args...>::IpTxJob::arpRequestPreamble[];
 
 template<class S, class... Args>
 constexpr const char Network<S, Args...>::IpTxJob::arpReplyPreamble[];
-
-template<class S, class... Args>
-constexpr AddressEthernet Network<S, Args...>::IpTxJob::broadcastMac;
-
-template<class S, class... Args>
-constexpr AddressEthernet Network<S, Args...>::IpTxJob::zeroMac;
 
 #endif /* IPTRANSMISSION_H_ */

@@ -103,8 +103,10 @@ TEST(IoChannelTimeoutCancel) {
 
 			Os::sleep(40);
 
-			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
+				if(!jobs[i].isOccupied()) return bad;
 				jobs[i].cancel();
+			}
 
 			Os::sleep(10);
 
@@ -112,9 +114,11 @@ TEST(IoChannelTimeoutCancel) {
 
 			Os::sleep(50);
 
-			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++)
+			for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
+				if(jobs[i].isOccupied()) return bad;
 				if(jobs[i].success != (int)Os::IoJob::Result::Canceled)
 					return bad;
+			}
 
 			return ok;
 		}
@@ -130,7 +134,7 @@ TEST(IoChannelMulti) {
 	struct Task: Base, public TestTask<Task> {
 		bool run() {
 			MultiJob<3> multiJob;
-			multiJob.start();
+			multiJob.launch(MultiJob<3>::entry);
 			process.counter = 3;
 
 			while(multiJob.idx){}
@@ -151,13 +155,15 @@ TEST(IoChannelMulti) {
 TEST(IoChannelErrors) {
 	struct Task: Base, public TestTask<Task> {
 		bool run() {
-			if(jobs[0].startTimeout(0)) return bad;
+			if(jobs[0].launchTimeout(Job::entry, 0)) return bad;
 
-			if(jobs[0].startTimeout((uintptr_t)-1)) return bad;
+			if(jobs[0].launchTimeout(Job::entry, (uintptr_t)-1)) return bad;
 
-			if(!jobs[0].start()) return bad;
+			if(!jobs[0].launch(Job::entry)) return bad;
 
-			if(jobs[0].start()) return bad;
+			if(jobs[0].launch(Job::entry)) return bad;
+
+			if(jobs[0].launchTimeout(Job::entry, 10)) return bad;
 
 			process.counter = 1;
 
@@ -178,33 +184,33 @@ TEST(IoSemaphoreChannel) {
 		bool run() {
 			SemJob jobs[3];
 
-			jobs[0].start(1);
+			jobs[0].launch(SemJob::entry, 1);
 
 			if(!jobs[0].done) return bad;	// 1
 
-			jobs[0].start(-1);
+			jobs[0].launch(SemJob::entry, -1);
 
 			if(!jobs[0].done) return bad;	// 0
 
-			jobs[0].start(-1);
+			jobs[0].launch(SemJob::entry, -1);
 
 			if(jobs[0].done) return bad;	// 0
 
-			jobs[1].start(2);
+			jobs[1].launch(SemJob::entry, 2);
 
 			if(!jobs[1].done) return bad;	// 2
 			if(!jobs[0].done) return bad;	// 1
 
-			jobs[0].start(-2);
+			jobs[0].launch(SemJob::entry, -2);
 
 			if(jobs[0].done) return bad;	// 1
 
-			jobs[1].start(-1);
+			jobs[1].launch(SemJob::entry, -1);
 
 			if(jobs[0].done) return bad;	// 1
 			if(jobs[1].done) return bad;	// 1
 
-			jobs[2].start(3);
+			jobs[2].launch(SemJob::entry, 3);
 
 			if(!jobs[2].done) return bad;	// 3
 			if(!jobs[0].done) return bad;	// 1
@@ -225,39 +231,56 @@ TEST(IoChannelComposite) {
 		bool run() {
 			CompositeJob jobs[3];
 
-			jobs[0].start(-2, 0);
-			jobs[1].start(-1, 0);
-			jobs[2].start(1, 0);
+			jobs[0].launch(CompositeJob::entry, -2);
+			jobs[1].launch(CompositeJob::entry, -1);
+			jobs[2].launch(CompositeJob::entry, 1);
 
 			if(jobs[0].stage != 0) return bad;
 			if(jobs[1].stage != 0) return bad;
 			if(jobs[2].stage != 1) return bad;
+			if(!jobs[0].isOccupied()) return bad;
+			if(!jobs[1].isOccupied()) return bad;
+			if(!jobs[2].isOccupied()) return bad;
 
 			process.counter = 1;
 
 			Os::sleep(10);
 
+			if(jobs[0].stage != 0) return bad;
+			if(jobs[1].stage != 0) return bad;
 			if(jobs[2].stage != 2) return bad;
+			if(!jobs[0].isOccupied()) return bad;
+			if(!jobs[1].isOccupied()) return bad;
+			if(jobs[2].isOccupied()) return bad;
 
-			jobs[2].start(1, 0);
+			jobs[2].launch(CompositeJob::entry, 1);
 
 			if(jobs[0].stage != 1) return bad;
+			if(jobs[1].stage != 0) return bad;
 			if(jobs[2].stage != 1) return bad;
+			if(!jobs[0].isOccupied()) return bad;
+			if(!jobs[1].isOccupied()) return bad;
+			if(!jobs[2].isOccupied()) return bad;
 
 			process.counter = 2;
 
 			Os::sleep(10);
 
 			if(jobs[0].stage != 2) return bad;
+			if(jobs[1].stage != 0) return bad;
 			if(jobs[2].stage != 2) return bad;
+			if(jobs[0].isOccupied()) return bad;
+			if(!jobs[1].isOccupied()) return bad;
+			if(jobs[2].isOccupied()) return bad;
 
 			process.counter = 100;
 
-			jobs[2].start(1, 0);
+			jobs[2].launch(CompositeJob::entry, 1);
 
 			Os::sleep(10);
 
 			if(jobs[1].stage != 2) return bad;
+			if(jobs[1].isOccupied()) return bad;
 
 			return ok;
 		}
@@ -275,9 +298,11 @@ TEST(IoChannelCompositeTimeout) {
         bool run() {
             CompositeJob job;
 
-            job.start(1, 10);
+            job.launchTimeout(CompositeJob::entry, 10, 1);
 
             while(!job.timedOut) {}
+
+            if(job.isOccupied()) return bad;
 
 			return ok;
         }
@@ -289,3 +314,38 @@ TEST(IoChannelCompositeTimeout) {
     CommonTestUtils::start();
     CHECK(!task.error);
 }
+
+TEST(IoChannelCompositeTimeoutCumulative) {
+    struct Task: Base, public TestTask<Task> {
+        bool run() {
+            CompositeJob jobs[2];
+
+            jobs[0].launchTimeout(CompositeJob::entry, 50, -1);
+
+            Os::sleep(5);
+
+            if(!jobs[0].isOccupied()) return bad;
+
+            jobs[1].launch(CompositeJob::entry, 1);
+
+            Os::sleep(1);
+
+            if(!jobs[0].isOccupied()) return bad;
+            if(jobs[0].stage != 1) return bad;
+
+            Os::sleep(50);
+
+            if(jobs[0].isOccupied()) return bad;
+            if(!jobs[0].timedOut) return bad;
+
+			return ok;
+        }
+    } task;
+
+    Base::process.init();
+    Base::semProcess.init();
+    task.start();
+    CommonTestUtils::start();
+    CHECK(!task.error);
+}
+

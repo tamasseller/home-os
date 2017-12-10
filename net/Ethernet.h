@@ -15,7 +15,7 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     friend class Network<S, Args...>;
     friend Driver;
 
-    ArpTable<Driver::arpCacheEntries> resolver;
+    ArpTable<Os, Driver::arpCacheEntries> resolver;
 
     virtual const AddressEthernet& getAddress() override final {
         return Driver::ethernetAddress;
@@ -25,9 +25,9 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
         return resolver.lookUp(ip, mac);
     }
 
-    virtual bool requestResolution(typename Os::IoJob::Hook hook, typename Os::IoJob* item, typename Os::IoJob::Callback callback, ArpTableIoData* data) override final {
-        return item->submitTimeout(hook, &resolver, Driver::arpReqTimeout, callback, data);
-    }
+	virtual typename Os::IoChannel *getResolver() override final {
+		return &resolver;
+	}
 
     virtual bool fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
     {
@@ -69,19 +69,14 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
         return true;
     }
 
-    bool removeItem(typename Os::IoJob::Data* data) {
-        Os::assert(data == currentPacket, "Invalid network packet queue state");
-        currentPacket = nextPacket;
-        auto it = items.iterator();
-
-        if((nextPacket = it.current()) != nullptr)
-            it.remove();
-
-        return true;
-    }
-
     bool removeCanceled(typename Os::IoJob::Data* data) {
-        return this->items.remove(static_cast<PacketTransmissionRequest*>(data));
+    	auto* p = static_cast<PacketTransmissionRequest*>(data);
+
+    	if(p == currentPacket || p == nextPacket)
+    		return false;
+
+        this->items.remove(static_cast<PacketTransmissionRequest*>(data));
+        return true;
     }
 
     bool hasJob() {
@@ -97,7 +92,15 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     }
 
     void packetTransmitted() {
-        this->jobDone(currentPacket);
+    	auto* p = currentPacket;
+
+        currentPacket = nextPacket;
+        auto it = items.iterator();
+
+        if((nextPacket = it.current()) != nullptr)
+            it.remove();
+
+        this->jobDone(p);
     }
 
 public:

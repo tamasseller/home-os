@@ -346,14 +346,6 @@ TEST(NetIpTransmitter, NoRoute##x) {                        \
     TxTests<Net##x>::runNoRoute();                          \
 }                                                           \
                                                             \
-TEST(NetIpTransmitter, Unresolved##x) {                     \
-    TxTests<Net##x>::runUnresolved();                       \
-}                                                           \
-                                                            \
-TEST(NetIpTransmitter, Resolved##x) {                       \
-    TxTests<Net##x>::runResolved();                         \
-}                                                           \
-                                                            \
 TEST(NetIpTransmitter, Successful##x) {                     \
     TxTests<Net##x>::runSuccessful();                       \
 }                                                           \
@@ -373,6 +365,19 @@ TEST(NetIpTransmitter, Indirect##x) {                       \
 TEST(NetIpTransmitter, IndirectWithDestructor##x) {         \
     TxTests<Net##x>::runIndirectWithDestructor();           \
 }                                                           \
+
+/*
+
+TEST(NetIpTransmitter, Unresolved##x) {                     \
+    TxTests<Net##x>::runUnresolved();                       \
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, Resolved##x) {                       \
+    TxTests<Net##x>::runResolved();                         \
+}                                                           \
+                                                            \
+
+ */
 
 INSTANTIATE_ALL_TESTS(64)
 INSTANTIATE_ALL_TESTS(43)

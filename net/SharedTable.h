@@ -69,7 +69,7 @@ struct SharedTable
 
             inline void erase() {
                 auto ret = getFlags()([](uintptr_t old, uintptr_t &result){
-                    result = old & ~validFlag;
+                    result = (old - 1) & ~validFlag;
                     return true;
                 });
 
@@ -121,12 +121,9 @@ struct SharedTable
                 if(!empty){
                     if(entry->takeIfValidOrEmpty()) {
                         if(entry->isValid()) {
-                            if(c(&entry->access())) {
-                                if(empty)
-                                    empty->release();
-
+                            if(c(&entry->access()))
                                 return entry;
-                            } else
+                            else
                                 entry->release();
                         } else {
                             empty = entry;
@@ -135,9 +132,7 @@ struct SharedTable
                 } else {
                     if(entry->takeIfValid()) {
                         if(c(&entry->access())) {
-                            if(empty)
-                                empty->release();
-
+                            empty->getFlags() = 0;
                             return entry;
                         }
 

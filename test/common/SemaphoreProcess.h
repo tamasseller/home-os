@@ -51,6 +51,8 @@ private:
 				return this->items.addBack(item);
 
 			count = newVal;
+
+			this->items.remove(item);
 			this->jobDone(item);
 
 			item = this->items.iterator().current();
@@ -59,7 +61,7 @@ private:
 		return true;
 	}
 
-	bool removeItem(typename Os::IoJob::Data* item) {
+	bool removeCanceled(typename Os::IoJob::Data* item) {
 		this->items.remove(static_cast<Data*>(item));
 		return true;
 	}

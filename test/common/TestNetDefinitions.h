@@ -16,7 +16,6 @@
 template<class Net>
 struct DummyIf {
     static constexpr size_t arpCacheEntries = 8;
-	static constexpr size_t arpReqTimeout = 100;
 	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
 	inline static void disableTxIrq() {}
 	inline static void init() {}

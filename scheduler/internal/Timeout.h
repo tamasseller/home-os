@@ -34,10 +34,7 @@ class Scheduler<Args...>::Timeout: Sleeper, Event {
 			if(self->isSleeping())
 				state.sleepList.remove(self);
 		} else {
-			if(self->isSleeping())
-				state.sleepList.update(self, arg);
-			else
-				state.sleepList.delay(self, arg);
+			state.sleepList.delay(self, arg);
 		}
 	}
 

@@ -31,9 +31,11 @@ TEST_GROUP(NetBufferPool) {
 	typedef BufferPool<Os, 10, Dummy> Pool;
 
 	class PoolJob: public Os::IoJob, Pool::IoData {
-		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, typename Os::IoJob::Hook) {
+		static bool writeResult(Os::IoJob::Launcher *launcher, Os::IoJob* item, Os::IoJob::Result result)
+		{
+			auto self = static_cast<PoolJob*>(item);
+
 			if(result == Os::IoJob::Result::Done) {
-				auto self = static_cast<PoolJob*>(item);
 				Dummy* current = self->result = self->allocator.get();
 
 				while(Dummy* next = self->allocator.get()) {
@@ -47,13 +49,17 @@ TEST_GROUP(NetBufferPool) {
 			return false;
 		}
 
-	public:
-		inline bool start(Pool &pool, size_t n, Pool::Quota quota = Pool::Quota::Tx, Os::IoJob::Hook hook = nullptr) {
-			result = nullptr;
-			this->request.quota = quota;
-			this->request.size = static_cast<uint16_t>(n);
-			return submit(hook, &pool, &PoolJob::writeResult, this);
+		static bool start(Os::IoJob::Launcher *launcher, Os::IoJob* item, Pool *pool, size_t n, Pool::Quota quota)
+		{
+			auto self = static_cast<PoolJob*>(item);
+			self->result = nullptr;
+			self->request.quota = quota;
+			self->request.size = static_cast<uint16_t>(n);
+			return launcher->launch(pool, &PoolJob::writeResult, self);
 		}
+
+	public:
+		static constexpr auto entry = &PoolJob::start;
 
 		Dummy* volatile result;
 		inline PoolJob(): result(nullptr) {}
@@ -82,17 +88,17 @@ TEST(NetBufferPool, Simple) {
 			pool.init(storage);
 
 			PoolJob jobs[3];
-			jobs[0].start(pool, 3);
+			jobs[0].launch(PoolJob::entry, &pool, 3, Pool::Quota::Tx);
 
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4);
+			jobs[1].launch(PoolJob::entry, &pool, 4, Pool::Quota::Tx);
 
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 5);
+			jobs[2].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
@@ -157,19 +163,19 @@ TEST(NetBufferPool, Ordering) {
 		bool run() {
 			pool.init(storage);
 
-			jobs[0].start(pool, 5);
+			jobs[0].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5);
+			jobs[1].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6);
+			jobs[2].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4);
+			jobs[3].launch(PoolJob::entry, &pool, 4, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
@@ -201,19 +207,19 @@ TEST(NetBufferPool, LastCanceled) {
 		bool run() {
 			pool.init(storage);
 
-			jobs[0].start(pool, 5);
+			jobs[0].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5);
+			jobs[1].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6);
+			jobs[2].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4);
+			jobs[3].launch(PoolJob::entry, &pool, 4, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
@@ -244,19 +250,19 @@ TEST(NetBufferPool, FirstCanceled) {
 		bool run() {
 			pool.init(storage);
 
-			jobs[0].start(pool, 5);
+			jobs[0].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 5);
+			jobs[1].launch(PoolJob::entry, &pool, 5, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[1].result == nullptr) return bad;
 
-			jobs[2].start(pool, 6);
+			jobs[2].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 4);
+			jobs[3].launch(PoolJob::entry, &pool, 4, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
@@ -288,19 +294,19 @@ TEST(NetBufferPool, Quota) {
 			PoolJob jobs[4];
 			pool.init(storage, 8, 8);					// M: 10, R: 8, T: 8
 
-			jobs[0].start(pool, 6, Pool::Quota::Tx);	// M: 4, R: 8, T: 2
+			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);	// M: 4, R: 8, T: 2
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4, Pool::Quota::Tx);	// M: 4, R: 8, T: 2 (Quota exceeded)
+			jobs[1].launch(PoolJob::entry, &pool, 4, Pool::Quota::Tx);	// M: 4, R: 8, T: 2 (Quota exceeded)
 			Os::sleep(1);
 			if(jobs[1].result != nullptr) return bad;
 
-			jobs[2].start(pool, 7, Pool::Quota::Rx);	// M: 4, R: 1, T: 2
+			jobs[2].launch(PoolJob::entry, &pool, 7, Pool::Quota::Rx);	// M: 4, R: 1, T: 2
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
-			jobs[3].start(pool, 6, Pool::Quota::Rx);	// M: 4, R: 1, T: 2
+			jobs[3].launch(PoolJob::entry, &pool, 6, Pool::Quota::Rx);	// M: 4, R: 1, T: 2
 			Os::sleep(1);
 			if(jobs[3].result != nullptr) return bad;
 
@@ -331,15 +337,15 @@ TEST(NetBufferPool, QuotaCancelRx) {
 			PoolJob jobs[4];
 			pool.init(storage, 8, 8);
 
-			jobs[0].start(pool, 6, Pool::Quota::Rx);
+			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4, Pool::Quota::Rx);
+			jobs[1].launch(PoolJob::entry, &pool, 4, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[1].result != nullptr) return bad;
 
-			jobs[2].start(pool, 2, Pool::Quota::Rx);
+			jobs[2].launch(PoolJob::entry, &pool, 2, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
@@ -364,15 +370,15 @@ TEST(NetBufferPool, QuotaCancelMem) {
 			PoolJob jobs[4];
 			pool.init(storage, 8, 8);
 
-			jobs[0].start(pool, 8, Pool::Quota::Tx);
+			jobs[0].launch(PoolJob::entry, &pool, 8, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4, Pool::Quota::Rx);
+			jobs[1].launch(PoolJob::entry, &pool, 4, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[1].result != nullptr) return bad;
 
-			jobs[2].start(pool, 4, Pool::Quota::Rx);
+			jobs[2].launch(PoolJob::entry, &pool, 4, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
@@ -400,15 +406,15 @@ TEST(NetBufferPool, QuotaCancelMemNonFirst) {
 			PoolJob jobs[4];
 			pool.init(storage, 8, 8);
 
-			jobs[0].start(pool, 8, Pool::Quota::Tx);
+			jobs[0].launch(PoolJob::entry, &pool, 8, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 4, Pool::Quota::Rx);
+			jobs[1].launch(PoolJob::entry, &pool, 4, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[1].result != nullptr) return bad;
 
-			jobs[2].start(pool, 4, Pool::Quota::Rx);
+			jobs[2].launch(PoolJob::entry, &pool, 4, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 
@@ -436,15 +442,15 @@ TEST(NetBufferPool, QuotaPrioPass) {
 			PoolJob jobs[4];
 			pool.init(storage, 6, 6);
 
-			jobs[0].start(pool, 6, Pool::Quota::None);
+			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::None);
 			Os::sleep(1);
 			if(jobs[0].result == nullptr) return bad;
 
-			jobs[1].start(pool, 6, Pool::Quota::Tx);
+			jobs[1].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);
 			Os::sleep(1);
 			if(jobs[1].result != nullptr) return bad;
 
-			jobs[2].start(pool, 6, Pool::Quota::Rx);
+			jobs[2].launch(PoolJob::entry, &pool, 6, Pool::Quota::Rx);
 			Os::sleep(1);
 			if(jobs[2].result != nullptr) return bad;
 

@@ -55,6 +55,7 @@ private:
 			if(param)
 				*param = count;
 
+			instance.items.remove(item);
 			instance.jobDone(item);
 		}
 	}
@@ -67,8 +68,9 @@ private:
 		return this->items.addBack(static_cast<Data*>(item));
 	}
 
-	bool removeItem(typename Os::IoJob::Data* item) {
-		return this->items.remove(static_cast<Data*>(item));
+	bool removeCanceled(typename Os::IoJob::Data* item) {
+		this->items.remove(static_cast<Data*>(item));
+		return true;
 	}
 
 	void enableProcess() {

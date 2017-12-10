@@ -8,18 +8,18 @@
 #ifndef ARPTABLE_H_
 #define ARPTABLE_H_
 
-#include "Network.h"
+#include "AddressIp4.h"
+#include "SharedTable.h"
+#include "AddressEthernet.h"
 
-template<class S, class... Args>
-struct Network<S, Args...>::ArpEntry {
-    friend class Network<S, Args...>;
+struct ArpEntry {
 	AddressIp4 ip;
 	AddressEthernet mac;
 	uint16_t timeout;
 };
 
-template<class S, class... Args>
-class Network<S, Args...>::ArpTableIoData: public Os::IoJob::Data {
+template<class Os>
+class ArpTableIoData: public Os::IoJob::Data {
 	friend class pet::LinkedList<ArpTableIoData>;
 	ArpTableIoData* next;
 public:
@@ -29,39 +29,76 @@ public:
 	};
 };
 
-
-template<class S, class... Args>
-template<size_t nEntries>
-class Network<S, Args...>::ArpTable:
-	SharedTable<Os, ArpEntry, nEntries>,
-	public Os::template IoChannelBase<ArpTable<nEntries>>
+template<class Os, size_t nEntries>
+class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries>>
 {
 	friend class ArpTable::IoChannelBase;
 
-	pet::LinkedList<ArpTableIoData> items;
+public:
+	typedef ArpTableIoData<Os> Data;
 
+private:
+
+	/// List of items added recently
+	pet::LinkedList<Data> newItems;
+
+	/// List of items added before the last ageing.
+	pet::LinkedList<Data> agedItems;
+
+	/// The current time by which the entries are timed out.
+	uint16_t ageingCounter = 0;
+
+	/// Implementation of the IoChannelBase interface.
 	inline bool hasJob() {
 		return true;
 	}
 
+	/// Implementation of the IoChannelBase interface.
 	inline bool addItem(typename Os::IoJob::Data* job)
 	{
-		ArpTableIoData* data = static_cast<ArpTableIoData*>(job);
+		Data* data = static_cast<Data*>(job);
 
 		if(lookUp(data->ip, data->mac)) {
 			this->jobDone(data);
 			return true;
 		}
 
-		return items.addBack(data);
+		return newItems.addBack(data);
 	}
 
-	inline bool removeItem(typename Os::IoJob::Data* job) {
-		items.remove(static_cast<ArpTableIoData*>(job));
+	/// Implementation of the IoChannelBase interface.
+	inline bool removeCanceled(typename Os::IoJob::Data* job) {
+		auto data = static_cast<Data*>(job);
+
+		if(!newItems.remove(data))
+			agedItems.remove(data);
+
 		return true;
 	}
 
+	inline bool flushRequests(typename pet::LinkedList<Data>::Iterator it, AddressIp4 ip, const AddressEthernet& mac)
+	{
+		bool ret = false;
+
+		for(; it.current(); it.step()) {
+			if(it.current()->ip == ip) {
+				auto x = it.current();
+				it.remove();
+				x->mac = mac;
+				this->jobDone(x);
+				ret = true;
+			}
+		}
+
+		return ret;
+	}
+
 public:
+	/**
+	 * Try to resolve an address immediately.
+	 *
+	 * @return True on success.
+	 */
 	inline bool lookUp(AddressIp4 ip, AddressEthernet& mac) {
 		if(auto x = this->find([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			mac = x->access().mac;
@@ -71,27 +108,60 @@ public:
 		return false;
 	}
 
+	/**
+	 * Add an ARP entry manually.
+	 */
 	inline void set(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout) {
-		if(auto ret = this->findOrAllocate([ip](const ArpEntry* entry){return entry->ip == ip;})) {
+		while(auto ret = this->findOrAllocate([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			if(ret->isValid()) {
-				ret->release();
-				return;
+				ret->erase();
+				continue;
 			}
 
 			ret->access().ip = ip;
 			ret->access().mac = mac;
 			ret->access().timeout = timeout;
 			ret->finalize();
-		}
-
-		for(auto it = this->items.iterator(); it.current(); it.step()) {
-			if(it.current()->ip == ip) {
-				it.current()->mac = mac;
-				this->jobDone(it.current());
-			}
+			break;
 		}
 	}
 
+	/**
+	 * Add an entry received from external communication.
+	 *
+	 * @NOTE Allowed to be called from event handler context only!
+	 */
+	inline void handleResolved(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout) {
+		this->set(ip, mac, timeout);
+		if(!flushRequests(newItems.iterator(), ip, mac)) {
+			flushRequests(agedItems.iterator(), ip, mac);
+		}
+	}
+
+	/**
+	 * Handle ageing of stored data and outstanding requests.
+	 *
+	 * @NOTE Allowed to be called from event handler context only!
+	 */
+	inline void ageContent() {
+		this->ageingCounter++;
+		while(auto *x = this->find([this](const ArpEntry* e){
+			return (static_cast<int16_t>(ageingCounter - e->timeout) > 0);
+		})) {
+            x->erase();
+        }
+
+		for(auto it = agedItems.iterator(); auto x = it.current(); it.step()) {
+			x->mac = AddressEthernet::allZero;
+			this->jobDone(x);
+		}
+
+		agedItems.take(newItems);
+	}
+
+	/**
+	 * Remove an ARP entry manually.
+	 */
 	inline void kill(AddressIp4 ip) {
 		while(auto ret = this->find([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			ret->erase();

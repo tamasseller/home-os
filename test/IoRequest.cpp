@@ -29,7 +29,7 @@ TEST(IoRequestAlreadyDone) {
 			if(!postReqsNoTimeout()) return bad;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++)
-				if(!reqs[i].shouldWait()) return bad;
+				if(!reqs[i].isOccupied()) return bad;
 
 			process.counter = 3;
 
@@ -38,9 +38,9 @@ TEST(IoRequestAlreadyDone) {
 			if(process.counter) return bad;
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
-				if(!reqs[i].shouldWait()) return bad;
+				if(!reqs[i].isOccupied()) return bad;
 				reqs[i].wait();
-				if(reqs[i].shouldWait()) return bad;
+				if(reqs[i].isOccupied()) return bad;
 
 				if(reqs[i].success != (int)Os::IoJob::Result::Done) return bad;
 			}
@@ -142,7 +142,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].init();
 				reqs[i].success = -1;
-				if(!reqs[i].startTimeout(100 + 10 * i)) return bad;
+				if(!reqs[i].launchTimeout(Req::entry, 100 + 10 * i)) return bad;
 			}
 
 			auto* s1 = Os::select(&reqs[0], &reqs[1], &reqs[2]);
@@ -150,7 +150,7 @@ TEST(IoRequestIoTimeoutSelect) {
 			if(!s1 || static_cast<Req*>(s1)->success != (int)Os::IoJob::Result::TimedOut) return bad;
 
 			process.counter = 3;
-			static_cast<Req*>(s1)->start();
+			static_cast<Req*>(s1)->launch(Req::entry);
 
 			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 				reqs[i].wait();
@@ -168,13 +168,51 @@ TEST(IoRequestIoTimeoutSelect) {
 	CHECK(!task.error);
 }
 
+TEST(IoRequestProtection) {
+	struct Task: public TestTask<Task>, Base  {
+		bool run() {
+			if(!postReqsNoTimeout()) return bad;
+
+			if(reqs[0].launch(Req::entry)) return bad;
+			if(reqs[1].launchTimeout(Req::entry, 10)) return bad;
+			if(reqs[2].launchTimeout(Req::entry, 0)) return bad;
+
+			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++)
+				if(!reqs[i].isOccupied()) return bad;
+
+			process.counter = 3;
+
+			Os::sleep(10);
+
+			if(reqs[0].launch(Req::entry)) return bad;
+			if(reqs[1].launchTimeout(Req::entry, 10)) return bad;
+			if(reqs[2].launchTimeout(Req::entry, 0)) return bad;
+
+			for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++)
+				reqs[i].wait();
+
+			if(!reqs[0].launch(Req::entry)) return bad;
+			if(!reqs[1].launchTimeout(Req::entry, 10)) return bad;
+			if(reqs[2].launchTimeout(Req::entry, 0)) return bad;
+
+			return ok;
+		}
+	} task;
+
+	Base::process.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
+
 TEST(IoRequestMulti) {
 	struct Task: Base, public TestTask<Task> {
 		bool run() {
 			Os::IoRequest<MultiJob<3>> multiReq;
 			multiReq.init();
 
-			multiReq.start();
+			multiReq.launch(multiReq.entry);
 			process.counter = 3;
 
 			multiReq.wait();
@@ -198,13 +236,13 @@ TEST(IoRequestComposite) {
 			Os::IoRequest<CompositeJob> compReq[2];
 
 			compReq[0].init();
-			compReq[0].start(-1, 0);
+			compReq[0].launch(CompositeJob::entry, -1);
 			process.counter = 100;
 
 			if(compReq[0].wait(10))return bad;
 
 			compReq[1].init();
-			compReq[1].start(1, 0);
+			compReq[1].launch(CompositeJob::entry, 1);
 
 			compReq[0].wait();
 			compReq[1].wait();
@@ -227,7 +265,7 @@ TEST(IoRequestMultiSelect) {
 
 			for(auto &x: multiReq) {
 				x.init();
-				x.start();
+				x.launch(x.entry);
 			}
 
 			process.counter = 6;
@@ -311,10 +349,10 @@ TEST(IoRequestVsMutexPrioChange)
 TEST(IoRequestCompositeTimeout) {
     struct Task: Base, public TestTask<Task> {
         bool run() {
-            Os::IoRequest<CompositeJob> req;
+        	Os::IoRequest<CompositeJob> req;
             req.init();
 
-            req.start(1, 10);
+            req.launchTimeout(req.entry, 10, 1);
 
             req.wait();
 

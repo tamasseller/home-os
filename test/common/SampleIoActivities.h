@@ -20,62 +20,66 @@ struct DummyProcessJobsBase {
 
 	/* TODO check if visibility can be decreased */
 	class Job: public Os::IoJob, public DummyProcess<Os>::Data {
-		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
-			Job* job = static_cast<Job*>(item);
-			job->success = (int)result;
+		friend typename Os::IoJob;
+
+		static bool writeResult(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result) {
+			Job* self = static_cast<Job*>(item);
+			self->success = (int)result;
 			return false;
 		}
 
+		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item) {
+			Job* self = static_cast<Job*>(item);
+			self->success = -1;
+			self->param = &self->count;
+			return launcher->launch(&DummyProcess<Os>::instance, &Job::writeResult, self);
+		}
+
 	public:
+		static constexpr auto entry = &Job::start;
 		volatile int success;
 		volatile int count;
 
+
 		inline Job(): success(-1), count(-1) {}
 
-		bool start(typename Os::IoJob::Hook hook = nullptr) {
-			success = -1;
-			this->param = &count;
-			return this->submit(hook, &DummyProcess<Os>::instance, &Job::writeResult, this);
-		}
-
-		bool startTimeout(uintptr_t timeout, typename Os::IoJob::Hook hook = nullptr) {
-			success = -1;
-			this->param = 0;
-			return this->submitTimeout(hook, &DummyProcess<Os>::instance, timeout, &Job::writeResult, this);
-		}
 	};
 
 	template<size_t n>
 	struct MultiJob: Os::IoJob, public DummyProcess<Os>::Data {
 		template<int> struct Selector {};
 
-		static bool writeResult(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
-			MultiJob* job = static_cast<MultiJob*>(item);
-			job->success[--job->idx] = (int)result;
+		static bool writeResult(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result) {
+			MultiJob* self = static_cast<MultiJob*>(item);
 
-			if(job->idx) {
-				job->submit(hook, &Process::instance, &MultiJob::writeResult, job);
+			self->success[--self->idx] = (int)result;
+
+			if(self->idx) {
+				launcher->launch(&Process::instance, &MultiJob::writeResult, self);
 				return true;
 			}
 
 			return false;
 		}
 
-	public:
-		volatile int idx = n;
-		volatile int success[n];
+		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item) {
+			MultiJob* self = static_cast<MultiJob*>(item);
 
-		inline bool start(typename Os::IoJob::Hook hook = nullptr) {
-			for(auto &x: success)
+			for(auto &x: self->success)
 				x = -1;
 
-			this->param = 0;
-			return this->submit(hook, &process, &MultiJob::writeResult, this);
+			self->param = 0;
+			return launcher->launch(&process, &MultiJob::writeResult, self);
 		}
+
+	public:
+		static constexpr auto entry = &MultiJob::start;
+		volatile int idx = n;
+		volatile int success[n];
 	};
 
-	class SemJob: Os::IoJob, public SemaphoreProcess<Os>::Data  {
-		static bool callback(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
+	class SemJob: public Os::IoJob, public SemaphoreProcess<Os>::Data  {
+		static bool callback(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result) {
 			static_cast<SemJob*>(item)->done = true;
 			return false;
 		}
@@ -83,24 +87,26 @@ struct DummyProcessJobsBase {
 		friend class Os::IoChannel;
 		template <class> friend class Os::IoRequest;
 
-	public:
-		volatile bool done;
-
-		bool start(int n, typename Os::IoJob::Hook hook = nullptr) {
-			done = false;
-			this->param = n;
-			return this->submit(hook, &SemaphoreProcess<Os>::instance, &SemJob::callback, this);
+		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, int n) {
+			auto self = static_cast<SemJob*>(item);
+			self->done = false;
+			self->param = n;
+			return launcher->launch(&SemaphoreProcess<Os>::instance, &SemJob::callback, self);
 		}
+	public:
+		static constexpr auto entry = &SemJob::start;
+
+		volatile bool done;
 	};
 
-	struct CompositeJob: Os::IoJob {
+	class CompositeJob: public Os::IoJob {
 
 		union {
 			typename DummyProcess<Os>::Data dummyData;
 			typename SemaphoreProcess<Os>::Data semData;
 		};
 
-		static bool step2(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*))
+		static bool step2(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result)
 		{
 		    auto self = static_cast<CompositeJob*>(item);
 
@@ -112,33 +118,31 @@ struct DummyProcessJobsBase {
 			return false;
 		}
 
-		static bool step1(typename Os::IoJob* item, typename Os::IoJob::Result result, void (*hook)(typename Os::IoJob*)) {
+		static bool step1(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result) {
 		    auto self = static_cast<CompositeJob*>(item);
 
 		    self->stage = 1;
 		    self->dummyData.param = 0;
-
-			if(self->timeout)
-				self->submitTimeout(hook, &Process::instance, self->timeout, &CompositeJob::step2, &self->dummyData);
-			else
-				self->submit(hook, &Process::instance, &CompositeJob::step2, &self->dummyData);
+		    launcher->launch(&Process::instance, &CompositeJob::step2, &self->dummyData);
 
 			return true;
 		}
 
-	public:
+		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, int n)
+		{
+			auto self = static_cast<CompositeJob*>(item);
 
-		bool start(int n, uintptr_t timeout, typename Os::IoJob::Hook hook = nullptr) {
-			stage = 0;
-			timedOut = false;
-			this->timeout = timeout;
-			this->semData.param = n;
+			self->stage = 0;
+			self->timedOut = false;
+			self->semData.param = n;
 
-			return this->submit(hook, &SemaphoreProcess<Os>::instance, &CompositeJob::step1, &this->semData);
+			return launcher->launch(&SemaphoreProcess<Os>::instance, &CompositeJob::step1, &self->semData);
 		}
 
+	public:
+		static constexpr auto entry = &CompositeJob::start;
+
 		volatile bool timedOut;
-		uintptr_t timeout;
 		volatile int stage;
 	};
 
@@ -151,7 +155,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			if(!jobs[i].startTimeout(100))
+			if(!jobs[i].launchTimeout(Job::entry, 100))
 				ret = false;
 		}
 
@@ -163,7 +167,7 @@ struct DummyProcessJobsBase {
 		bool ret = true;
 
 		for(unsigned int i=0; i<sizeof(jobs)/sizeof(jobs[0]); i++) {
-			if(!jobs[i].start())
+			if(!jobs[i].launch(Job::entry))
 				ret = false;
 		}
 
@@ -173,7 +177,7 @@ struct DummyProcessJobsBase {
 	bool postReqsNoTimeout() {
 		for(unsigned int i=0; i<sizeof(reqs)/sizeof(reqs[0]); i++) {
 			reqs[i].init();
-			if(!reqs[i].start())
+			if(!reqs[i].launch(Req::entry))
 				return false;
 		}
 

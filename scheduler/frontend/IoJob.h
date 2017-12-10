@@ -33,23 +33,32 @@ class Scheduler<Args...>::IoJob: Sleeper, Event {
 
 public:
 
-	enum class Result: uintptr_t{
-		NotYet, Done, Canceled, TimedOut
-	};
-
-	typedef void (*Hook)(IoJob*);
-	typedef bool (*Callback)(IoJob*, Result, Hook);
-
 	class Data {
 		friend Scheduler<Args...>;
 		IoJob* job;
 	};
+
+	enum class Result: uintptr_t{
+		NotYet, Done, Canceled, TimedOut
+	};
+
+	class Launcher;
+	typedef bool (*Callback)(Launcher*, IoJob*, Result);
+
+protected:
+	template<uintptr_t value> struct OverwriteCombiner;
+	struct ParamOverwriteCombiner;
 
 private:
 	// TODO describe actors and their locking and actions.
 	Atomic<IoChannel *> channel = nullptr;
 	Data* data;
 	Callback finished;
+
+	class LauncherBase;
+	class NormalLauncher;
+	class ContinuationLauncher;
+	class TimeoutLauncher;
 
 	static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
 	static constexpr intptr_t cancelValue = (intptr_t) -2;
@@ -59,21 +68,19 @@ private:
 		// TODO describe locking hackery (race between process completion (and
 		// possible re-submission), cancelation and timeout on channel field).
 		while(IoChannel *channel = this->channel) {
-
-			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
+			Registry<IoChannel>::check(channel);
 
 			typename IoChannel::RemoveResult removeResult = channel->remove(this, result);
 			if(removeResult == IoChannel::RemoveResult::Raced)
 				continue;
 
-			/*
-			 * This operation must not fail because the channel pointer
-			 * is acquired exclusively
-			 */
-			assert(removeResult != IoChannel::RemoveResult::NotPresent, ErrorStrings::ioRequestState);
+			if(removeResult != IoChannel::RemoveResult::Denied) {
+				ContinuationLauncher launcher(this);
+				finished(&launcher, this, result);
 
-			if(removeResult == IoChannel::RemoveResult::Ok)
-				finished(this, result, nullptr);
+				if(this->isSleeping())
+					state.sleepList.remove(this);
+			}
 
 			break;
 		}
@@ -106,29 +113,28 @@ private:
 
 			assert(channel, ErrorStrings::ioRequestState);
 
-			Registry<IoChannelCommon>::check(static_cast<IoChannelCommon*>(channel));
+			Registry<IoChannel>::check(channel);
 
 			channel->add(self);
 
-			if(hasTimeout) {
-				if(self->isSleeping())
-					state.sleepList.update(self, arg);
-				else
-					state.sleepList.delay(self, arg);
-			}
+			if(hasTimeout)
+				state.sleepList.delay(self, arg);
+
 		} else {
-			bool isCancel = hasTimeout || arg == cancelValue;
-			bool isDone = hasTimeout || arg == doneValue;
-
-			assert(isDone || isCancel, ErrorStrings::ioRequestArgument);
-
-			if(self->isSleeping())
-				state.sleepList.remove(self);
-
-			if(isCancel) {
+			if(arg == cancelValue) {
 				self->removeSynhronized(Result::Canceled);
+			} else if(arg == doneValue){
+				ContinuationLauncher launcher(self);
+				bool goOn = self->finished(&launcher, self, Result::Done);
+
+				if(!goOn) {
+					if(self->isSleeping())
+						state.sleepList.remove(self);
+
+					self->channel = nullptr;
+				}
 			} else
-				self->finished(self, Result::Done, nullptr);
+				assert(false, ErrorStrings::ioRequestArgument); // Never executed normally ( LCOV_EXCL_LINE ).
 
 		}
 	}
@@ -137,62 +143,171 @@ private:
 		static_cast<IoJob*>(sleeper)->removeSynhronized(Result::TimedOut);
 	}
 
-	template<uintptr_t value> struct OverwriteCombiner {
-		inline bool operator()(uintptr_t old, uintptr_t& result) const {
-			result = value;
-			return true;
-		}
-	};
-
-	inline bool takeOver(void (*hook)(IoJob*), IoChannel* channel, Callback callback, Data* data) {
-		if(!this->channel.compareAndSwap(nullptr, channel))
-			return false;
-
-		this->finished = callback;
-		data->job = this;
-		this->data = data;
-
-		if(hook)
-			hook(this);
-
-		return true;
-    }
-
 public:
+	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
+
 	inline bool isOccupied() {
 		return this->channel != nullptr;
 	}
 
-	inline bool submit(Hook hook, IoChannel* channel, Callback callback, Data* data) {
-		if(!takeOver(hook, channel, callback, data))
-			return false;
-
-		state.eventList.issue(this, OverwriteCombiner<IoJob::submitNoTimeoutValue>());
-		return true;
+	template<class Method, class... C>
+	inline bool launch(Method method, C... c) {
+		NormalLauncher launcher(this);
+		return method(&launcher, this, c...);
 	}
 
-	inline bool submitTimeout(Hook hook, IoChannel* channel, uintptr_t time, Callback callback, Data* data)
-	{
-		if(!time || time >= (uintptr_t)INTPTR_MAX)
-			return false;
-
-		if(!takeOver(hook, channel, callback, data))
-			return false;
-
-		state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
-			result = time;
-			return true;
-		});
-
-		return true;
+	template<class Method, class... C>
+	inline bool launchTimeout(Method method, uintptr_t time, C... c) {
+		TimeoutLauncher launcher(this, time);
+		return method(&launcher, this, c...);
 	}
-
-	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
 
 	inline void cancel() {
 		state.eventList.issue(this, OverwriteCombiner<IoJob::cancelValue>());
 	}
 
+	/**
+	 * Deleted copy constructors and assignment operators.
+	 *
+	 * IoJobs should be stable and uniquely referenceable entities
+	 * throughout their whole liftime, because the references to them
+	 * are used in scenarios where race conditions pose tight restrictions
+	 * on the runtime sanity checks that can be performed on them.
+	 */
+	IoJob(const IoJob&) = delete;
+	IoJob(IoJob&&) = delete;
+	void operator =(const IoJob&) = delete;
+	void operator =(IoJob&&) = delete;
+};
+
+template<class... Args>
+template<uintptr_t value>
+struct Scheduler<Args...>::IoJob::OverwriteCombiner {
+	inline bool operator()(uintptr_t old, uintptr_t& result) const {
+		result = value;
+		return true;
+	}
+};
+
+template<class... Args>
+struct Scheduler<Args...>::IoJob::ParamOverwriteCombiner {
+	uintptr_t value;
+
+	inline bool operator()(uintptr_t old, uintptr_t& result) const {
+		result = value;
+		return true;
+	}
+
+	inline ParamOverwriteCombiner(uintptr_t value): value(value) {}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoJob::Launcher
+{
+	friend IoJob;
+
+protected:
+	typedef bool (*Worker)(Launcher*, IoChannel*, Callback, Data* data);
+
+private:
+	Worker worker;
+
+protected:
+	inline Launcher(Worker worker): worker(worker) {}
+
+public:
+	inline bool launch(IoChannel* channel, Callback callback, Data* data) {
+		return worker(this, channel, callback, data);
+	}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoJob::LauncherBase: Launcher
+{
+	friend IoJob;
+
+	IoJob* job;
+
+	inline void commonOverwrite(IoChannel* channel, Callback callback, Data* data) {
+		job->finished = callback;
+		data->job = job;
+		job->data = data;
+    }
+
+	inline void forceOverwrite(IoChannel* channel, Callback callback, Data* data) {
+		job->channel = channel;
+		commonOverwrite(channel, callback, data);
+	}
+
+	inline bool takeOver(IoChannel* channel, Callback callback, Data* data) {
+		if(!job->channel.compareAndSwap(nullptr, channel))
+			return false;
+
+		commonOverwrite(channel, callback, data);
+		return true;
+    }
+
+	inline LauncherBase(IoJob* job, typename Launcher::Worker worker): Launcher(worker), job(job) {}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoJob::NormalLauncher: LauncherBase
+{
+	friend IoJob;
+
+	static bool submit(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	{
+		auto self = static_cast<NormalLauncher*>(launcher);
+
+		if(!self->takeOver(channel, callback, data))
+			return false;
+
+		state.eventList.issue(self->job, OverwriteCombiner<IoJob::submitNoTimeoutValue>()); // TODO assert true
+		return true;
+	}
+
+	NormalLauncher(IoJob* job): LauncherBase(job, &NormalLauncher::submit) {}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoJob::ContinuationLauncher: LauncherBase
+{
+	friend IoJob;
+
+	static bool resubmit(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	{
+		auto self = static_cast<ContinuationLauncher*>(launcher);
+
+		Registry<IoChannel>::check(channel);
+		self->forceOverwrite(channel, callback, data);
+		return channel->add(self->job);
+	}
+
+	ContinuationLauncher(IoJob* job): LauncherBase(job, &ContinuationLauncher::resubmit) {}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoJob::TimeoutLauncher: LauncherBase
+{
+	friend IoJob;
+	uintptr_t time;
+
+	static bool submitTimeout(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	{
+		auto self = static_cast<TimeoutLauncher*>(launcher);
+		auto time = self->time;
+
+		if(!time || time >= (uintptr_t)INTPTR_MAX)
+			return false;
+
+		if(!self->takeOver(channel, callback, data))
+			return false;
+
+		state.eventList.issue(self->job, ParamOverwriteCombiner(time)); // TODO assert true
+		return true;
+	}
+
+	TimeoutLauncher(IoJob* job, uintptr_t time): LauncherBase(job, &TimeoutLauncher::submitTimeout), time(time) {}
 };
 
 }

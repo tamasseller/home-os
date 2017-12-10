@@ -194,10 +194,6 @@ private:
 		return true;
 	}
 
-	inline bool removeItem(typename Os::IoJob::Data* job) {
-		return true;
-	}
-
 	inline bool removeCanceled(typename Os::IoJob::Data* job) {
 		IoData* data = static_cast<IoData*>(job);
 
@@ -211,8 +207,6 @@ private:
 			} else if(txRet == ReservationQueue::RemoveResult::NotFound) {
 				if(rxQueue.remove(data) == ReservationQueue::RemoveResult::First)
 					updateQuota(&rxQueue);
-				else
-					return false;
 			}
 		}
 

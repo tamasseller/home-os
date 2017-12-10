@@ -13,14 +13,14 @@
 #include "meta/ApplyToPack.h"
 
 template<class S, class... Args>
-class Network<S, Args...>::Interface: public Os::IoChannelCommon {
+class Network<S, Args...>::Interface: public Os::IoChannel {
 	friend class Network<S, Args...>;
 
 	const size_t headerSize;
 
 public:
 	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
-	virtual bool requestResolution(typename Os::IoJob::Hook, typename Os::IoJob*, typename Os::IoJob::Callback, ArpTableIoData*) = 0;
+	virtual typename Os::IoChannel *getResolver() = 0;
 	virtual bool fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 
     virtual const AddressEthernet& getAddress() = 0;

@@ -74,8 +74,7 @@ struct SchedulerOptions {
 		class CountingSemaphore;
 
 		class IoChannel;
-        class IoChannelCommon;
-		template<class, class = IoChannelCommon> class IoChannelBase;
+		template<class, class = IoChannel> class IoChannelBase;
 
 		class IoJob;
 		template<class> class IoRequest;
@@ -180,7 +179,7 @@ struct SchedulerOptions {
 				CountingSemaphore,
 				BinarySemaphore,
 				WaitableSet,
-				IoChannelCommon,
+				IoChannel,
 				IoRequestCommon
 			> {
 			inline void* operator new(size_t, void* x) { return x; }

@@ -10,12 +10,13 @@
 
 #include "meta/Configuration.h"
 
+#include "ArpTable.h"
+#include "AddressIp4.h"
 #include "BufferPool.h"
 #include "SharedTable.h"
-#include "AddressIp4.h"
 #include "AddressEthernet.h"
-#include "InetChecksumDigester.h"
 #include "NetErrorStrings.h"
+#include "InetChecksumDigester.h"
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
@@ -59,10 +60,6 @@ struct NetworkOptions {
 	private:
 		template<class> class Ethernet;
 		template<class, class = void> struct Interfaces;
-
-		class ArpEntry;
-		class ArpTableIoData;
-		template<size_t> class ArpTable;
 
 		class RoutingTable;
 
@@ -142,7 +139,6 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "Endian.h"
 #include "Routing.h"
 #include "Ethernet.h"
-#include "ArpTable.h"
 #include "Interfaces.h"
 #include "IpTransmission.h"
 
