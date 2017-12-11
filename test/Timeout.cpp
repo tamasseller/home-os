@@ -26,27 +26,22 @@ using Os=OsRr;
 namespace {
 	volatile uint32_t counter;
 
-	using Timeout = OsInternalTester<Os>::Timeout;
 	using Sleeper = OsInternalTester<Os>::Sleeper;
 
-	static void increment(Sleeper*) {
-		counter++;
-	}
+	template<bool periodic>
+	struct Timeout: OsInternalTester<Os>::Timeout {
+		static void increment(::Sleeper* s) {
+			counter++;
 
-	template<class I> struct Helper;
+			if(periodic)
+				static_cast<Timeout*>(s)->extend(5);
+		}
 
-	template<int... I>
-	struct Helper<pet::Sequence<I...>> {
-		typedef void(*f)(Sleeper*);
-		static constexpr f dummy(int x) {return &increment;}
-
-		static Timeout timeouts[sizeof...(I)];
+		Timeout(): OsInternalTester<Os>::Timeout(&increment) {}
 	};
 
-	template<int... I>
-	Timeout Helper<pet::Sequence<I...>>::timeouts[sizeof...(I)] = {dummy(I)...};
-
-	auto &timeouts = Helper<pet::sequence<0, 10>>::timeouts;
+	Timeout<false> timeouts[10];
+	Timeout<true> periodicTimeouts[3];
 }
 
 TEST_GROUP(Timeout) {};
@@ -54,13 +49,14 @@ TEST_GROUP(Timeout) {};
 TEST(Timeout, Simple)
 {
 	struct Task: public TestTask<Task> {
-		Os::TickType exit;
 		bool run() {
 			for(unsigned int i=0; i < sizeof(timeouts)/sizeof(timeouts[0]); i++)
 				timeouts[i].start(10 + 3 * i);
 			while(counter != 10);
 
-			exit = (int)Os::getTick();
+			auto exit = Os::getTick();
+			if(exit < 37 || 40 < exit)
+				return bad;
 
 			return ok;
 		}
@@ -69,14 +65,12 @@ TEST(Timeout, Simple)
 	task.start();
 	counter = 0;
 	CommonTestUtils::start();
-	CHECK(37 <= task.exit && task.exit < 40);
+	CHECK(!task.error);
 }
 
 TEST(Timeout, Interrupt)
 {
 	struct Task: public TestTask<Task> {
-		Os::TickType exit;
-
 		static void isr() {
 			for(unsigned int i=0; i < sizeof(timeouts)/sizeof(timeouts[0]); i++)
 				timeouts[i].start(10 + 3 * i);
@@ -87,7 +81,10 @@ TEST(Timeout, Interrupt)
 		bool run() {
 			CommonTestUtils::registerIrq(isr);
 			while(counter != 10);
-			exit = (int)Os::getTick();
+
+			auto exit = (int)Os::getTick();
+			if(exit < 37 || 40 < exit)
+				return bad;
 
 			return ok;
 		}
@@ -96,7 +93,7 @@ TEST(Timeout, Interrupt)
 	task.start();
 	counter = 0;
 	CommonTestUtils::start();
-	CHECK(37 <= task.exit && task.exit < 40);
+	CHECK(!task.error);
 }
 
 TEST(Timeout, Cancel)
@@ -116,8 +113,33 @@ TEST(Timeout, Cancel)
 		}
 	} task;
 
-	counter = 0;
 	task.start();
+	counter = 0;
 	CommonTestUtils::start();
 	CHECK(!counter);
+}
+
+TEST(Timeout, Periodic)
+{
+	struct Task: public TestTask<Task> {
+		Os::TickType exit;
+		bool run() {
+			for(unsigned int i=0; i < sizeof(periodicTimeouts)/sizeof(periodicTimeouts[0]); i++)
+				periodicTimeouts[i].start(3);
+
+			Os::sleep(15);
+
+			for(unsigned int i=0; i < sizeof(periodicTimeouts)/sizeof(periodicTimeouts[0]); i++)
+				periodicTimeouts[i].cancel();
+
+			Os::sleep(15);
+
+			return ok;
+		}
+	} task;
+
+	task.start();
+	counter = 0;
+	CommonTestUtils::start();
+	CHECK(counter == 9);
 }

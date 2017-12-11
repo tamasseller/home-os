@@ -23,18 +23,31 @@
 namespace home {
 
 template<class... Args>
-class Scheduler<Args...>::Timeout: Sleeper, Event {
+class Scheduler<Args...>::Timeout: protected Sleeper, Event {
 	friend Scheduler<Args...>;
 
-	static void modify(Event* event, uintptr_t arg)
+	static void modify(Event* event, uintptr_t uarg)
 	{
 		Timeout* self = static_cast<Timeout*>(event);
+		intptr_t arg = static_cast<intptr_t>(uarg);
 
-		if(arg == (uintptr_t)-1) {
+		if(arg == -1) {
 			if(self->isSleeping())
 				state.sleepList.remove(self);
-		} else {
+		} else if(arg > 0){
 			state.sleepList.delay(self, arg);
+		} else {
+			state.sleepList.extend(self, ~arg);
+		}
+	}
+
+protected:
+	void extend(uintptr_t time) {
+		if(time && time < INTPTR_MAX - 1) {
+			state.eventList.issue(this, [time](uintptr_t, uintptr_t& result) {
+				result = ~time;
+				return true;
+			});
 		}
 	}
 

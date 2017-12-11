@@ -16,14 +16,18 @@ template<class S, class... Args>
 class Network<S, Args...>::Interface: public Os::IoChannel {
 	friend class Network<S, Args...>;
 
-	const size_t headerSize;
-
 public:
-	virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
-	virtual typename Os::IoChannel *getResolver() = 0;
-	virtual bool fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
+	struct AddressResolver: Os::IoChannel {
+		virtual const AddressEthernet& getAddress() = 0;
+		virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
+		virtual bool fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
+	};
 
-    virtual const AddressEthernet& getAddress() = 0;
+	inline void ageContent() {}
+
+	inline AddressResolver *getResolver() {
+        return resolver;
+    }
 
 	inline typename Os::IoChannel *getSender() {
         return static_cast<typename Os::IoChannel*>(this);
@@ -33,7 +37,12 @@ public:
         return headerSize;
     }
 
-    inline Interface(size_t headerSize): headerSize(headerSize) {}
+    inline Interface(size_t headerSize, AddressResolver* resolver): headerSize(headerSize), resolver(resolver) {}
+
+private:
+
+	const size_t headerSize;
+	AddressResolver* const resolver;
 };
 
 template<class S, class... Args>
@@ -52,9 +61,23 @@ class Network<S, Args...>::Interfaces<typename NetworkOptions::Set<Input...>, vo
 		static constexpr link value = &init;
 	};
 
+    template<link rest, class C, class...>
+	struct Ager {
+		static inline void ageContent(Interfaces* const ifs) {
+			static_cast<typename C::template Wrapped<Network<S, Args...>>*>(ifs)->ageContent();
+			rest(ifs);
+		}
+
+		static constexpr link value = &ageContent;
+	};
+
 public:
-	void init() {
+    inline void init() {
         (pet::ApplyToPack<link, Initializer, &Interfaces::nop, Input...>::value)(this);
+	}
+
+	inline void ageContent() {
+        (pet::ApplyToPack<link, Ager, &Interfaces::nop, Input...>::value)(this);
 	}
 };
 

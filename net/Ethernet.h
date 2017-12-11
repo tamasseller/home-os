@@ -15,38 +15,38 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     friend class Network<S, Args...>;
     friend Driver;
 
-    ArpTable<Os, Driver::arpCacheEntries> resolver;
+    struct Resolver: ArpTable<Os, Driver::arpCacheEntries, typename Interface::AddressResolver> {
+        virtual const AddressEthernet& getAddress() override final {
+            return Driver::ethernetAddress;
+        }
 
-    virtual const AddressEthernet& getAddress() override final {
-        return Driver::ethernetAddress;
-    }
+        virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) override final {
+            return this->lookUp(ip, mac);
+        }
 
-    virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) override final {
-        return resolver.lookUp(ip, mac);
-    }
+		virtual bool fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
+		{
+			if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
+				return false;
 
-	virtual typename Os::IoChannel *getResolver() override final {
-		return &resolver;
-	}
+			if(packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) != 6)
+				return false;
 
-    virtual bool fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
-    {
-        if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
-            return false;
+			if(!packet.write16net(etherType))
+				return false;
 
-        if(packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) != 6)
-            return false;
+			return true;
+		}
+    } resolver;
 
-        if(!packet.write16net(etherType))
-            return false;
-
-        return true;
-    }
-
-    void init() {
+    inline void init() {
         Ethernet::IoChannelBase::init();
         resolver.init();
         Driver::init();
+    }
+
+    inline void ageContent() {
+    	resolver.ageContent();
     }
 
     PacketTransmissionRequest *currentPacket, *nextPacket;
@@ -104,9 +104,9 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     }
 
 public:
-    inline Ethernet(): Ethernet::IoChannelBase(14) {}
+    inline Ethernet(): Ethernet::IoChannelBase(14, &resolver) {}
 
-    ArpTable<Driver::arpCacheEntries> *getArpCache() {
+    decltype(resolver) *getArpCache() {
         return &resolver;
     }
 };

@@ -23,6 +23,7 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
 	PET_CONFIG_VALUE(BufferSize, size_t);
 	PET_CONFIG_VALUE(BufferCount, size_t);
+	PET_CONFIG_VALUE(TicksPerSecond, size_t);
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
@@ -45,6 +46,7 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
+		PET_EXTRACT_VALUE(secTicks, TicksPerSecond, 1000, Options);
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
@@ -77,6 +79,12 @@ struct NetworkOptions {
 		using RxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
 
 		static struct State {
+			struct Ager: Os::Timeout {
+				inline void age();
+				static inline void doAgeing(typename Os::Sleeper*);
+				inline Ager(): Os::Timeout(&Ager::doAgeing) {}
+			} ager;
+
             inline void* operator new(size_t, void* x) { return x; }
 			Interfaces<IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
@@ -117,6 +125,7 @@ struct NetworkOptions {
 		    new(&state) State();
 			state.interfaces.init();
 			state.pool.init(buffers);
+			state.ager.start(secTicks);
 		}
 
 		static inline bool addRoute(const Route& route) {
@@ -128,10 +137,21 @@ struct NetworkOptions {
 };
 
 template<class S, class... Args>
-typename NetworkOptions::Configurable<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
+using Network = NetworkOptions::Configurable<S, Args...>;
 
 template<class S, class... Args>
-using Network = NetworkOptions::Configurable<S, Args...>;
+typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
+
+template<class S, class... Args>
+inline void Network<S, Args...>::State::Ager::age() {
+	state.interfaces.ageContent();
+	this->extend(secTicks);
+}
+
+template<class S, class... Args>
+inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sleeper) {
+	static_cast<Ager*>(sleeper)->age();
+}
 
 #include "Packet.h"
 #include "PacketBuilder.h"

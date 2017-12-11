@@ -128,7 +128,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
-                        if(!tx.shouldWait())
+                        if(!tx.isOccupied())
                             return Task::bad;
 
                         Net::template geEthernetInterface<DummyIf>()->getArpCache()->set(
@@ -166,7 +166,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
-                        if(tx.shouldWait())
+                        if(tx.isOccupied())
                             return Task::bad;
 
                         if(tx.getError())
@@ -201,7 +201,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), strlen(text)))
                             return Task::bad;
 
-                        if(tx.shouldWait())
+                        if(tx.isOccupied())
                             return Task::bad;
 
                         if(tx.getError())
@@ -365,13 +365,12 @@ TEST(NetIpTransmitter, Indirect##x) {                       \
 TEST(NetIpTransmitter, IndirectWithDestructor##x) {         \
     TxTests<Net##x>::runIndirectWithDestructor();           \
 }                                                           \
-
-/*
-
+															\
 TEST(NetIpTransmitter, Unresolved##x) {                     \
     TxTests<Net##x>::runUnresolved();                       \
 }                                                           \
-                                                            \
+
+/*                                                            \
 TEST(NetIpTransmitter, Resolved##x) {                       \
     TxTests<Net##x>::runResolved();                         \
 }                                                           \

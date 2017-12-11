@@ -29,8 +29,8 @@ public:
 	};
 };
 
-template<class Os, size_t nEntries>
-class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries>>
+template<class Os, size_t nEntries, class Base = typename Os::IoChannel>
+class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries, Base>, Base>
 {
 	friend class ArpTable::IoChannelBase;
 

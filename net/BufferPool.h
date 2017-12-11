@@ -214,7 +214,7 @@ private:
 	}
 
 	inline bool hasJob() { return false; }
-	inline void enableProcess() {}
+	inline void enableProcess() {}	// This method is never called ( LCOV_EXCL_LINE )
 	inline void disableProcess() {}
 
 public:

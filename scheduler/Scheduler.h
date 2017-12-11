@@ -58,31 +58,6 @@ struct SchedulerOptions {
 		PET_EXTRACT_TYPE(Profile, HardwareProfile, void, Options);
 		PET_EXTRACT_TEMPLATE(PolicyTemplate, SchedulingPolicy, RoundRobinPolicy, Options);
 
-	public:
-		/*
-		 * Public, front-end types
-		 */
-		using TickType = typename Profile::TickType;
-		class ErrorStrings;
-
-		template<class Data> class Atomic;
-
-		class Task;
-		class Mutex;
-		class SharedAtomicList;
-		class BinarySemaphore;
-		class CountingSemaphore;
-
-		class IoChannel;
-		template<class, class = IoChannel> class IoChannelBase;
-
-		class IoJob;
-		template<class> class IoRequest;
-
-		class Event;
-
-	private:
-		template<class> friend class OsInternalTester;
 		/*
 		 * Internal types.
 		 */
@@ -100,7 +75,6 @@ struct SchedulerOptions {
 		template<ScalabilityHint, class = void> class SleeperBase;
 		template<ScalabilityHint, class = void> class SleepListBase;
 
-		class Timeout;
 		class EventList;
 		class PreemptionEvent;
 
@@ -109,13 +83,44 @@ struct SchedulerOptions {
 		template<class...> class RegistryRootHub;
 		struct SyscallMap;
 
+	public:
+		/*
+		 * Public, front-end types
+		 */
+		using TickType = typename Profile::TickType;
+		class ErrorStrings;
+
+		template<class Data> class Atomic;
+
+		class Task;
+		class Mutex;
+		class SharedAtomicList;
+		class BinarySemaphore;
+		class CountingSemaphore;
+
+		/*
+		 * Public, driver-oriented types
+		 */
+		class Timeout;
+
+		class IoChannel;
+		template<class, class = IoChannel> class IoChannelBase;
+
+		class IoJob;
+		template<class> class IoRequest;
+
+		class Event;
+
+		using Sleeper = class SleeperBase<sleeperStorageOption>;
+
+	private:
+		template<class> friend class OsInternalTester;
 
 		/*
 		 * Helper type and template aliases.
 		 */
 		template<class Object> using Registry = ObjectRegistry<Object, registryEnabled>;
 		using PolicyBase = PolicyTemplate<Task, Blockable>;
-		using Sleeper = class SleeperBase<sleeperStorageOption>;
 		using SleepList = class SleepListBase<sleeperStorageOption>;
 
 		/*

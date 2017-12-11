@@ -65,15 +65,24 @@ class Scheduler<Args...>::SleepListBase<SchedulerOptions::ScalabilityHint::Few, 
 
 	pet::OrderedDoubleList<Sleeper, &SleepListBase::compareDeadline> list;
 
-public:
-	inline void delay(Sleeper* elem, uintptr_t delay)
-	{
-		elem->deadline = Profile::getTick() + delay;
-
+	inline void update(Sleeper* elem) {
 		if(elem->isSleeping())
 			list.remove(elem);
 
 		list.add(elem);
+	}
+
+public:
+	inline void delay(Sleeper* elem, uintptr_t delay)
+	{
+		elem->deadline = Profile::getTick() + delay;
+		update(elem);
+	}
+
+	inline void extend(Sleeper* elem, uintptr_t delay)
+	{
+		elem->deadline += delay;
+		update(elem);
 	}
 
 	inline void remove(Sleeper* elem)
@@ -138,15 +147,24 @@ class Scheduler<Args...>::SleepListBase<SchedulerOptions::ScalabilityHint::Many,
 
 	pet::BinaryHeap<&SleepListBase::compareDeadline> heap;
 
-public:
-	inline void delay(Sleeper* elem, uintptr_t delay)
-	{
-		elem->deadline = Profile::getTick() + delay;
-
+	inline void update(Sleeper* elem) {
 		if(elem->isSleeping())
 			heap.update(elem);
 		else
 			heap.insert(elem);
+	}
+
+public:
+	inline void delay(Sleeper* elem, uintptr_t delay)
+	{
+		elem->deadline = Profile::getTick() + delay;
+		update(elem);
+	}
+
+	inline void extend(Sleeper* elem, uintptr_t delay)
+	{
+		elem->deadline += delay;
+		update(elem);
 	}
 
 	inline void remove(Sleeper* elem)
