@@ -23,6 +23,8 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
 	PET_CONFIG_VALUE(BufferSize, size_t);
 	PET_CONFIG_VALUE(BufferCount, size_t);
+	PET_CONFIG_VALUE(TxBufferLimit, size_t);
+	PET_CONFIG_VALUE(RxBufferLimit, size_t);
 	PET_CONFIG_VALUE(TicksPerSecond, size_t);
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
@@ -46,6 +48,11 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
+		PET_EXTRACT_VALUE(txBufferLimit, TxBufferLimit, bufferCount * 75 / 100, Options);
+		PET_EXTRACT_VALUE(rxBufferLimit, RxBufferLimit, bufferCount * 75 / 100, Options);
+
+		PET_CONFIG_VALUE(TxBufferLimit, size_t);
+		PET_CONFIG_VALUE(RxBufferLimit, size_t);
 		PET_EXTRACT_VALUE(secTicks, TicksPerSecond, 1000, Options);
 		PET_EXTRACT_TYPE(IfsToBeUsed, Interfaces, Set<>, Options);
 
@@ -124,7 +131,7 @@ struct NetworkOptions {
 		    state.~State();
 		    new(&state) State();
 			state.interfaces.init();
-			state.pool.init(buffers);
+			state.pool.init(buffers, txBufferLimit, rxBufferLimit);
 			state.ager.start(secTicks);
 		}
 

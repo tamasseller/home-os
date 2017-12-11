@@ -166,10 +166,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
-                        if(tx.isOccupied())
-                            return Task::bad;
-
-                        if(tx.getError())
+                        if(tx.isOccupied() || tx.getError())
                             return Task::bad;
 
                         if(tx.fill("foobar", 6) != 6)
@@ -201,10 +198,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), strlen(text)))
                             return Task::bad;
 
-                        if(tx.isOccupied())
-                            return Task::bad;
-
-                        if(tx.getError())
+                        if(tx.isOccupied() || tx.getError())
                             return Task::bad;
 
                         if(tx.fill(text, strlen(text)) != strlen(text))
@@ -216,6 +210,62 @@ TEST_GROUP(NetIpTransmitter) {
                             return Task::bad;
 
                         tx.wait();
+
+                        if(Accessor::pool.statUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+            }
+
+            static inline void runWaitForBuffers() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter tx1, tx2;
+
+                        tx1.init();
+                        tx2.init();
+
+                        static constexpr auto nBytesAvailable = tx1.blockMaxPayload * (64 * 75 / 100);
+
+                        if(!tx1.prepare(AddressIp4::make(10, 10, 10, 1), nBytesAvailable - 14 - 20))
+                            return Task::bad;
+
+                        if(tx1.isOccupied() || tx1.getError())
+                            return Task::bad;
+
+                        if(tx1.fill("foobar", 6) != 6)
+                            return Task::bad;
+
+                        if(!tx2.prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                            return Task::bad;
+
+                        if(!tx2.isOccupied())
+                            return Task::bad;
+
+                        expectIp();
+
+                        if(!tx1.send(254))
+                            return Task::bad;
+
+                        tx1.wait();
+
+                        tx2.wait();
+
+                        if(tx2.isOccupied() || tx2.getError())
+                            return Task::bad;
+
+                        if(tx2.fill("foobar", 6) != 6)
+                            return Task::bad;
+
+                        expectIp();
+
+                        if(!tx2.send(254))
+                            return Task::bad;
+
+                        tx2.wait();
 
                         if(Accessor::pool.statUsed()) return Task::bad;
 
@@ -299,9 +349,7 @@ TEST_GROUP(NetIpTransmitter) {
                 static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
                 struct Task: public TestTask<Task> {
-
                     bool destroyed = false;
-
 
                     static void destroy(void* ptr, const char* data, uint16_t length) {
                         auto *self = reinterpret_cast<Task*>(ptr);
@@ -353,6 +401,10 @@ TEST(NetIpTransmitter, Successful##x) {                     \
 TEST(NetIpTransmitter, Longer##x) {                         \
     TxTests<Net##x>::runLonger();                           \
 }                                                           \
+															\
+TEST(NetIpTransmitter, WaitForBuffers##x) {                 \
+    TxTests<Net##x>::runWaitForBuffers();                   \
+}                                                           \
                                                             \
 TEST(NetIpTransmitter, Multi##x) {                          \
     TxTests<Net##x>::runMulti();                            \
@@ -369,14 +421,10 @@ TEST(NetIpTransmitter, IndirectWithDestructor##x) {         \
 TEST(NetIpTransmitter, Unresolved##x) {                     \
     TxTests<Net##x>::runUnresolved();                       \
 }                                                           \
-
-/*                                                            \
+                                                            \
 TEST(NetIpTransmitter, Resolved##x) {                       \
     TxTests<Net##x>::runResolved();                         \
-}                                                           \
-                                                            \
-
- */
+}
 
 INSTANTIATE_ALL_TESTS(64)
 INSTANTIATE_ALL_TESTS(43)

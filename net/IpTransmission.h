@@ -111,8 +111,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
 	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
 
-	static const auto blockMaxPayload = Block::dataSize;
-
 	/*
 	 * Data fields that store information during the various steps of the process.
 	 */
@@ -208,15 +206,18 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 	inline AsyncResult allocateBuffers(Launcher *launcher, size_t size, Callback callback)
 	{
-		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
-		if(ret.hasMore()) {
-			packet.stage1.poolParams.allocator = ret;
-			return callback(launcher, this, Result::Done) ? AsyncResult::Later: AsyncResult::Done;
-		}
-
+		// This branch is not supposed to be taken ( LCOV_EXCL_START ).
 		if(size > UINT16_MAX) {
 			error = NetErrorStrings::allocError;
 			return AsyncResult::Error;
+		}
+		// LCOV_EXCL_STOP
+
+		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
+
+		if(ret.hasMore()) {
+			packet.stage1.poolParams.allocator = ret;
+			return callback(launcher, this, Result::Done) ? AsyncResult::Later: AsyncResult::Done;
 		}
 
 		packet.stage1.poolParams.request.size = static_cast<uint16_t>(size);
@@ -370,6 +371,20 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
+	/*
+	 * For sending
+	 */
+	static bool sent(Launcher *launcher, IoJob* item, Result result)
+	{
+		auto self = static_cast<IpTxJob*>(item);
+
+		self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
+		return false;
+	}
+
+public:
+	static const auto blockMaxPayload = Block::dataSize;
+
 	/**
 	 * Initiate the packet preparation sequence.
 	 */
@@ -432,17 +447,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		} else
 			self->error = NetErrorStrings::noRoute;
 
-		return false;
-	}
-
-	/*
-	 * For sending
-	 */
-	static bool sent(Launcher *launcher, IoJob* item, Result result)
-	{
-		auto self = static_cast<IpTxJob*>(item);
-
-		self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
 		return false;
 	}
 
