@@ -17,8 +17,17 @@ template<class Net>
 struct DummyIf {
     static constexpr size_t arpCacheEntries = 8;
 	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
-	inline static void disableTxIrq() {}
-	inline static void init() {}
+	static bool enabled, delayed;
+	static size_t dummyPrefixSize;
+
+	inline static void disableTxIrq() {
+		enabled = false;
+	}
+
+	inline static void init() {
+		dummyPrefixSize = 0;
+		enabled = delayed = false;
+	}
 
 	template<class... C>
 	static inline void expectN(size_t n, C... c) {
@@ -34,24 +43,61 @@ struct DummyIf {
 			MOCK(DummyIf)::EXPECT(tx).withParam(sum);
 	}
 
-	inline void enableTxIrq() {
-	    auto x = Net::template geEthernetInterface<DummyIf>();
+	static inline void processPackets() {
+	    auto x = Net::template getEthernetInterface<DummyIf>();
 	    while(auto* p = x->getCurrentTxPacket()) {
 	        typename Net::PacketStream packet;
 	        packet.init(*p);
 
 	        uint32_t sum = 0;
-	        while(!packet.atEop())
-	            sum = 31 * sum + packet.read8();
+	        size_t skip = dummyPrefixSize;
+	        while(!packet.atEop()) {
+	        	auto b = packet.read8();
+	        	if(skip)
+	        		skip--;
+	        	else
+	        		sum = 31 * sum + b;
+	        }
 
 	        MOCK(DummyIf)::CALL(tx).withParam(sum);
 	        x->packetTransmitted();
 	    }
 	}
+
+	static inline void enableTxIrq() {
+		enabled = true;
+		if(!delayed)
+			processPackets();
+	}
+
+	static inline void setDelayed(bool x) {
+		delayed = x;
+		if(!delayed && enabled)
+			processPackets();
+	}
+
+	static inline void setFillSize(size_t size) {
+		dummyPrefixSize = size - 14; /* 14: ethernet header size */
+	}
+
+	template<class T>
+	static inline void preHeaderFill(T& packet) {
+		for(auto i = 0u; i<dummyPrefixSize; i++)
+			packet.write8(0);
+	}
 };
 
 template<class Net>
 constexpr AddressEthernet DummyIf<Net>::ethernetAddress;
+
+template<class Net>
+bool DummyIf<Net>::enabled;
+
+template<class Net>
+bool DummyIf<Net>::delayed;
+
+template<class Net>
+size_t DummyIf<Net>::dummyPrefixSize = 0;
 
 using Ifs = NetworkOptions::Interfaces<
     NetworkOptions::Set<
@@ -81,6 +127,10 @@ struct NetworkTestAccessor: Net {
 	using Net::PacketDisassembler;
 	using Net::TxPacketBuilder;
 	using Net::RxPacketBuilder;
+
+	static void overrideHeaderSize(typename Net::Interface* interface, size_t headerSize) {
+		interface->headerSize = headerSize;
+	}
 };
 
 #endif /* TESTNETDEFINITIONS_H_ */

@@ -14,7 +14,7 @@ struct Network<S, Args...>::DummyDigester {
 };
 
 template<class S, class... Args>
-inline bool Network<S, Args...>::fillInitialIpHeader(
+inline void Network<S, Args...>::fillInitialIpHeader(
 		TxPacketBuilder &packet,
 		AddressIp4 srcIp,
 		AddressIp4 dstIp)
@@ -30,16 +30,14 @@ inline bool Network<S, Args...>::fillInitialIpHeader(
 			0x00, 0x00		// checksum
 	};
 
-	if(!packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble)))
-		return false;
+	bool preambleOk = packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble));
+	Os::assert(preambleOk, NetErrorStrings::unknown);
 
-	if(!packet.write32net(srcIp.addr))
-		return false;
+	bool srcOk = packet.write32net(srcIp.addr);
+	Os::assert(srcOk, NetErrorStrings::unknown);
 
-	if(!packet.write32net(dstIp.addr))
-		return false;
-
-	return true;
+	bool dstOk = packet.write32net(dstIp.addr);
+	Os::assert(dstOk, NetErrorStrings::unknown);
 }
 
 template<class S, class... Args>
@@ -123,8 +121,8 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 			l2headerLength -= chunk.length();
 		}
 
-		if(!disassembler.advance())
-			return (uint16_t)-1;
+		bool ok = disassembler.advance();
+		Os::assert(ok, NetErrorStrings::unknown);
 	}
 
 	/*
@@ -132,13 +130,12 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 	 * and calculate the checksum over it.
 	 */
 	while(length < headerLength) {
-
-		if(!disassembler.advance())
-			return (uint16_t)-1;
+		bool ok = disassembler.advance();
+		Os::assert(ok, NetErrorStrings::unknown);
 
 		Chunk chunk = disassembler.getCurrentChunk();
 
-		const size_t leftoverHeaderLength = length - headerLength;
+		const size_t leftoverHeaderLength = headerLength - length;
 		const size_t newLength = length + chunk.length();
 
 		if(ttlOffset < newLength)
@@ -167,7 +164,7 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 			/*
 			 * If all is header, then process all if it as that (as above).
 			 */
-			headerChecksum.consume(chunk.start, chunk.length(), length & 1);
+			headerChecksum.consume(chunk.start, chunk.length(), length & 1); // If block < 20byte (LCOV_EXCL_LINE)
 		}
 
 		length = newLength;
@@ -185,14 +182,13 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 
 	headerChecksum.patch(0, correctEndian(static_cast<uint16_t>(length)));
 
-	if(length > UINT16_MAX)
-		return (uint16_t)-1;
+	Os::assert(length <= UINT16_MAX, NetErrorStrings::unknown);
 
 	return static_cast<uint16_t>(length);
 }
 
 template<class S, class... Args>
-inline bool Network<S, Args...>::headerFixupStepTwo(
+inline void Network<S, Args...>::headerFixupStepTwo(
 		PacketStream &modifier,
 		size_t l2HeaderSize,
 		uint16_t length,
@@ -201,19 +197,17 @@ inline bool Network<S, Args...>::headerFixupStepTwo(
 	static constexpr size_t lengthOffset = 2;
 	static constexpr size_t skipBetweenLengthAndChecksum = 6;
 
-	if(!modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset)))
-		return false;
+	bool skipOk = modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset));
+	Os::assert(skipOk, NetErrorStrings::unknown);
 
-	if(!modifier.write16net(static_cast<uint16_t>(length)))
-		return false;
+	bool lengthOk = modifier.write16net(static_cast<uint16_t>(length));
+	Os::assert(lengthOk, NetErrorStrings::unknown);
 
-	if(!modifier.skipAhead(skipBetweenLengthAndChecksum))
-		return false;
+	bool skip2ok = modifier.skipAhead(skipBetweenLengthAndChecksum);
+	Os::assert(skip2ok, NetErrorStrings::unknown);
 
-	if(!modifier.write16raw(headerChecksum))
-		return false;
-
-	return true;
+	bool checksumOk = modifier.write16raw(headerChecksum);
+	Os::assert(checksumOk, NetErrorStrings::unknown);
 }
 
 

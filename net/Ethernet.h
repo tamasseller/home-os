@@ -15,6 +15,11 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     friend class Network<S, Args...>;
     friend Driver;
 
+    using TxPacketBuilder = Network<S, Args...>::TxPacketBuilder;
+
+    template<class T> static void callPre(TxPacketBuilder& packet, decltype(T::preHeaderFill(packet))*) { return T::preHeaderFill(packet); }
+    template<class T> static void callPre(...) {}
+
     struct Resolver: ArpTable<Os, Driver::arpCacheEntries, typename Interface::AddressResolver> {
         virtual const AddressEthernet& getAddress() override final {
             return Driver::ethernetAddress;
@@ -24,18 +29,16 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
             return this->lookUp(ip, mac);
         }
 
-		virtual bool fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
+		virtual void fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
 		{
-			if(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) != 6)
-				return false;
+			callPre<Driver>(packet, 0);
 
-			if(packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) != 6)
-				return false;
-
-			if(!packet.write16net(etherType))
-				return false;
-
-			return true;
+			bool dstOk = packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) == 6;
+			Os::assert(dstOk, NetErrorStrings::unknown);
+			bool srcOk = packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) == 6;
+			Os::assert(srcOk, NetErrorStrings::unknown);
+			bool typeOk = packet.write16net(etherType);
+			Os::assert(typeOk, NetErrorStrings::unknown);
 		}
     } resolver;
 

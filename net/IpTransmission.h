@@ -244,15 +244,9 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 			packet.init(allocator);
 
-			if(!resolver->fillHeader(packet, self->transmission.stage1.arp.mac, etherTypeIp)) {
-				self->error = NetErrorStrings::unknown;
-				return false;
-			}
+			resolver->fillHeader(packet, self->transmission.stage1.arp.mac, etherTypeIp);
 
-			if(!fillInitialIpHeader(packet, route->getSource(), self->transmission.stage1.dst)) {
-				self->error = NetErrorStrings::unknown;
-				return false;
-			}
+			fillInitialIpHeader(packet, route->getSource(), self->transmission.stage1.dst);
 
 			self->transmission.stage23.device = dev;
 		}
@@ -478,10 +472,11 @@ public:
 		PacketStream modifier;
 		modifier.init(self->packet.stage3.packet);
 
-		if(!headerFixupStepTwo(modifier, self->transmission.stage23.device->getHeaderSize(), length, headerChecksum.result())) {
-			self->error = NetErrorStrings::unknown;
-			return false;
-		}
+		headerFixupStepTwo(
+				modifier,
+				self->transmission.stage23.device->getHeaderSize(),
+				length,
+				headerChecksum.result());
 
 		return launcher->launch(self->transmission.stage23.device->getSender(), &IpTxJob::sent, &self->packet.stage3.packet);
 	}

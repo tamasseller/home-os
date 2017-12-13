@@ -13,7 +13,7 @@ TEST_GROUP(NetIpTransmitter) {
             using Accessor = NetworkTestAccessor<Net>;
 
             static void expectArpReq(size_t n) {
-                Net::template geEthernetInterface<DummyIf>()->expectN(n,
+                Net::template getEthernetInterface<DummyIf>()->expectN(n,
                     /*            dst                 |                src                | etherType */
                     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x06,
                     /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
@@ -23,8 +23,8 @@ TEST_GROUP(NetIpTransmitter) {
                 );
             }
 
-            static void expectIp() {
-                Net::template geEthernetInterface<DummyIf>()->expectN(1,
+            static void expectIp(size_t n = 1) {
+                Net::template getEthernetInterface<DummyIf>()->expectN(n,
                     /*            dst                 |                src                | etherType */
                     0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
                     /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
@@ -37,7 +37,7 @@ TEST_GROUP(NetIpTransmitter) {
             }
 
             static void expectLongIp() {
-                Net::template geEthernetInterface<DummyIf>()->expectN(1,
+                Net::template getEthernetInterface<DummyIf>()->expectN(1,
                         /*            dst                 |                src                | etherType */
                         0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
                         /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
@@ -60,7 +60,7 @@ TEST_GROUP(NetIpTransmitter) {
                 if(addRoute) {
                     Net::addRoute(
                     		typename Net::Route(
-                    			Net::template geEthernetInterface<DummyIf>(),
+                    			Net::template getEthernetInterface<DummyIf>(),
                     			AddressIp4::make(10, 10, 10, 10),
                     			8
 							),
@@ -69,7 +69,7 @@ TEST_GROUP(NetIpTransmitter) {
                 }
 
                 if(addArp) {
-                    Net::template geEthernetInterface<DummyIf>()->getArpCache()->set(
+                    Net::template getEthernetInterface<DummyIf>()->getArpCache()->set(
                             AddressIp4::make(10, 10, 10, 1),
                             AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
                             32767
@@ -89,6 +89,16 @@ TEST_GROUP(NetIpTransmitter) {
                             return Task::bad;
 
                         if(tx.getError() != NetErrorStrings::noRoute)
+                            return Task::bad;
+
+                        if(tx.fill("foobar", 6) != 0)
+                            return Task::bad;
+
+                        static constexpr const char* text = "whatever";
+                        if(tx.addIndirect(text, strlen(text)))
+                            return Task::bad;
+
+                        if(tx.send(254))
                             return Task::bad;
 
                         return Task::ok;
@@ -135,7 +145,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.isOccupied())
                             return Task::bad;
 
-                        Net::template geEthernetInterface<DummyIf>()->getArpCache()->set(
+                        Net::template getEthernetInterface<DummyIf>()->getArpCache()->set(
                                 AddressIp4::make(10, 10, 10, 1),
                                 AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
                                 32768
@@ -280,7 +290,7 @@ TEST_GROUP(NetIpTransmitter) {
                 work<true, true>(task);
             }
 
-            static inline void runMulti() {
+			static inline void runMulti() {
                 struct Task: public TestTask<Task> {
                     bool run() {
                         typename Net::IpTransmitter tx;
@@ -389,6 +399,86 @@ TEST_GROUP(NetIpTransmitter) {
 
                 work<true, true>(task);
             }
+
+            static inline void runPrefetch() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter txs[3];
+
+                        Net::template getEthernetInterface<DummyIf>()->setDelayed(true);
+
+                        for(auto i=0u; i<sizeof(txs)/sizeof(txs[0]); i++) {
+                        	auto &tx = txs[i];
+                            tx.init();
+
+                            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0, 1))
+                                return Task::bad;
+
+                            if(tx.fill("foobar", 6) != 6)
+                                return Task::bad;
+
+                            if(!tx.send(254))
+                                return Task::bad;
+                        }
+
+                        expectIp(3);
+                        Net::template getEthernetInterface<DummyIf>()->setDelayed(false);
+
+                        for(auto i=0u; i<sizeof(txs)/sizeof(txs[0]); i++)
+                        	txs[i].wait();
+
+                        if(Accessor::pool.statUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+            }
+
+            static inline void runFunnyHeaders() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                    	typename Net::IpTransmitter tx;
+                    	tx.init();
+
+                    	size_t sizes[4] = {
+                    			tx.blockMaxPayload - 1,
+                    			tx.blockMaxPayload + 1,
+                    			2 * tx.blockMaxPayload - 1,
+                    			2 * tx.blockMaxPayload + 1
+                    	};
+
+                    	for(size_t headerSize: sizes) {
+                    		Accessor::overrideHeaderSize(Net::template getEthernetInterface<DummyIf>(), headerSize);
+                    		Net::template getEthernetInterface<DummyIf>()->setFillSize(headerSize);
+
+                            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                                return Task::bad;
+
+                            if(tx.isOccupied() || tx.getError())
+                                return Task::bad;
+
+                            if(tx.fill("foobar", 6) != 6)
+                                return Task::bad;
+
+                            expectIp();
+
+                            if(!tx.send(254))
+                                return Task::bad;
+
+                            tx.wait();
+
+                            if(Accessor::pool.statUsed()) return Task::bad;
+                    	}
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+
+            }
     };
 };
 
@@ -428,6 +518,14 @@ TEST(NetIpTransmitter, Unresolved##x) {                     \
                                                             \
 TEST(NetIpTransmitter, Resolved##x) {                       \
     TxTests<Net##x>::runResolved();                         \
+}														    \
+															\
+TEST(NetIpTransmitter, Prefetch##x) {                       \
+	TxTests<Net##x>::runPrefetch();                         \
+}															\
+    														\
+TEST(NetIpTransmitter, FunnyHeaders##x) {                   \
+	TxTests<Net##x>::runFunnyHeaders();                     \
 }
 
 INSTANTIATE_ALL_TESTS(64)

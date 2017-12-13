@@ -42,7 +42,6 @@ struct NetworkOptions {
 	class Configurable {
 		template<class> friend class NetworkTestAccessor;
 		friend class NetworkOptions;
-		typedef Scheduler Os;
 
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
@@ -64,6 +63,7 @@ struct NetworkOptions {
 	public:
 		class Interface;
 		class PacketStream;
+		typedef Scheduler Os;
 
 	private:
 		template<class> class Ethernet;
@@ -99,7 +99,7 @@ struct NetworkOptions {
 		class IpTxJob;
 		class DummyDigester;
 
-		static bool fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
+		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
 		template<class HeaderDigester, class PayloadDigester>
 		static inline uint16_t headerFixupStepOne(
@@ -111,7 +111,7 @@ struct NetworkOptions {
 				HeaderDigester &headerChecksum,
 				PayloadDigester &payloadChecksum);
 
-		static inline bool headerFixupStepTwo(
+		static inline void headerFixupStepTwo(
 				PacketStream &modifier,
 				size_t l2HeaderSize,
 				uint16_t length,
@@ -138,7 +138,7 @@ struct NetworkOptions {
 		    return state.routingTable.add(route, setUp);
 		}
 
-		template<template<class> class Driver> constexpr static inline Ethernet<Driver<Configurable>> *geEthernetInterface();
+		template<template<class> class Driver> constexpr static inline Ethernet<Driver<Configurable>> *getEthernetInterface();
 	};
 };
 

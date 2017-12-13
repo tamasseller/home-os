@@ -138,7 +138,6 @@ public:
 		return false;
 	}
 
-
 	/**
 	 * Set 'up' all of the routes through the specified interface.
 	 */

@@ -10,7 +10,7 @@ INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 
 ifeq ('x','')
-endif
+
 
 
 # Atomic list related tests.
@@ -66,6 +66,8 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 # Networking related tests.
 
+endif
+
 SOURCES += $(ROOT)/test/NetArp.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetRouting.cpp
@@ -73,6 +75,7 @@ SOURCES += $(ROOT)/test/NetChecksum.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
+
 
 # Testing utilities.
 

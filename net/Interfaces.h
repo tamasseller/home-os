@@ -14,13 +14,14 @@
 
 template<class S, class... Args>
 class Network<S, Args...>::Interface: public Os::IoChannel {
+    template<class> friend class NetworkTestAccessor;
 	friend class Network<S, Args...>;
 
 public:
 	struct AddressResolver: Os::IoChannel {
 		virtual const AddressEthernet& getAddress() = 0;
 		virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
-		virtual bool fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
+		virtual void fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 	};
 
 	inline void ageContent() {}
@@ -40,8 +41,7 @@ public:
     inline Interface(size_t headerSize, AddressResolver* resolver): headerSize(headerSize), resolver(resolver) {}
 
 private:
-
-	const size_t headerSize;
+	size_t headerSize;
 	AddressResolver* const resolver;
 };
 
@@ -84,7 +84,7 @@ public:
 template<class S, class... Args>
 template<template<class> class Driver>
 constexpr inline typename Network<S, Args...>::template Ethernet<Driver<Network<S, Args...>>> *
-Network<S, Args...>::geEthernetInterface() {
+Network<S, Args...>::getEthernetInterface() {
 	return static_cast<Ethernet<Driver<Network<S, Args...>>>*>(&state.interfaces);
 }
 
