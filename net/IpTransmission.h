@@ -230,7 +230,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	static bool allocated(Launcher *launcher, IoJob* item, Result result) {
 		auto self = static_cast<IpTxJob*>(item);
 		auto route = self->transmission.stage1.route;
-		Interface* dev = route->dev;
+		Interface* dev = route->getDevice();
 		state.routingTable.releaseRoute(route);
 
 		if(result != Result::Done) {
@@ -238,7 +238,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			self->error = NetErrorStrings::genericCancel;
 		} else {
 			auto route = self->transmission.stage1.route;
-			auto resolver = route->dev->getResolver();
+			auto resolver = route->getDevice()->getResolver();
 			auto allocator = self->packet.stage1.poolParams.allocator;
 			auto &packet = self->packet.stage2.packet;
 
@@ -269,14 +269,14 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 		if(result == Result::Done) {
 			auto route = self->transmission.stage1.route;
-			auto resolver = route->dev->getResolver();
+			auto resolver = route->getDevice()->getResolver();
 
 			if(resolver && self->transmission.stage1.arp.mac == AddressEthernet::allZero) {
 				if(self->transmission.stage1.retry--){
 					/*
 					 * Restart arp query packet generation and sending.
 					 */
-					const auto size = (arpReqSize + route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
+					const auto size = (arpReqSize + route->getDevice()->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 					AsyncResult ret = self->allocateBuffers(launcher, size, &IpTxJob::arpPacketAllocated);
 
 					if(ret != AsyncResult::Error)
@@ -324,7 +324,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * Wait for the required address.
 			 */
 			self->transmission.stage1.arp.ip = self->transmission.stage1.dst;
-			if(launcher->launch(self->transmission.stage1.route->dev->getResolver(), &IpTxJob::addressResolved, &self->transmission.stage1.arp))
+			if(launcher->launch(self->transmission.stage1.route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->transmission.stage1.arp))
 				return true;
 		}
 
@@ -346,11 +346,11 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			auto route = self->transmission.stage1.route;
 			const uint32_t senderIp = route->getSource().addr;
 			const uint32_t targetIp = self->transmission.stage1.dst.addr;
-			const AddressEthernet &senderMac = route->dev->getResolver()->getAddress();
+			const AddressEthernet &senderMac = route->getDevice()->getResolver()->getAddress();
 			auto &packet = self->packet.stage2.packet;
 
 			packet.init(allocator);
-			route->dev->getResolver()->fillHeader(packet, AddressEthernet::broadcast, etherTypeArp);
+			route->getDevice()->getResolver()->fillHeader(packet, AddressEthernet::broadcast, etherTypeArp);
 			packet.copyIn(arpRequestPreamble, sizeof(arpRequestPreamble));
 			packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
 			packet.write32net(senderIp);
@@ -361,7 +361,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			Packet copy = self->packet.stage2.packet;
 			self->packet.stage3.packet.init(copy);
 
-			if(launcher->launch(route->dev->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
+			if(launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
 				return true;
 		}
 
@@ -397,11 +397,11 @@ public:
 		/*
 		 * Find the right network and save arguments.
 		 */
-		if(auto route = state.routingTable.findRoute(dst)) {
+		if(auto route = state.routingTable.findRouteTo(dst)) {
 			self->transmission.stage1.route = route;
 			self->transmission.stage1.dst = dst;
 
-			nInLine += ipHeaderSize + route->dev->getHeaderSize();
+			nInLine += ipHeaderSize + route->getDevice()->getHeaderSize();
 			/*
 			 * The final number of buffers is determined not only by the amount of in-line data
 			 * but also the indirect data references. If in-line and indirect buffers are used
@@ -427,7 +427,7 @@ public:
 			 * Try to find the L2 address from the device cache, if found short
 			 * circuit the ARP querying and cut-through to the completion of it.
 			 */
-			auto resolver = route->dev->getResolver();
+			auto resolver = route->getDevice()->getResolver();
 			if(!resolver || resolver->resolveAddress(dst, self->transmission.stage1.arp.mac)) {
 				addressResolved(launcher, self, Result::Done);
 				return true;
@@ -437,7 +437,7 @@ public:
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
 			self->transmission.stage1.retry = arpRequestRetry;
-			const auto size = (arpReqSize + route->dev->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
+			const auto size = (arpReqSize + route->getDevice()->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 			if(self->allocateBuffers(launcher, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
 

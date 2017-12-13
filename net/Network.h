@@ -10,6 +10,7 @@
 
 #include "meta/Configuration.h"
 
+#include "Routing.h"
 #include "ArpTable.h"
 #include "AddressIp4.h"
 #include "BufferPool.h"
@@ -62,15 +63,11 @@ struct NetworkOptions {
 
 	public:
 		class Interface;
-		class Route;
-
 		class PacketStream;
 
 	private:
 		template<class> class Ethernet;
 		template<class, class = void> struct Interfaces;
-
-		class RoutingTable;
 
 		struct Chunk;
 		class Block;
@@ -80,7 +77,8 @@ struct NetworkOptions {
 		template <class> class PacketWriterBase;
 		class PacketTransmissionRequest;
 
-		typedef BufferPool<OsRr, bufferCount, Block> Pool;
+		typedef BufferPool<Os, bufferCount, Block> Pool;
+		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
 		template<typename Pool::Quota> class PacketBuilder;
 		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
 		using RxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
@@ -121,6 +119,7 @@ struct NetworkOptions {
 
 	public:
 		typedef typename Pool::Storage Buffers;
+		using Route = typename RoutingTable::Route;
 
 		class IpTransmitter;
 
@@ -135,8 +134,8 @@ struct NetworkOptions {
 			state.ager.start(secTicks);
 		}
 
-		static inline bool addRoute(const Route& route) {
-		    return state.routingTable.add(route);
+		static inline bool addRoute(const Route& route, bool setUp = false) {
+		    return state.routingTable.add(route, setUp);
 		}
 
 		template<template<class> class Driver> constexpr static inline Ethernet<Driver<Configurable>> *geEthernetInterface();
@@ -164,7 +163,6 @@ inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sle
 #include "PacketBuilder.h"
 #include "PacketStream.h"
 #include "Endian.h"
-#include "Routing.h"
 #include "Ethernet.h"
 #include "Interfaces.h"
 #include "IpTransmission.h"

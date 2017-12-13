@@ -58,9 +58,13 @@ TEST_GROUP(NetIpTransmitter) {
                 Net::init(NetBuffers<Net>::buffers);
 
                 if(addRoute) {
-                    Net::addRoute(typename Net::Route(
-                            AddressIp4::make(10, 10, 10, 0), 8,
-                            AddressIp4::make(10, 10, 10, 10), Net::template geEthernetInterface<DummyIf>())
+                    Net::addRoute(
+                    		typename Net::Route(
+                    			Net::template geEthernetInterface<DummyIf>(),
+                    			AddressIp4::make(10, 10, 10, 10),
+                    			8
+							),
+                    		true
                     );
                 }
 

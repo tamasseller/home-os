@@ -170,18 +170,27 @@ struct SharedTable
         }
 
         template<class C>
-        inline Entry* find(C&& c)
+        inline Entry* find(C&& c, size_t &base)
         {
-            for(Entry* entry = entries; entry < entries + nItems; entry++) {
+            for(Entry* entry = entries + base; entry < entries + nItems; entry++) {
                 if(entry->takeIfValid()) {
-                    if(c(&entry->access()))
+                    if(c(&entry->access())) {
+                    	base = entry - entries + 1;
                         return entry;
+                    }
 
                     entry->release();
                 }
             }
 
             return nullptr;
+        }
+
+        template<class C>
+        inline Entry* find(C&& c)
+        {
+        	size_t base = 0;
+            return find(c, base);
         }
 };
 

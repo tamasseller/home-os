@@ -37,7 +37,6 @@ public:
 static constexpr AddressEthernet broadcast = AddressEthernet::make(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 static constexpr AddressEthernet zero = AddressEthernet::make(0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
 
-
 template<int dummy>
 constexpr AddressEthernet AddressEthernet::ConstantContainer<dummy>::broadcast =
 		AddressEthernet::make(0xff, 0xff, 0xff, 0xff, 0xff, 0xff);

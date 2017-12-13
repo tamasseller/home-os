@@ -40,7 +40,7 @@ TEST_GROUP(NetSharedTable) {
     	inline ~Kv() {ctorDtorCount--;}
     };
 
-    struct KvTable: private SharedTable<Os, Kv, 16> {
+    struct KvTable: SharedTable<Os, Kv, 16> {
         inline typename SharedTable<Os, Kv, 16>::Entry* openOrCreate(int k) {
             auto ret = this->SharedTable<Os, Kv, 16>::findOrAllocate([k](Kv* e){ return e->k == k;});
 
@@ -258,4 +258,36 @@ TEST(NetSharedTable, FindBest)
     CHECK(ctorDtorCount == 3);
 
     CHECK(uut.highestKey() == 3);
+}
+
+TEST(NetSharedTable, Iterate)
+{
+    KvTable uut;
+    ctorDtorCount = 0;
+
+    uut.set(1, 1);
+    uut.set(2, 2);
+    uut.set(3, 3);
+    uut.set(4, 1);
+    uut.set(5, 2);
+    uut.set(6, 3);
+    uut.set(7, 1);
+    uut.set(8, 2);
+
+    size_t base = 0;
+    auto x = uut.find([](const Kv* kv){return kv->v == 2;}, base);
+    CHECK(x->access().k == 2);
+    CHECK(base == 2);
+
+    auto y = uut.find([](const Kv* kv){return kv->v == 2;}, base);
+    CHECK(y->access().k == 5);
+    CHECK(base == 5);
+
+    auto z = uut.find([](const Kv* kv){return kv->v == 2;}, base);
+    CHECK(z->access().k == 8);
+    CHECK(base == 8);
+
+    auto u = uut.find([](const Kv* kv){return kv->v == 2;}, base);
+    CHECK(!u);
+    CHECK(base == 8);
 }
