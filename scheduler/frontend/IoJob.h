@@ -206,8 +206,11 @@ class Scheduler<Args...>::IoJob::Launcher
 {
 	friend IoJob;
 
+public:
+	typedef void (*Initializer)(IoJob*);
+
 protected:
-	typedef bool (*Worker)(Launcher*, IoChannel*, Callback, Data* data);
+	typedef bool (*Worker)(Launcher*, IoChannel*, Callback, Data* data, Initializer init);
 
 private:
 	Worker worker;
@@ -216,8 +219,8 @@ protected:
 	inline Launcher(Worker worker): worker(worker) {}
 
 public:
-	inline bool launch(IoChannel* channel, Callback callback, Data* data) {
-		return worker(this, channel, callback, data);
+	inline bool launch(IoChannel* channel, Callback callback, Data* data, Initializer init = nullptr) {
+		return worker(this, channel, callback, data, init);
 	}
 };
 
@@ -255,12 +258,20 @@ class Scheduler<Args...>::IoJob::NormalLauncher: LauncherBase
 {
 	friend IoJob;
 
-	static bool submit(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	static bool submit(
+			Launcher* launcher,
+			IoChannel* channel,
+			Callback callback,
+			Data* data,
+			typename Launcher::Initializer init)
 	{
 		auto self = static_cast<NormalLauncher*>(launcher);
 
 		if(!self->takeOver(channel, callback, data))
 			return false;
+
+		if(init)
+			init(self->job);
 
 		state.eventList.issue(self->job, OverwriteCombiner<IoJob::submitNoTimeoutValue>()); // TODO assert true
 		return true;
@@ -274,12 +285,21 @@ class Scheduler<Args...>::IoJob::ContinuationLauncher: LauncherBase
 {
 	friend IoJob;
 
-	static bool resubmit(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	static bool resubmit(
+			Launcher* launcher,
+			IoChannel* channel,
+			Callback callback,
+			Data* data,
+			typename Launcher::Initializer init)
 	{
 		auto self = static_cast<ContinuationLauncher*>(launcher);
 
 		Registry<IoChannel>::check(channel);
 		self->forceOverwrite(channel, callback, data);
+
+		if(init)
+			init(self->job);
+
 		return channel->add(self->job);
 	}
 
@@ -292,7 +312,12 @@ class Scheduler<Args...>::IoJob::TimeoutLauncher: LauncherBase
 	friend IoJob;
 	uintptr_t time;
 
-	static bool submitTimeout(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
+	static bool submitTimeout(
+			Launcher* launcher,
+			IoChannel* channel,
+			Callback callback,
+			Data* data,
+			typename Launcher::Initializer init)
 	{
 		auto self = static_cast<TimeoutLauncher*>(launcher);
 		auto time = self->time;
@@ -302,6 +327,9 @@ class Scheduler<Args...>::IoJob::TimeoutLauncher: LauncherBase
 
 		if(!self->takeOver(channel, callback, data))
 			return false;
+
+		if(init)
+			init(self->job);
 
 		state.eventList.issue(self->job, ParamOverwriteCombiner(time)); // TODO assert true
 		return true;
