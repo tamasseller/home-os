@@ -117,87 +117,58 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	const char* error;
 
 	union {
-		struct {
-			/**
-			 * The route the packed is to be sent over.
-			 *
-			 * It is used only until the headers are constructed, provides:
-			 *
-			 *  - The network interface that is used for:
-			 *    - Querying the associated ARP cache.
-			 *    - Sending the packet in stage 3.
-			 *  - The source address to be specified in the IP header.
-			 */
-			Route* route;
+	        /**
+	         * The route the packed is to be sent over.
+	         *
+	         * It is used only until the headers are constructed, provides:
+	         *
+	         *  - The network interface that is used for:
+	         *    - Querying the associated ARP cache.
+	         *    - Sending the packet in stage 3.
+	         *  - The source address to be specified in the IP header.
+	         */
+	        Route* route;
+	        Interface* device;
+	};
 
-			/**
-			 * Destination IP address.
-			 */
-			AddressIp4 dst;
+    /**
+     * Destination IP address.
+     */
+    AddressIp4 dst;
 
-			/**
-			 * ARP resolution request and reply holder, provides the
-			 * destination MAC address after the resolution is done.
-			 */
-			ArpTableIoData<Os> arp;
+    /**
+     * ARP resolution request and reply holder, provides the
+     * destination MAC address after the resolution is done.
+     */
+    ArpTableIoData<Os> arp;
 
-			/**
-			 * ARP retry counter.
-			 */
-			uint8_t retry;
+    /**
+     * ARP retry counter.
+     */
+    uint8_t retry;
 
-			/**
-			 * Number of blocks to be allocated for user data.
-			 */
-			uint8_t nBlocks;
-		} stage1;
-
-
-		struct {
-			/**
-			 * The device over which the packet is sent.
-			 *
-			 * It is used after the headers are done but before the
-			 * packet is sent (stage 2, 3).
-			 */
-			Interface* device;
-		} stage23;
-	} transmission;
+    /**
+     * Number of blocks to be allocated for user data.
+     */
+        uint8_t nBlocks;
 
 	union {
 		/**
-		 * Packet information used during the first stage.
-		 */
-		struct {
-			/**
-			 * Buffer pool request and reply holder, it holds the allocator
-			 * used for the header and data assembly.
-			 */
-			typename Pool::IoData poolParams;
-		} stage1;
+		 * Packet information used during the first stage: buffer pool request and
+		 * reply holder, it holds the allocator used for the header and data assembly.
+         */
+		typename Pool::IoData stage1;
+		/**
+		 * Packet information used during the second stage: the assembled packet, filled
+		 * with the headers at the end of stage 1 and during stage 2, the packet is also
+		 * patched at the start of stage 3 with the size and possibly the checksum. */
+        TxPacketBuilder stage2;
 
 		/**
-		 * Packet information used during the second stage.
-		 */
-		struct {
-			/**
-			 * The assembled packet, filled with the headers at the end of
-			 * stage 1 and during stage 2, the packet is also patched at the
-			 * start of stage 3 with the size and possibly the checksum.
-			 */
-			TxPacketBuilder packet;
-		} stage2;
-
-		/**
-		 * Packet data used during the third, final stage.
-		 */
-		struct {
-			/**
-			 * The final queueable packet, that is made from _stage12.packet_.
-			 * during stage 3.
-			 */
-			PacketTransmissionRequest packet;
-		} stage3;
+		 * Packet data used during the third, final stage: The final queueable packet,
+		 * that is made from _stage2_. during stage 3.
+         */
+        PacketTransmissionRequest stage3;
 	} packet;
 
 	enum class AsyncResult {
@@ -216,40 +187,39 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
 
 		if(ret.hasMore()) {
-			packet.stage1.poolParams.allocator = ret;
+			packet.stage1.allocator = ret;
 			return callback(launcher, this, Result::Done) ? AsyncResult::Later: AsyncResult::Done;
 		}
 
-		packet.stage1.poolParams.request.size = static_cast<uint16_t>(size);
-		packet.stage1.poolParams.request.quota = Pool::Quota::Tx;
+		packet.stage1.request.size = static_cast<uint16_t>(size);
+		packet.stage1.request.quota = Pool::Quota::Tx;
 
-		return launcher->launch(&state.pool, callback, &packet.stage1.poolParams)
+		return launcher->launch(&state.pool, callback, &packet.stage1)
 				? AsyncResult::Later : AsyncResult::Error;
 	}
 
-	static bool allocated(Launcher *launcher, IoJob* item, Result result) {
+	static bool allocated(Launcher *launcher, IoJob* item, Result result)
+	{
 		auto self = static_cast<IpTxJob*>(item);
-		auto route = self->transmission.stage1.route;
+		auto route = self->route;
 		Interface* dev = route->getDevice();
 		state.routingTable.releaseRoute(route);
 
-		if(result != Result::Done) {
-			// assert(result == Result::Canceled);
-			self->error = NetErrorStrings::genericCancel;
-		} else {
-			auto route = self->transmission.stage1.route;
+		if(result == Result::Done) {
+			auto route = self->route;
 			auto resolver = route->getDevice()->getResolver();
-			auto allocator = self->packet.stage1.poolParams.allocator;
-			auto &packet = self->packet.stage2.packet;
+			auto allocator = self->packet.stage1.allocator;
+			auto &packet = self->packet.stage2;
 
 			packet.init(allocator);
 
-			resolver->fillHeader(packet, self->transmission.stage1.arp.mac, etherTypeIp);
+			resolver->fillHeader(packet, self->arp.mac, etherTypeIp);
 
-			fillInitialIpHeader(packet, route->getSource(), self->transmission.stage1.dst);
+			fillInitialIpHeader(packet, route->getSource(), self->dst);
 
-			self->transmission.stage23.device = dev;
-		}
+			self->device = dev;
+		} else
+		    self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 
 		return false;
 	}
@@ -262,11 +232,11 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		auto self = static_cast<IpTxJob*>(item);
 
 		if(result == Result::Done) {
-			auto route = self->transmission.stage1.route;
+			auto route = self->route;
 			auto resolver = route->getDevice()->getResolver();
 
-			if(resolver && self->transmission.stage1.arp.mac == AddressEthernet::allZero) {
-				if(self->transmission.stage1.retry--){
+			if(resolver && self->arp.mac == AddressEthernet::allZero) {
+				if(self->retry--){
 					/*
 					 * Restart arp query packet generation and sending.
 					 */
@@ -288,16 +258,18 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Allocate buffer for the business packet.
 			 */
-			AsyncResult ret = self->allocateBuffers(launcher, self->transmission.stage1.nBlocks, &IpTxJob::allocated);
+			AsyncResult ret = self->allocateBuffers(launcher, self->nBlocks, &IpTxJob::allocated);
 
 			if(ret != AsyncResult::Error)
 				return ret == AsyncResult::Later;
 
+			self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+		} else {
+            state.routingTable.releaseRoute(self->route);
+            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 		}
-		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
-		self->error = NetErrorStrings::unknown;
+
 		return false;
-		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/**
@@ -307,25 +279,27 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	{
 		auto self = static_cast<IpTxJob*>(item);
 
-		if(result == Result::Done) {
-			/*
-			 * Dispose of the ARP request packet in the hope that the request is not needed to
-			 * be repeated (and even if it needs to be, avoid sitting on resources while waiting).
-			 */
-			self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
+        /*
+         * Dispose of the ARP request packet in the hope that the request is not needed to
+         * be repeated (and even if it needs to be, avoid sitting on resources while waiting).
+         */
+        self->packet.stage3.template dispose<Pool::Quota::Tx>();
 
+		if(result == Result::Done) {
 			/*
 			 * Wait for the required address.
 			 */
-			self->transmission.stage1.arp.ip = self->transmission.stage1.dst;
-			if(launcher->launch(self->transmission.stage1.route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->transmission.stage1.arp))
+			self->arp.ip = self->dst;
+			if(launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp))
 				return true;
+
+            self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+		} else {
+            state.routingTable.releaseRoute(self->route);
+            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 		}
 
-		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
-		self->error = NetErrorStrings::unknown;
 		return false;
-		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/**
@@ -335,13 +309,14 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	{
 		IpTxJob* self = static_cast<IpTxJob*>(item);
 
+        auto route = self->route;
+
 		if(result == Result::Done) {
-			auto allocator = self->packet.stage1.poolParams.allocator;
-			auto route = self->transmission.stage1.route;
+			auto allocator = self->packet.stage1.allocator;
 			const uint32_t senderIp = route->getSource().addr;
-			const uint32_t targetIp = self->transmission.stage1.dst.addr;
+			const uint32_t targetIp = self->dst.addr;
 			const AddressEthernet &senderMac = route->getDevice()->getResolver()->getAddress();
-			auto &packet = self->packet.stage2.packet;
+			auto &packet = self->packet.stage2;
 
 			packet.init(allocator);
 			route->getDevice()->getResolver()->fillHeader(packet, AddressEthernet::broadcast, etherTypeArp);
@@ -352,17 +327,19 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			packet.write32net(targetIp);
 			packet.done();
 
-			Packet copy = self->packet.stage2.packet;
-			self->packet.stage3.packet.init(copy);
+			Packet copy = self->packet.stage2;
+			self->packet.stage3.init(copy);
 
-			if(launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3.packet))
+			if(launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3))
 				return true;
+
+	        self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+		} else {
+            state.routingTable.releaseRoute(route);
+            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 		}
 
-		/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
-		self->error = NetErrorStrings::unknown;
 		return false;
-		/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
 	}
 
 	/*
@@ -372,7 +349,11 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	{
 		auto self = static_cast<IpTxJob*>(item);
 
-		self->packet.stage3.packet.template dispose<Pool::Quota::Tx>();
+		self->packet.stage3.template dispose<Pool::Quota::Tx>();
+
+        if(result != Result::Done)
+            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
+
 		return false;
 	}
 
@@ -392,8 +373,8 @@ public:
 		 * Find the right network and save arguments.
 		 */
 		if(auto route = state.routingTable.findRouteTo(dst)) {
-			self->transmission.stage1.route = route;
-			self->transmission.stage1.dst = dst;
+			self->route = route;
+			self->dst = dst;
 
 			nInLine += ipHeaderSize + route->getDevice()->getHeaderSize();
 			/*
@@ -409,11 +390,11 @@ public:
 			 *                                 ^          |
 			 *                                 |          |
 			 * Truncated block (one byte wc) --/          |
-			 *                ___________________________/ \____________________________
-			 *               /                                                          \
-			 *               | arbitrary length user data accessed through by reference |
+			 *                ___________________________/ \_________________________
+			 *               /                                                       \
+			 *               | arbitrary length user data accessed through reference |
 			 */
-			self->transmission.stage1.nBlocks = static_cast<uint8_t>(
+			self->nBlocks = static_cast<uint8_t>(
 					(nInLine - nIndirect + blockMaxPayload - 1) / blockMaxPayload +
 					2 * nIndirect);
 
@@ -422,7 +403,7 @@ public:
 			 * circuit the ARP querying and cut-through to the completion of it.
 			 */
 			auto resolver = route->getDevice()->getResolver();
-			if(!resolver || resolver->resolveAddress(dst, self->transmission.stage1.arp.mac)) {
+			if(!resolver || resolver->resolveAddress(dst, self->arp.mac)) {
 				addressResolved(launcher, self, Result::Done);
 				return true;
 			}
@@ -430,7 +411,7 @@ public:
 			/*
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
-			self->transmission.stage1.retry = arpRequestRetry;
+			self->retry = arpRequestRetry;
 			const auto size = (arpReqSize + route->getDevice()->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
 			if(self->allocateBuffers(launcher, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
 				return true;
@@ -448,18 +429,18 @@ public:
 	{
 		auto self = static_cast<IpTxJob*>(item);
 
-		self->packet.stage2.packet.done();
-		Packet copy = self->packet.stage2.packet;
-		self->packet.stage3.packet.init(copy);
+		self->packet.stage2.done();
+		Packet copy = self->packet.stage2;
+		self->packet.stage3.init(copy);
 
 		InetChecksumDigester headerChecksum;
 		DummyDigester payloadChecksum;
 
 		uint16_t length = headerFixupStepOne(
-				self->packet.stage3.packet,
+				self->packet.stage3,
 				ttl,
 				protocol,
-				self->transmission.stage23.device->getHeaderSize(),
+				self->device->getHeaderSize(),
 				ipHeaderSize,
 				headerChecksum,
 				payloadChecksum);
@@ -470,20 +451,20 @@ public:
 		}
 
 		PacketStream modifier;
-		modifier.init(self->packet.stage3.packet);
+		modifier.init(self->packet.stage3);
 
 		headerFixupStepTwo(
 				modifier,
-				self->transmission.stage23.device->getHeaderSize(),
+				self->device->getHeaderSize(),
 				length,
 				headerChecksum.result());
 
-		return launcher->launch(self->transmission.stage23.device->getSender(), &IpTxJob::sent, &self->packet.stage3.packet);
+		return launcher->launch(self->device->getSender(), &IpTxJob::sent, &self->packet.stage3);
 	}
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob> {
+class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob> { // TODO reduce visibility
 	bool check() {
 		if(this->isOccupied())
 			this->wait();
@@ -491,11 +472,17 @@ class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob>
 		return this->error == nullptr;
 	}
 public:
-	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0, size_t timeout = 100)
+	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{
 		check();
 		return this->launch(&IpTxJob::startPreparation, dst, inLineSize, indirectCount);
 	}
+
+    inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
+    {
+        check();
+        return this->launchTimeout(&IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
+    }
 
 	inline bool send(uint8_t protocol, uint8_t ttl = 64)
 	{
@@ -505,19 +492,27 @@ public:
 		return this->launch(&IpTxJob::startTransmission, protocol, ttl);
 	}
 
+    inline bool sendTimeout(size_t timeout, uint8_t protocol, uint8_t ttl = 64)
+    {
+        if(!check())
+            return false;
+
+        return this->launchTimeout(&IpTxJob::startTransmission, timeout, protocol, ttl);
+    }
+
 	inline uint16_t fill(const char* data, uint16_t length)
 	{
 		if(!check())
 			return false;
 
-		return this->packet.stage2.packet.copyIn(data, length);
+		return this->packet.stage2.copyIn(data, length);
 	}
 
     inline bool addIndirect(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr) {
 		if(!check())
 			return false;
 
-        return this->packet.stage2.packet.addByReference(data, length, destructor, userData);
+        return this->packet.stage2.addByReference(data, length, destructor, userData);
     }
 
 	inline const char* getError() {

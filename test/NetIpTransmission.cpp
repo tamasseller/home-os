@@ -421,6 +421,8 @@ TEST_GROUP(NetIpTransmitter) {
                                 return Task::bad;
                         }
 
+                        txs[0].cancel(); // Can not be canceled.
+
                         expectIp(3);
                         Net::template getEthernetInterface<DummyIf>()->setDelayed(false);
 
@@ -479,6 +481,153 @@ TEST_GROUP(NetIpTransmitter) {
                 work<true, true>(task);
 
             }
+
+            static inline void runCancelInAllocation() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        AddressIp4 targets[2] = {
+                             AddressIp4::make(10, 10, 10, 1),   // Has static ARP entry.
+                             AddressIp4::make(10, 10, 10, 2)   // No ARP entry, triggers cancel in ARP request buffer allocation.
+                        };
+                        for(AddressIp4 target: targets) {
+                            typename Net::IpTransmitter tx1, tx2;
+
+                            tx1.init();
+                            tx2.init();
+
+                            static constexpr auto nBytesAvailable = tx1.blockMaxPayload * (64 * 75 / 100);
+
+                            if(!tx1.prepare(AddressIp4::make(10, 10, 10, 1), nBytesAvailable - 14 - 20))
+                                return Task::bad;
+
+                            if(tx1.fill("foobar", 6) != 6)
+                                return Task::bad;
+
+                            if(!tx2.prepare(target, 6))
+                                return Task::bad;
+
+                            tx2.cancel();
+                            tx2.wait();
+
+                            if(tx2.isOccupied() || tx2.getError() != NetErrorStrings::genericCancel)
+                                return Task::bad;
+
+                            if(tx2.sendTimeout(123, 254))
+                                return Task::bad;
+
+                            expectIp();
+
+                            if(!tx1.send(254))
+                                return Task::bad;
+
+                            tx1.wait();
+
+                            if(Accessor::pool.statUsed()) return Task::bad;
+                        }
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+            }
+
+            static inline void runTimeoutInArpRx() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter tx;
+                        tx.init();
+
+                        expectArpReq(1);
+
+                        if(!tx.prepareTimeout(10, AddressIp4::make(10, 10, 10, 1), 6))
+                            return Task::bad;
+
+                        tx.wait();
+
+                        if(tx.getError() != NetErrorStrings::genericTimeout)
+                            return Task::bad;
+
+                        if(Accessor::pool.statUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, false>(task);
+            }
+
+            static inline void runCancelInArpTx() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter tx;
+                        tx.init();
+
+                        expectArpReq(1);
+
+                        if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                            return Task::bad;
+
+                        tx.cancel();
+
+                        tx.wait();
+
+                        if(tx.getError() != NetErrorStrings::genericCancel)
+                            return Task::bad;
+
+                        if(Accessor::pool.statUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, false>(task);
+            }
+
+            static inline void runTimeoutInSend() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter txs[3];
+
+                        Net::template getEthernetInterface<DummyIf>()->setDelayed(true);
+
+                        for(int i=0; i<3; i++) {
+                            txs[i].init();
+
+                            if(!txs[i].prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                                return Task::bad;
+
+                            if(txs[i].fill("foobar", 6) != 6)
+                                return Task::bad;
+                        }
+
+                        for(int i=0; i<2; i++)
+                            if(!txs[i].send(254))
+                                return Task::bad;
+
+                        if(!txs[2].sendTimeout(1, 254))
+                            return Task::bad;
+
+                        txs[2].wait();
+
+                        if(txs[2].getError() != NetErrorStrings::genericTimeout)
+                            return Task::bad;
+
+                        expectIp(2);
+
+                        Net::template getEthernetInterface<DummyIf>()->setDelayed(false);
+
+                        for(int i=0; i<2; i++)
+                            txs[i].wait();
+
+                        if(Accessor::pool.statUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+            }
     };
 };
 
@@ -526,7 +675,23 @@ TEST(NetIpTransmitter, Prefetch##x) {                       \
     														\
 TEST(NetIpTransmitter, FunnyHeaders##x) {                   \
 	TxTests<Net##x>::runFunnyHeaders();                     \
-}
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, CancelInAllocation##x) {             \
+    TxTests<Net##x>::runCancelInAllocation();               \
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, TimeoutInArpRx##x) {                 \
+    TxTests<Net##x>::runTimeoutInArpRx();                   \
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, CancelInArpTx##x) {                  \
+    TxTests<Net##x>::runCancelInArpTx();                    \
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, TimeoutInSend##x) {                  \
+    TxTests<Net##x>::runTimeoutInSend();                    \
+}                                                           \
 
 INSTANTIATE_ALL_TESTS(64)
 INSTANTIATE_ALL_TESTS(43)
