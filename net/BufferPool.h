@@ -22,8 +22,8 @@
 
 #include "DataContainer.h"
 
-template<class Os, size_t nBlocks, class Data>
-class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, Data>>, Os::Event
+template<class Os, size_t nBlocks, class Data, size_t txQuota = nBlocks, size_t rxQuota = nBlocks>
+class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, Data, txQuota, rxQuota>>, Os::Event
 {
 	friend class BufferPool::IoChannelBase;
 
@@ -222,7 +222,15 @@ public:
 		return nBlocks - memQueue.stat();
 	}
 
-	inline void init(Storage &blocks, size_t txQuota=nBlocks, size_t rxQuota=nBlocks) {
+	inline size_t statTxUsed() {
+		return txQuota - txQueue.stat();
+	}
+
+	inline size_t statRxUsed() {
+		return rxQuota - rxQueue.stat();
+	}
+
+	inline void init(Storage &blocks) {
 		memQueue.init(nBlocks);
 		txQueue.init(txQuota);
 		rxQueue.init(rxQuota);
@@ -262,8 +270,8 @@ public:
 	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
 
-template<class Os, size_t nBlocks, class Data>
-class BufferPool<Os, nBlocks, Data>::AtomicPool
+template<class Os, size_t nBlocks, class Data, size_t txQuota, size_t rxQuota>
+class BufferPool<Os, nBlocks, Data, txQuota, rxQuota>::AtomicPool
 {
 	Atomic<Block*> head;
 
@@ -309,8 +317,8 @@ public:
 	}
 };
 
-template<class Os, size_t nBlocks, class Data>
-class BufferPool<Os, nBlocks, Data>::ReservationQueue
+template<class Os, size_t nBlocks, class Data, size_t txQuota, size_t rxQuota>
+class BufferPool<Os, nBlocks, Data, txQuota, rxQuota>::ReservationQueue
 {
 	Atomic<size_t> nFree;			///< Number of free blocks.
 	pet::LinkedList<IoData> items;	///< Requests waiting for free buffers.

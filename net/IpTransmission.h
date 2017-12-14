@@ -289,7 +289,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Wait for the required address.
 			 */
-			self->arp.ip = self->dst;
+			self->arp.ip = self->dst; // TODO gateway
 			if(launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp))
 				return true;
 
@@ -314,7 +314,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		if(result == Result::Done) {
 			auto allocator = self->packet.stage1.allocator;
 			const uint32_t senderIp = route->getSource().addr;
-			const uint32_t targetIp = self->dst.addr;
+			const uint32_t targetIp = self->dst.addr; // TODO gateway
 			const AddressEthernet &senderMac = route->getDevice()->getResolver()->getAddress();
 			auto &packet = self->packet.stage2;
 
@@ -403,7 +403,7 @@ public:
 			 * circuit the ARP querying and cut-through to the completion of it.
 			 */
 			auto resolver = route->getDevice()->getResolver();
-			if(!resolver || resolver->resolveAddress(dst, self->arp.mac)) {
+			if(!resolver || resolver->resolveAddress(dst, self->arp.mac)) { // TODO gateway
 				addressResolved(launcher, self, Result::Done);
 				return true;
 			}
@@ -436,14 +436,14 @@ public:
 		InetChecksumDigester headerChecksum;
 		DummyDigester payloadChecksum;
 
-		uint16_t length = headerFixupStepOne(
+		uint16_t length = headerFixupStepOne<true>(
 				self->packet.stage3,
-				ttl,
-				protocol,
 				self->device->getHeaderSize(),
 				ipHeaderSize,
 				headerChecksum,
-				payloadChecksum);
+				payloadChecksum,
+				ttl,
+				protocol);
 
 		if(length == (size_t)-1) {
 			self->error = NetErrorStrings::unknown;

@@ -183,12 +183,12 @@ TEST(NetPacket, FreeSpare) {
 	struct Task: TaskBase<Task> {
 		bool run() {
 			init(4);
-			if(Accessor::pool.statUsed() != 4) return bad;
+			if(Accessor::pool.statTxUsed() != 4) return bad;
 			if(builder.copyIn(foobar, strlen(foobar)) != strlen(foobar)) return bad;
 
 			builder.done();
 
-			if(Accessor::pool.statUsed() != 1) return bad;
+			if(Accessor::pool.statTxUsed() != 1) return bad;
 
 			return checkStreamContent(foobar);
 		}

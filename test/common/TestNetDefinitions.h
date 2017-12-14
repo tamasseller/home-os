@@ -13,12 +13,17 @@
 
 #include "1test/Mock.h"
 
-template<class Net>
+template<class Net, uint16_t blockMaxPayload>
 struct DummyIf {
     static constexpr size_t arpCacheEntries = 8;
 	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
+	static constexpr auto mtu = 100u;
+	static constexpr auto nRxBlocks = (mtu + blockMaxPayload - 1) / blockMaxPayload;
+
 	static bool enabled, delayed;
 	static size_t dummyPrefixSize;
+	static char* rxTable[nRxBlocks];
+	static int rxWriteIdx, rxReadIdx;
 
 	inline static void disableTxIrq() {
 		enabled = false;
@@ -27,7 +32,38 @@ struct DummyIf {
 	inline static void init() {
 		dummyPrefixSize = 0;
 		enabled = delayed = false;
+		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(1/*nRxBlocks*/);
 	}
+
+	inline bool takeRxBuffer(char* data) {
+		rxTable[rxWriteIdx] = data;
+		rxWriteIdx = (rxWriteIdx + 1) % nRxBlocks;
+		return true;
+	}
+
+	template<class... C>
+	static inline void receive(C... c) {
+		const uint8_t input[] = {static_cast<uint8_t>(c)...}, *p = input;
+		auto length = sizeof...(C);
+
+		typename Net::PacketAssembler assembler;
+
+		while(length) {
+			char* chunk = rxTable[rxReadIdx];
+			rxReadIdx = (rxReadIdx + 1) % nRxBlocks;
+
+			int run = (length < blockMaxPayload) ? length : blockMaxPayload;
+			memcpy(chunk, p, run);
+			p += run;
+
+			assembler.addBlockByFinalInlineData(chunk, run);
+
+			length -= run;
+		}
+
+		// TODO post rx packet
+	}
+
 
 	template<class... C>
 	static inline void expectN(size_t n, C... c) {
@@ -87,17 +123,25 @@ struct DummyIf {
 	}
 };
 
-template<class Net>
-constexpr AddressEthernet DummyIf<Net>::ethernetAddress;
+template<class Net, uint16_t n>
+constexpr AddressEthernet DummyIf<Net, n>::ethernetAddress;
 
-template<class Net>
-bool DummyIf<Net>::enabled;
+template<class Net, uint16_t n>
+bool DummyIf<Net, n>::enabled;
 
-template<class Net>
-bool DummyIf<Net>::delayed;
+template<class Net, uint16_t n>
+bool DummyIf<Net, n>::delayed;
 
-template<class Net>
-size_t DummyIf<Net>::dummyPrefixSize = 0;
+template<class Net, uint16_t n>
+size_t DummyIf<Net, n>::dummyPrefixSize = 0;
+
+template<class Net, uint16_t n>
+char* DummyIf<Net, n>::rxTable[];
+template<class Net, uint16_t n>
+int DummyIf<Net, n>::rxWriteIdx = 0;
+template<class Net, uint16_t n>
+int DummyIf<Net, n>::rxReadIdx = 0;
+
 
 using Ifs = NetworkOptions::Interfaces<
     NetworkOptions::Set<

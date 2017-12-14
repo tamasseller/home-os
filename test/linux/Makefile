@@ -66,9 +66,10 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 # Networking related tests.
 
-endif
 
+endif
 SOURCES += $(ROOT)/test/NetArp.cpp
+SOURCES += $(ROOT)/test/NetIcmp.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetRouting.cpp
 SOURCES += $(ROOT)/test/NetChecksum.cpp

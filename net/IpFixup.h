@@ -41,15 +41,15 @@ inline void Network<S, Args...>::fillInitialIpHeader(
 }
 
 template<class S, class... Args>
-template<class HeaderDigester, class PayloadDigester>
+template<bool patch, class HeaderDigester, class PayloadDigester>
 inline uint16_t Network<S, Args...>::headerFixupStepOne(
 		Packet packet,
-		uint8_t ttl,
-		uint8_t protocol,
 		size_t l2headerLength,
 		size_t ipHeaderLength,
 		HeaderDigester &headerChecksum,
-		PayloadDigester &payloadChecksum)
+		PayloadDigester &payloadChecksum,
+		uint8_t ttl,
+		uint8_t protocol)
 {
 	static constexpr size_t ttlOffset = 8;
 	static constexpr size_t protocolOffset = 9;
@@ -89,10 +89,10 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 			 *  | L2 L2 L2 L2 L2 L2 L2 | -> | L2 L2 L2 IP IP IP IP |
 			 *                               <--skip--><--length-->
 			 */
-			if(ttlOffset < length)
+			if(patch && (ttlOffset < length))
 				chunk.start[l2headerLength + ttlOffset] = ttl;
 
-			if(protocolOffset < length)
+			if(patch && (protocolOffset < length))
 				chunk.start[l2headerLength + protocolOffset] = protocol;
 
 			if(length >= headerLength) {
@@ -138,10 +138,10 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 		const size_t leftoverHeaderLength = headerLength - length;
 		const size_t newLength = length + chunk.length();
 
-		if(ttlOffset < newLength)
+		if(patch && (ttlOffset < newLength))
 			chunk.start[ttlOffset - length] = ttl;
 
-		if(protocolOffset < newLength)
+		if(patch && (protocolOffset < newLength))
 			chunk.start[protocolOffset - length] = protocol;
 
 		if(chunk.length() >= leftoverHeaderLength) {
@@ -209,7 +209,5 @@ inline void Network<S, Args...>::headerFixupStepTwo(
 	bool checksumOk = modifier.write16raw(headerChecksum);
 	Os::assert(checksumOk, NetErrorStrings::unknown);
 }
-
-
 
 #endif /* IPFIXUP_H_ */

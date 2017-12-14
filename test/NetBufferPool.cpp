@@ -30,10 +30,11 @@ TEST_GROUP(NetBufferPool) {
 
 	typedef BufferPool<Os, 10, Dummy> Pool;
 
-	class PoolJob: public Os::IoJob, Pool::IoData {
+	template<class P=Pool>
+	class GenericPoolJob: public Os::IoJob, P::IoData {
 		static bool writeResult(Os::IoJob::Launcher *launcher, Os::IoJob* item, Os::IoJob::Result result)
 		{
-			auto self = static_cast<PoolJob*>(item);
+			auto self = static_cast<GenericPoolJob*>(item);
 
 			if(result == Os::IoJob::Result::Done) {
 				Dummy* current = self->result = self->allocator.get();
@@ -49,24 +50,24 @@ TEST_GROUP(NetBufferPool) {
 			return false;
 		}
 
-		static bool start(Os::IoJob::Launcher *launcher, Os::IoJob* item, Pool *pool, size_t n, Pool::Quota quota)
+		static bool start(Os::IoJob::Launcher *launcher, Os::IoJob* item, P *pool, size_t n, typename P::Quota quota)
 		{
-			auto self = static_cast<PoolJob*>(item);
+			auto self = static_cast<GenericPoolJob*>(item);
 			self->result = nullptr;
 			self->request.quota = quota;
 			self->request.size = static_cast<uint16_t>(n);
-			return launcher->launch(pool, &PoolJob::writeResult, self);
+			return launcher->launch(pool, &GenericPoolJob::writeResult, self);
 		}
 
 	public:
-		static constexpr auto entry = &PoolJob::start;
+		static constexpr auto entry = &GenericPoolJob::start;
 
 		Dummy* volatile result;
-		inline PoolJob(): result(nullptr) {}
+		inline GenericPoolJob(): result(nullptr) {}
 
-		template<Pool::Quota quota = Pool::Quota::Tx>
-		void destroy(Pool &pool) {
-			Pool::Deallocator deallocator(result);
+		template<typename P::Quota quota = P::Quota::Tx>
+		void destroy(P &pool) {
+			typename P::Deallocator deallocator(result);
 
 			for(Dummy* current = result->next; current;) {
 				Dummy* next = current->next;
@@ -74,7 +75,7 @@ TEST_GROUP(NetBufferPool) {
 				current = next;
 			}
 
-			deallocator.deallocate<quota>(&pool);
+			deallocator.template deallocate<quota>(&pool);
 		}
 	};
 };
@@ -83,6 +84,7 @@ TEST(NetBufferPool, Simple) {
 	struct Task: public TestTask<Task> {
 		Pool pool;
 		Pool::Storage storage;
+		typedef GenericPoolJob<Pool> PoolJob;
 
 		bool run() {
 			pool.init(storage);
@@ -119,11 +121,13 @@ TEST(NetBufferPool, Simple) {
 
 TEST(NetBufferPool, Direct) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 6, 8> Pool;
 		Pool pool;
 		Pool::Storage storage;
+		typedef GenericPoolJob<Pool> PoolJob;
 
 		bool run() {
-			pool.init(storage, 6, 8);
+			pool.init(storage);
 
 			auto r1 = pool.allocateDirect<Pool::Quota::Tx>(10);
 			if(r1.hasMore()) return bad;
@@ -158,6 +162,7 @@ TEST(NetBufferPool, Ordering) {
 	struct Task: public TestTask<Task> {
 		Pool pool;
 		Pool::Storage storage;
+		typedef GenericPoolJob<Pool> PoolJob;
 		PoolJob jobs[4];
 
 		bool run() {
@@ -202,6 +207,7 @@ TEST(NetBufferPool, LastCanceled) {
 	struct Task: public TestTask<Task> {
 		Pool pool;
 		Pool::Storage storage;
+		typedef GenericPoolJob<Pool> PoolJob;
 		PoolJob jobs[4];
 
 		bool run() {
@@ -245,6 +251,7 @@ TEST(NetBufferPool, FirstCanceled) {
 	struct Task: public TestTask<Task> {
 		Pool pool;
 		Pool::Storage storage;
+		typedef GenericPoolJob<Pool> PoolJob;
 		PoolJob jobs[4];
 
 		bool run() {
@@ -287,12 +294,14 @@ TEST(NetBufferPool, FirstCanceled) {
 
 TEST(NetBufferPool, Quota) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 8, 8> Pool;
 		Pool pool;
+		typedef GenericPoolJob<Pool> PoolJob;
 		Pool::Storage storage;
 
 		bool run() {
 			PoolJob jobs[4];
-			pool.init(storage, 8, 8);					// M: 10, R: 8, T: 8
+			pool.init(storage);											// M: 10, R: 8, T: 8
 
 			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::Tx);	// M: 4, R: 8, T: 2
 			Os::sleep(1);
@@ -330,12 +339,14 @@ TEST(NetBufferPool, Quota) {
 
 TEST(NetBufferPool, QuotaCancelRx) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 8, 8> Pool;
 		Pool pool;
+		typedef GenericPoolJob<Pool> PoolJob;
 		Pool::Storage storage;
 
 		bool run() {
 			PoolJob jobs[4];
-			pool.init(storage, 8, 8);
+			pool.init(storage);
 
 			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::Rx);
 			Os::sleep(1);
@@ -363,12 +374,14 @@ TEST(NetBufferPool, QuotaCancelRx) {
 
 TEST(NetBufferPool, QuotaCancelMem) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 8, 8> Pool;
 		Pool pool;
+		typedef GenericPoolJob<Pool> PoolJob;
 		Pool::Storage storage;
 
 		bool run() {
 			PoolJob jobs[4];
-			pool.init(storage, 8, 8);
+			pool.init(storage);
 
 			jobs[0].launch(PoolJob::entry, &pool, 8, Pool::Quota::Tx);
 			Os::sleep(1);
@@ -399,12 +412,14 @@ TEST(NetBufferPool, QuotaCancelMem) {
 
 TEST(NetBufferPool, QuotaCancelMemNonFirst) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 8, 8> Pool;
 		Pool pool;
+		typedef GenericPoolJob<Pool> PoolJob;
 		Pool::Storage storage;
 
 		bool run() {
 			PoolJob jobs[4];
-			pool.init(storage, 8, 8);
+			pool.init(storage);
 
 			jobs[0].launch(PoolJob::entry, &pool, 8, Pool::Quota::Tx);
 			Os::sleep(1);
@@ -435,12 +450,14 @@ TEST(NetBufferPool, QuotaCancelMemNonFirst) {
 
 TEST(NetBufferPool, QuotaPrioPass) {
 	struct Task: public TestTask<Task> {
+		typedef BufferPool<Os, 10, Dummy, 6, 6> Pool;
 		Pool pool;
+		typedef GenericPoolJob<Pool> PoolJob;
 		Pool::Storage storage;
 
 		bool run() {
 			PoolJob jobs[4];
-			pool.init(storage, 6, 6);
+			pool.init(storage);
 
 			jobs[0].launch(PoolJob::entry, &pool, 6, Pool::Quota::None);
 			Os::sleep(1);

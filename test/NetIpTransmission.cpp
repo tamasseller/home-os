@@ -193,7 +193,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -225,7 +225,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -281,7 +281,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx2.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -320,7 +320,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -350,7 +350,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -390,7 +390,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx.wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
                         if(!destroyed) return Task::bad;
 
                         return Task::ok;
@@ -429,7 +429,7 @@ TEST_GROUP(NetIpTransmitter) {
                         for(auto i=0u; i<sizeof(txs)/sizeof(txs[0]); i++)
                         	txs[i].wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -471,7 +471,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                             tx.wait();
 
-                            if(Accessor::pool.statUsed()) return Task::bad;
+                            if(Accessor::pool.statTxUsed()) return Task::bad;
                     	}
 
                         return Task::ok;
@@ -522,7 +522,7 @@ TEST_GROUP(NetIpTransmitter) {
 
                             tx1.wait();
 
-                            if(Accessor::pool.statUsed()) return Task::bad;
+                            if(Accessor::pool.statTxUsed()) return Task::bad;
                         }
 
                         return Task::ok;
@@ -548,7 +548,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(tx.getError() != NetErrorStrings::genericTimeout)
                             return Task::bad;
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -575,7 +575,7 @@ TEST_GROUP(NetIpTransmitter) {
                         if(tx.getError() != NetErrorStrings::genericCancel)
                             return Task::bad;
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }
@@ -620,7 +620,7 @@ TEST_GROUP(NetIpTransmitter) {
                         for(int i=0; i<2; i++)
                             txs[i].wait();
 
-                        if(Accessor::pool.statUsed()) return Task::bad;
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
 
                         return Task::ok;
                     }

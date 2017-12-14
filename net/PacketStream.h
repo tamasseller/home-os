@@ -9,7 +9,7 @@
 #define PACKETSTREAM_H_
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketStream: PacketDisassembler, public PacketWriterBase<PacketStream>
+class Network<S, Args...>::PacketStream: public PacketDisassembler, public PacketWriterBase<PacketStream>
 {
 	friend class PacketStream::PacketWriterBase;
 

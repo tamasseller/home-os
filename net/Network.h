@@ -30,8 +30,8 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
-	template<template<class> class Driver> struct EthernetInterface {
-	        template<class Net> using Wrapped = typename Net::template Ethernet<Driver<Net>>;
+	template<template<class, uint16_t> class Driver> struct EthernetInterface {
+	        template<class Net, uint16_t n> using Wrapped = typename Net::template Ethernet<Driver<Net, n>>;
 	};
 
 	template<class... Members> struct Set {
@@ -67,7 +67,7 @@ struct NetworkOptions {
 
 	private:
 		template<class> class Ethernet;
-		template<class, class = void> struct Interfaces;
+		template<uint16_t, class, class = void> struct Interfaces;
 
 		struct Chunk;
 		class Block;
@@ -77,11 +77,11 @@ struct NetworkOptions {
 		template <class> class PacketWriterBase;
 		class PacketTransmissionRequest;
 
-		typedef BufferPool<Os, bufferCount, Block> Pool;
+		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
 		template<typename Pool::Quota> class PacketBuilder;
 		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
-		using RxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
+		using RxPacketBuilder = PacketBuilder<Pool::Quota::Rx>;
 
 		static struct State {
 			struct Ager: Os::Timeout {
@@ -91,25 +91,28 @@ struct NetworkOptions {
 			} ager;
 
             inline void* operator new(size_t, void* x) { return x; }
-			Interfaces<IfsToBeUsed> interfaces;
+			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
 		} state;
 
 		class IpTxJob;
 		class DummyDigester;
+		class PacketProcessor;
+		class ArpPacketProcessor;
+		class IpPacketProcessor;
 
 		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
-		template<class HeaderDigester, class PayloadDigester>
+		template<bool patch, class HeaderDigester, class PayloadDigester>
 		static inline uint16_t headerFixupStepOne(
 				Packet packet,
-				uint8_t ttl,
-				uint8_t protocol,
 				size_t l2headerLength,
 				size_t ipHeaderLength,
 				HeaderDigester &headerChecksum,
-				PayloadDigester &payloadChecksum);
+				PayloadDigester &payloadChecksum,
+				uint8_t ttl,
+				uint8_t protocol);
 
 		static inline void headerFixupStepTwo(
 				PacketStream &modifier,
@@ -118,6 +121,7 @@ struct NetworkOptions {
 				uint16_t headerChecksum);
 
 	public:
+		static constexpr auto blockMaxPayload = Block::dataSize;
 		typedef typename Pool::Storage Buffers;
 		using Route = typename RoutingTable::Route;
 
@@ -130,7 +134,7 @@ struct NetworkOptions {
 		    state.~State();
 		    new(&state) State();
 			state.interfaces.init();
-			state.pool.init(buffers, txBufferLimit, rxBufferLimit);
+			state.pool.init(buffers);
 			state.ager.start(secTicks);
 		}
 
@@ -138,7 +142,8 @@ struct NetworkOptions {
 		    return state.routingTable.add(route, setUp);
 		}
 
-		template<template<class> class Driver> constexpr static inline Ethernet<Driver<Configurable>> *getEthernetInterface();
+		template<template<class, uint16_t> class Driver>
+		constexpr static inline auto* getEthernetInterface();
 	};
 };
 
@@ -160,6 +165,7 @@ inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sle
 }
 
 #include "Packet.h"
+#include "PacketProcessor.h"
 #include "PacketBuilder.h"
 #include "PacketStream.h"
 #include "Endian.h"

@@ -52,6 +52,13 @@ class Network<S, Args...>::Ethernet: public Os::template IoChannelBase<Ethernet<
     	resolver.ageContent();
     }
 
+    virtual void takeRxBuffers(typename Pool::Allocator allocator) override final {
+    	while(allocator.hasMore()) {
+    		if(!this->Driver::takeRxBuffer(allocator.get()->getData()))
+    			break;
+    	}
+    }
+
     PacketTransmissionRequest *currentPacket, *nextPacket;
     pet::LinkedList<PacketTransmissionRequest> items;
 

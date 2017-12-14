@@ -170,6 +170,10 @@ public:
 		if(entry.destructor)
 			entry.destructor(entry.user, entry.start, entry.size);
 	}
+
+	static inline Block* fromInlineData(char* data) {
+		return reinterpret_cast<Block*>(data - sizeof(Header));
+	}
 };
 
 template<class S, class... Args>
@@ -209,6 +213,13 @@ protected:
 
 public:
 	inline void addBlock(Block* next) {
+		current->setNext(next);
+		current = next;
+	}
+
+	inline void addBlockByFinalInlineData(char* data, uint16_t length) {
+		auto next = Block::fromInlineData(data);
+		next->setLength = length;
 		current->setNext(next);
 		current = next;
 	}

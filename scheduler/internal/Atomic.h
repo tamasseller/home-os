@@ -33,21 +33,21 @@ struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 
 	Data increment() {
 		return (*this)([](Data old, Data& result){
-			result = old + 1;
+			result = static_cast<Data>(old + 1);
 			return true;
 		});
 	}
 
 	Data increment(Data amount) {
 		return (*this)([](Data old, Data& result, Data amount){
-			result = old + amount;
+			result = static_cast<Data>(old + amount);
 			return true;
 		}, amount);
 	}
 
 	Data decrement() {
 		return (*this)([](Data old, Data& result){
-			result = old - 1;
+			result = static_cast<Data>(old - 1);
 			return true;
 		});
 	}
