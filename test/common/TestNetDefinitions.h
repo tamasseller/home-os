@@ -32,7 +32,7 @@ struct DummyIf {
 	inline static void init() {
 		dummyPrefixSize = 0;
 		enabled = delayed = false;
-		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(1/*nRxBlocks*/);
+		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nRxBlocks);
 	}
 
 	inline bool takeRxBuffer(char* data) {
@@ -41,29 +41,46 @@ struct DummyIf {
 		return true;
 	}
 
+	static inline char* receiveSome(const uint8_t *&p, uint16_t &length, uint16_t &run)
+	{
+		char* ret = rxTable[rxReadIdx];
+		rxReadIdx = (rxReadIdx + 1) % nRxBlocks;
+
+		run = (length < blockMaxPayload) ? length : blockMaxPayload;
+
+		memcpy(ret, p, run);
+		p += run;
+
+		length = static_cast<uint16_t>(length - run);
+
+		return ret;
+	}
+
 	template<class... C>
 	static inline void receive(C... c) {
 		const uint8_t input[] = {static_cast<uint8_t>(c)...}, *p = input;
-		auto length = sizeof...(C);
+		uint16_t length = sizeof...(C), run;
 
 		typename Net::PacketAssembler assembler;
+		char* chunk = receiveSome(p, length, run);
+		assembler.initByFinalInlineData(chunk, run);
+		uint16_t nBlocksConsumed = 1;
 
 		while(length) {
-			char* chunk = rxTable[rxReadIdx];
-			rxReadIdx = (rxReadIdx + 1) % nRxBlocks;
-
-			int run = (length < blockMaxPayload) ? length : blockMaxPayload;
-			memcpy(chunk, p, run);
-			p += run;
-
+			char* chunk = receiveSome(p, length, run);
 			assembler.addBlockByFinalInlineData(chunk, run);
-
-			length -= run;
+			nBlocksConsumed++;
 		}
 
-		// TODO post rx packet
-	}
+		assembler.done();
 
+		if(!input[13]) /* 13: second byte of ethertype */
+			Net::template getEthernetInterface<DummyIf>()->ipPacketReceived(assembler);
+		else
+			Net::template getEthernetInterface<DummyIf>()->arpPacketReceived(assembler);
+
+		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nBlocksConsumed);
+	}
 
 	template<class... C>
 	static inline void expectN(size_t n, C... c) {

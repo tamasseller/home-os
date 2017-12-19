@@ -97,7 +97,6 @@ public:
 		limit = data + maxLength;
 	}
 
-
 	inline void done() {
 		finalizeCurrent();
 		PacketAssembler::done();

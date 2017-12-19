@@ -131,13 +131,12 @@ private:
 	ReservationQueue txQueue;	///< Requests waiting due to TX quota exceeded.
 	ReservationQueue rxQueue;	///< Requests waiting due to RX quota exceeded.
 
-	inline ReservationQueue* getQotaQueue(Quota quota) {
-		if(quota == Quota::Tx)
-			return &txQueue;
-		else if(quota == Quota::Rx)
-			return &rxQueue;
-		else
-			return nullptr;
+	constexpr inline ReservationQueue* getQotaQueue(Quota quota) {
+		return (quota == Quota::Tx) ?
+				&txQueue :
+				((quota == Quota::Rx) ?
+						&rxQueue :
+						nullptr);
 	}
 
 	inline void updateQuota(ReservationQueue* queue) {

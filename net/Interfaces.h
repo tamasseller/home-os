@@ -45,6 +45,10 @@ public:
 	}
 
     virtual void takeRxBuffers(typename Pool::Allocator allocator) = 0;
+
+    static inline void ipPacketReceived(Packet packet) {
+    	// TODO
+    }
 private:
     using IoJob = typename Os::IoJob;
 	using Result = typename IoJob::Result;
@@ -60,12 +64,12 @@ private:
     	auto self = static_cast<Interface*>(item);
     	Os::assert(result == Result::Done, NetErrorStrings::unknown);
 
-    	// TODO
+    	self->takeRxBuffers(static_cast<typename Pool::IoData*>(self)->allocator);
 
     	if(uint16_t n = self->nBuffersRequested.reset()) {
         	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
         	if(ret.hasMore()) {
-        		// TODO
+        		self->takeRxBuffers(ret);
         		return false;
         	}
 
@@ -85,13 +89,14 @@ private:
 
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item, uint16_t n)
     {
+		auto self = static_cast<Interface*>(item);
     	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
+
     	if(ret.hasMore()) {
-    		// TODO
+    		self->takeRxBuffers(ret);
     		return false;
     	}
 
-		auto self = static_cast<Interface*>(item);
     	self->nBuffersRequested.increment(n);
    		return launcher->launch(
    				&state.pool,

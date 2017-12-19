@@ -175,6 +175,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		Done, Later, Error
 	};
 
+	// TODO make size uin16_t
 	inline AsyncResult allocateBuffers(Launcher *launcher, size_t size, Callback callback)
 	{
 		// This branch is not supposed to be taken ( LCOV_EXCL_START ).

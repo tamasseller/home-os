@@ -79,6 +79,10 @@ private:
 		IndirectEntry entry;
 	};
 
+	static constexpr size_t dataOffset() {
+		return reinterpret_cast<size_t>(reinterpret_cast<Block*>(0)->bytes);
+	}
+
 public:
 	/**
 	 * Read the next block.
@@ -172,7 +176,7 @@ public:
 	}
 
 	static inline Block* fromInlineData(char* data) {
-		return reinterpret_cast<Block*>(data - sizeof(Header));
+		return reinterpret_cast<Block*>(data - dataOffset());
 	}
 };
 
@@ -219,7 +223,7 @@ public:
 
 	inline void addBlockByFinalInlineData(char* data, uint16_t length) {
 		auto next = Block::fromInlineData(data);
-		next->setLength = length;
+		next->setSize(length);
 		current->setNext(next);
 		current = next;
 	}
@@ -227,6 +231,12 @@ public:
 	inline void init(Block* first) {
 		Packet::init(first);
 		current = first;
+	}
+
+	inline void initByFinalInlineData(char* data, uint16_t length) {
+		auto first = Block::fromInlineData(data);
+		first->setSize(length);
+		init(first);
 	}
 
 	inline void done() {

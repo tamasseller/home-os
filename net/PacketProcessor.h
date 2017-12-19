@@ -26,6 +26,7 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 			} while(reader.moveToNextPacket());
 		}
 	};
+
 protected:
 	inline PacketProcessor(void (*callback)(typename Os::Event*, uintptr_t)): Os::Event(callback) {}
 
@@ -33,6 +34,7 @@ protected:
 	static constexpr void (*make(typename Os::Event*, uintptr_t)) () {
 		return &Wrapper<T, worker>::trampoline;
 	}
+
 public:
 	void process(Packet packet) {
 		Block* first = packet.first, *last = first;
@@ -50,8 +52,5 @@ public:
 
 template<class S, class... Args>
 class Network<S, Args...>::IpPacketProcessor: PacketProcessor {};
-
-template<class S, class... Args>
-class Network<S, Args...>::ArpPacketProcessor PacketProcessor {};
 
 #endif /* PACKETPROCESSOR_H_ */

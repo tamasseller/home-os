@@ -63,6 +63,7 @@ struct NetworkOptions {
 	public:
 		class Interface;
 		class PacketStream;
+		class PacketAssembler;
 		typedef Scheduler Os;
 
 	private:
@@ -72,7 +73,6 @@ struct NetworkOptions {
 		struct Chunk;
 		class Block;
 		class Packet;
-		class PacketAssembler;
 		class PacketDisassembler;
 		template <class> class PacketWriterBase;
 		class PacketTransmissionRequest;
@@ -99,8 +99,8 @@ struct NetworkOptions {
 		class IpTxJob;
 		class DummyDigester;
 		class PacketProcessor;
-		class ArpPacketProcessor;
 		class IpPacketProcessor;
+		class ArpReplyJob;
 
 		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
@@ -133,8 +133,8 @@ struct NetworkOptions {
 		static inline void init(Buffers &buffers) {
 		    state.~State();
 		    new(&state) State();
-			state.interfaces.init();
 			state.pool.init(buffers);
+			state.interfaces.init();
 			state.ager.start(secTicks);
 		}
 

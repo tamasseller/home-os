@@ -31,7 +31,7 @@ TEST_GROUP(NetIpTransmitter) {
                     0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
                     /* source IP address  | destination IP address */
                     0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
-                    /* TBD */
+                    /* data */
                     'f', 'o', 'o', 'b', 'a', 'r'
                 );
             }
@@ -44,7 +44,7 @@ TEST_GROUP(NetIpTransmitter) {
                         0x45, 0x00, 0x00, 0x3f, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xa3,
                         /* source IP address  | destination IP address */
                         0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
-                        /* TBD */
+                        /* data */
                         'T', 'h', 'e', ' ', 'q', 'u', 'i', 'c', 'k', ' ', 'b', 'r', 'o', 'w', 'n', ' ',
                         'f', 'o', 'x', ' ', 'j', 'u', 'm', 'p', 's', ' ', 'o', 'v', 'e', 'r', ' ', 't',
                         'h', 'e', ' ', 'l', 'a', 'z', 'y', ' ', 'd', 'o', 'g'
