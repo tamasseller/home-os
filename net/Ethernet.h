@@ -293,20 +293,12 @@ class Network<S, Args...>::Ethernet:
 		builder.done();
 		self->txReq.init(builder);
 
-		bool ok = launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
-		Os::assert(ok, NetErrorStrings::unknown);
+		launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
 		return true;
 	}
 
 	static constexpr uint16_t arpReplySize = 28;
 	static constexpr uint16_t arpPacketBufferCount = (arpReplySize + /* + TODO l2 header + */ + blockMaxPayload - 1) / blockMaxPayload;
-
-	static inline void initPoolParams(IoJob* item)
-	{
-		auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
-		self->poolParams.request.size = arpPacketBufferCount;
-		self->poolParams.request.quota = Pool::Quota::Tx;
-	}
 
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item)
     {
@@ -314,13 +306,15 @@ class Network<S, Args...>::Ethernet:
 
     	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(arpPacketBufferCount);
 
-
-    	if(!ret.hasMore())
-       		return launcher->launch(&state.pool, &Ethernet::buffersAcquired, &self->poolParams, initPoolParams);
-
-    	self->poolParams.allocator = ret; // TODO solve race with running job if not launched (direct allocation).
-
-		return buffersAcquired(launcher, item, Result::Done);
+    	if(ret.hasMore()) {
+            self->poolParams.allocator = ret;
+    	    return buffersAcquired(launcher, item, Result::Done);
+    	} else {
+            self->poolParams.request.size = arpPacketBufferCount;
+            self->poolParams.request.quota = Pool::Quota::Tx;
+            launcher->launch(&state.pool, &Ethernet::buffersAcquired, &self->poolParams);
+            return true;
+    	}
     }
 
 public:

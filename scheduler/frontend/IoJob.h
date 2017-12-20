@@ -55,9 +55,7 @@ private:
 	Data* data;
 	Callback finished;
 
-	class LauncherBase;
 	class NormalLauncher;
-	class ContinuationLauncher;
 	class TimeoutLauncher;
 
 	static constexpr intptr_t submitNoTimeoutValue = (intptr_t) -1;
@@ -75,7 +73,7 @@ private:
 				continue;
 
 			if(removeResult != IoChannel::RemoveResult::Denied) {
-				ContinuationLauncher launcher(this);
+				NormalLauncher launcher(this);
 				finished(&launcher, this, result);
 
 				if(this->isSleeping())
@@ -124,7 +122,7 @@ private:
 			if(arg == cancelValue) {
 				self->removeSynhronized(Result::Canceled);
 			} else if(arg == doneValue){
-				ContinuationLauncher launcher(self);
+			    NormalLauncher launcher(self);
 				bool goOn = self->finished(&launcher, self, Result::Done);
 
 				if(!goOn) {
@@ -143,6 +141,23 @@ private:
 		static_cast<IoJob*>(sleeper)->removeSynhronized(Result::TimedOut);
 	}
 
+	bool acquire() {
+	    return channel.compareAndSwap(nullptr, reinterpret_cast<IoChannel*>(-1));
+	}
+
+	template<class Method, class... C>
+	bool launchWithLauncher(Launcher* launcher, Method method, C... c) {
+	        if(!acquire())
+	            return false;
+
+	        if(!method(launcher, this, c...)) {
+	            channel = nullptr;
+	            return false;
+	        }
+
+	        return true;
+	}
+
 public:
 	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
 
@@ -152,14 +167,18 @@ public:
 
 	template<class Method, class... C>
 	inline bool launch(Method method, C... c) {
-		NormalLauncher launcher(this);
-		return method(&launcher, this, c...);
+        NormalLauncher launcher(this);
+        return launchWithLauncher(&launcher, method, c...);
 	}
 
 	template<class Method, class... C>
-	inline bool launchTimeout(Method method, uintptr_t time, C... c) {
+	inline bool launchTimeout(Method method, uintptr_t time, C... c)
+	{
+        if(!time || time >= (uintptr_t)INTPTR_MAX)
+            return false;
+
 		TimeoutLauncher launcher(this, time);
-		return method(&launcher, this, c...);
+		return launchWithLauncher(&launcher, method, c...);
 	}
 
 	inline void cancel() {
@@ -206,136 +225,56 @@ class Scheduler<Args...>::IoJob::Launcher
 {
 	friend IoJob;
 
-public:
-	typedef void (*Initializer)(IoJob*);
-
 protected:
-	typedef bool (*Worker)(Launcher*, IoChannel*, Callback, Data* data, Initializer init);
+	typedef void (*Worker)(Launcher*, IoChannel*, Callback, Data* data);
+	IoJob* job;
 
 private:
 	Worker worker;
 
 protected:
-	inline Launcher(Worker worker): worker(worker) {}
+	inline Launcher(IoJob* job, Worker worker): job(job), worker(worker) {}
+
+    inline void jobSetup(IoChannel* channel, Callback callback, Data* data) {
+        Registry<IoChannel>::check(channel);
+
+        job->channel = channel;
+        job->finished = callback;
+        data->job = job;
+        job->data = data;
+    }
 
 public:
-	inline bool launch(IoChannel* channel, Callback callback, Data* data, Initializer init = nullptr) {
-		return worker(this, channel, callback, data, init);
+	inline void launch(IoChannel* channel, Callback callback, Data* data) {
+		worker(this, channel, callback, data);
 	}
 };
 
 template<class... Args>
-class Scheduler<Args...>::IoJob::LauncherBase: Launcher
-{
-	friend IoJob;
-
-	IoJob* job;
-
-	inline void commonOverwrite(IoChannel* channel, Callback callback, Data* data) {
-		job->finished = callback;
-		data->job = job;
-		job->data = data;
-    }
-
-	inline void forceOverwrite(IoChannel* channel, Callback callback, Data* data) {
-		job->channel = channel;
-		commonOverwrite(channel, callback, data);
-	}
-
-	inline bool takeOver(IoChannel* channel, Callback callback, Data* data) {
-		if(!job->channel.compareAndSwap(nullptr, channel))
-			return false;
-
-		commonOverwrite(channel, callback, data);
-		return true;
-    }
-
-	inline LauncherBase(IoJob* job, typename Launcher::Worker worker): Launcher(worker), job(job) {}
-};
-
-template<class... Args>
-class Scheduler<Args...>::IoJob::NormalLauncher: LauncherBase
-{
-	friend IoJob;
-
-	static bool submit(
-			Launcher* launcher,
-			IoChannel* channel,
-			Callback callback,
-			Data* data,
-			typename Launcher::Initializer init)
+class Scheduler<Args...>::IoJob::NormalLauncher: public Launcher {
+	static void worker(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
 	{
-		auto self = static_cast<NormalLauncher*>(launcher);
-
-		if(!self->takeOver(channel, callback, data))
-			return false;
-
-		if(init)
-			init(self->job);
-
-		state.eventList.issue(self->job, OverwriteCombiner<IoJob::submitNoTimeoutValue>()); // TODO assert true
-		return true;
+		launcher->jobSetup(channel, callback, data);
+		channel->add(launcher->job);
 	}
 
-	NormalLauncher(IoJob* job): LauncherBase(job, &NormalLauncher::submit) {}
+public:
+	NormalLauncher(IoJob* job): Launcher(job, &NormalLauncher::worker) {}
 };
 
 template<class... Args>
-class Scheduler<Args...>::IoJob::ContinuationLauncher: LauncherBase
-{
-	friend IoJob;
-
-	static bool resubmit(
-			Launcher* launcher,
-			IoChannel* channel,
-			Callback callback,
-			Data* data,
-			typename Launcher::Initializer init)
-	{
-		auto self = static_cast<ContinuationLauncher*>(launcher);
-
-		Registry<IoChannel>::check(channel);
-		self->forceOverwrite(channel, callback, data);
-
-		if(init)
-			init(self->job);
-
-		return channel->add(self->job);
-	}
-
-	ContinuationLauncher(IoJob* job): LauncherBase(job, &ContinuationLauncher::resubmit) {}
-};
-
-template<class... Args>
-class Scheduler<Args...>::IoJob::TimeoutLauncher: LauncherBase
-{
-	friend IoJob;
+class Scheduler<Args...>::IoJob::TimeoutLauncher: public Launcher {
 	uintptr_t time;
 
-	static bool submitTimeout(
-			Launcher* launcher,
-			IoChannel* channel,
-			Callback callback,
-			Data* data,
-			typename Launcher::Initializer init)
+	static void worker(Launcher* launcher, IoChannel* channel, Callback callback, Data* data)
 	{
-		auto self = static_cast<TimeoutLauncher*>(launcher);
-		auto time = self->time;
-
-		if(!time || time >= (uintptr_t)INTPTR_MAX)
-			return false;
-
-		if(!self->takeOver(channel, callback, data))
-			return false;
-
-		if(init)
-			init(self->job);
-
-		state.eventList.issue(self->job, ParamOverwriteCombiner(time)); // TODO assert true
-		return true;
+		auto time = static_cast<TimeoutLauncher*>(launcher)->time;
+        launcher->jobSetup(channel, callback, data);
+        state.eventList.issue(launcher->job, ParamOverwriteCombiner(time)); // TODO assert true
 	}
 
-	TimeoutLauncher(IoJob* job, uintptr_t time): LauncherBase(job, &TimeoutLauncher::submitTimeout), time(time) {}
+public:
+	TimeoutLauncher(IoJob* job, uintptr_t time): Launcher(job, &TimeoutLauncher::worker), time(time) {}
 };
 
 }

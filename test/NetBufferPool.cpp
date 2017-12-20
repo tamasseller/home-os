@@ -56,7 +56,8 @@ TEST_GROUP(NetBufferPool) {
 			self->result = nullptr;
 			self->request.quota = quota;
 			self->request.size = static_cast<uint16_t>(n);
-			return launcher->launch(pool, &GenericPoolJob::writeResult, self);
+			launcher->launch(pool, &GenericPoolJob::writeResult, self);
+			return true;
 		}
 
 	public:

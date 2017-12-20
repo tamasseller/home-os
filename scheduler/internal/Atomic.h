@@ -59,14 +59,22 @@ struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
 		});
 	}
 
-	bool compareAndSwap(Data expected, Data update) {
-		return expected == (*this)([expected, update](Data old, Data& result){
+	bool compareAndSwap(Data expected, Data update)
+	{
+	    bool done = false;
+
+		return expected == (*this)([&done, expected, update](Data old, Data& result){
 			if(old == expected) {
+			    done = true;
 				result = update;
 				return true;
+			} else {
+			    done = false;
+			    return false;
 			}
-			return false;
 		});
+
+		return done;
 	}
 };
 

@@ -33,7 +33,7 @@ public:
 
 	inline Atomic(Value value) {
 		data = value;
-		clrex();
+		clrex();        // TODO is this ok (for example: preempted between write and clrex)?
 	}
 
 	inline operator Value() {

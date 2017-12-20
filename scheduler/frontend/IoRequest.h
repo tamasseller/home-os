@@ -87,10 +87,9 @@ class Scheduler<Args...>::IoRequestCommon:
 	}
 
 protected:
-	class LauncherBase;
-	class NormalLauncher;
-	class ContinuationLauncher;
-	class TimeoutLauncher;
+	class RequestLauncher;
+	class NormalRequestLauncher;
+	class TimeoutRequestLauncher;
 
 public:
 	inline void init() {
@@ -107,129 +106,53 @@ public:
 };
 
 template<class... Args>
-class Scheduler<Args...>::IoRequestCommon::LauncherBase: IoJob::Launcher
+class Scheduler<Args...>::IoRequestCommon::RequestLauncher: public IoJob::Launcher
 {
 	template<class> friend class IoRequest;
 	friend class IoRequestCommon;
 
-	IoJob* job;
 	IoRequestCommon* self;
 	typename IoJob::Callback activator;
 
-	inline void commonOverwrite(IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data) {
+    inline void jobSetup(IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data) {
+        IoJob::Launcher::jobSetup(channel, activator, data);
 		self->hijackedMethod = callback;
-		job->finished = activator;
-		data->job = job;
-		job->data = data;
+	}
+
+	inline RequestLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator, typename IoJob::Launcher::Worker worker):
+		IoJob::Launcher(job, worker), self(self), activator(activator){}
+};
+
+template<class... Args>
+class Scheduler<Args...>::IoRequestCommon::NormalRequestLauncher: public RequestLauncher {
+    static void worker(typename IoJob::Launcher* launcher, IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data)
+    {
+        auto reqLauncher= static_cast<RequestLauncher*>(launcher);
+        reqLauncher->jobSetup(channel, callback, data);
+        channel->add(reqLauncher->job);
     }
 
-	inline void forceOverwrite(IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data) {
-		job->channel = channel;
-		commonOverwrite(channel, callback, data);
-	}
+public:
+    NormalRequestLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator):
+        RequestLauncher(self, job, activator, &NormalRequestLauncher::worker) {}
+};
 
-	inline bool takeOver(IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data) {
-		if(!job->channel.compareAndSwap(nullptr, channel))
-			return false;
+template<class... Args>
+class Scheduler<Args...>::IoRequestCommon::TimeoutRequestLauncher: public RequestLauncher {
+    uintptr_t time;
 
-		commonOverwrite(channel, callback, data);
-		return true;
+    static void worker(typename IoJob::Launcher* launcher, IoChannel* channel, typename IoJob::Callback callback, typename IoJob::Data* data)
+    {
+        auto reqLauncher= static_cast<RequestLauncher*>(launcher);
+        auto time = static_cast<TimeoutRequestLauncher*>(launcher)->time;
+
+        reqLauncher->jobSetup(channel, callback, data);
+        state.eventList.issue(reqLauncher->job, typename IoJob::ParamOverwriteCombiner(time)); // TODO assert true
     }
 
-	inline LauncherBase(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator, typename IoJob::Launcher::Worker worker):
-		IoJob::Launcher(worker),
-		job(job),
-		self(self),
-		activator(activator){}
-};
-
-template<class... Args>
-class Scheduler<Args...>::IoRequestCommon::NormalLauncher: LauncherBase
-{
-	template<class> friend class IoRequest;
-
-	static bool submit(
-			typename IoJob::Launcher* launcher,
-			IoChannel* channel,
-			typename IoJob::Callback callback,
-			typename IoJob::Data* data,
-			typename IoJob::Launcher::Initializer init)
-	{
-		auto self = static_cast<NormalLauncher*>(launcher);
-
-		if(!self->takeOver(channel, callback, data))
-			return false;
-
-		if(init)
-			init(self->job);
-
-		state.eventList.issue(self->job, typename IoJob::template OverwriteCombiner<IoJob::submitNoTimeoutValue>()); // TODO assert true
-		return true;
-	}
-
-	NormalLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator):
-		LauncherBase(self, job, activator, &NormalLauncher::submit) {}
-};
-
-template<class... Args>
-class Scheduler<Args...>::IoRequestCommon::ContinuationLauncher: LauncherBase
-{
-	template<class> friend class IoRequest;
-
-	static bool resubmit(
-			typename IoJob::Launcher* launcher,
-			IoChannel* channel,
-			typename IoJob::Callback callback,
-			typename IoJob::Data* data,
-			typename IoJob::Launcher::Initializer init)
-	{
-		auto self = static_cast<ContinuationLauncher*>(launcher);
-
-		Registry<IoChannel>::check(channel);
-		self->forceOverwrite(channel, callback, data);
-
-		if(init)
-			init(self->job);
-
-		state.eventList.issue(self->job, typename IoJob::template OverwriteCombiner<IoJob::submitNoTimeoutValue>()); // TODO assert true
-		return true;
-	}
-
-	ContinuationLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator):
-		LauncherBase(self, job, activator, &ContinuationLauncher::resubmit) {}
-};
-
-template<class... Args>
-class Scheduler<Args...>::IoRequestCommon::TimeoutLauncher: LauncherBase
-{
-	template<class> friend class IoRequest;
-	uintptr_t time;
-
-	static bool submitTimeout(
-			typename IoJob::Launcher* launcher,
-			IoChannel* channel,
-			typename IoJob::Callback callback,
-			typename IoJob::Data* data,
-			typename IoJob::Launcher::Initializer init)
-	{
-		auto self = static_cast<TimeoutLauncher*>(launcher);
-		auto time = self->time;
-
-		if(!time || time >= (uintptr_t)INTPTR_MAX)
-			return false;
-
-		if(!self->takeOver(channel, callback, data))
-			return false;
-
-		if(init)
-			init(self->job);
-
-		state.eventList.issue(self->job, typename IoJob::ParamOverwriteCombiner(time)); // TODO assert true
-		return true;
-	}
-
-	TimeoutLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator, uintptr_t time):
-		LauncherBase(self, job, activator, &TimeoutLauncher::submitTimeout), time(time) {}
+public:
+    TimeoutRequestLauncher(IoRequestCommon* self, IoJob* job, typename IoJob::Callback activator, uintptr_t time):
+        RequestLauncher(self, job, activator, &TimeoutRequestLauncher::worker), time(time) {}
 };
 
 template<class... Args>
@@ -265,7 +188,7 @@ class Scheduler<Args...>::IoRequest:
 
 	    this->result = IoJob::Result::NotYet;
 
-	    typename IoRequestCommon::ContinuationLauncher launcher(this, this, &IoRequest::activator);
+	    typename IoRequestCommon::NormalRequestLauncher launcher(this, this, &IoRequest::activator);
 
 	    if(!this->hijackedMethod(&launcher, job, result)) {
 	    	this->hijackedMethod = nullptr;
@@ -288,15 +211,18 @@ public:
 	template<class Method, class... C>
 	inline bool launch(Method method, C... c) {
 		auto job = static_cast<IoJob*>(this);
-		typename IoRequestCommon::NormalLauncher launcher(this, job, &IoRequest::activator);
-		return method(&launcher, this, c...);
+		typename IoRequestCommon::NormalRequestLauncher launcher(this, job, &IoRequest::activator);
+        return this->launchWithLauncher(&launcher, method, c...);
 	}
 
 	template<class Method, class... C>
 	inline bool launchTimeout(Method method, uintptr_t time, C... c) {
+        if(!time || time >= (uintptr_t)INTPTR_MAX)
+            return false;
+
 		auto job = static_cast<IoJob*>(this);
-		typename IoRequestCommon::TimeoutLauncher launcher(this, job, &IoRequest::activator, time);
-		return method(&launcher, this, c...);
+		typename IoRequestCommon::TimeoutRequestLauncher launcher(this, job, &IoRequest::activator, time);
+		return this->launchWithLauncher(&launcher, method, c...);
 	}
 };
 

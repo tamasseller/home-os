@@ -40,8 +40,16 @@ public:
         return headerSize;
     }
 
-    inline void requestRxBuffers(uint16_t n) {
-    	this->launch(&Interface::acquireBuffers, n);
+    inline void requestRxBuffers(uint16_t n)
+    {
+        typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
+
+        if(!ret.hasMore()) {
+            this->nBuffersRequested.increment(n);
+            this->launch(&Interface::acquireBuffers, n);
+        } else {
+            this->takeRxBuffers(ret);
+        }
 	}
 
     virtual void takeRxBuffers(typename Pool::Allocator allocator) = 0;
@@ -75,34 +83,21 @@ private:
 
         	self->request.size = n;
         	self->request.quota = Pool::Quota::Rx;
-    		return launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
+    		launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
+    		return true;
     	} else
     		return false;
     }
 
-	static inline void copyBufferAmount(IoJob* item)
-	{
-		auto self = static_cast<Interface*>(item);
-		self->request.size = self->nBuffersRequested.reset();
-		self->request.quota = Pool::Quota::Rx;
-	}
-
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item, uint16_t n)
     {
 		auto self = static_cast<Interface*>(item);
-    	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
 
-    	if(ret.hasMore()) {
-    		self->takeRxBuffers(ret);
-    		return false;
-    	}
+		self->request.size = self->nBuffersRequested.reset();
+        self->request.quota = Pool::Quota::Rx;
 
-    	self->nBuffersRequested.increment(n);
-   		return launcher->launch(
-   				&state.pool,
-   				&Interface::buffersAcquired,
-   				static_cast<typename Pool::IoData*>(self),
-   				Interface::copyBufferAmount);
+   		launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
+   		return true;
     }
 };
 

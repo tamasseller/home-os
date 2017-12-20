@@ -35,11 +35,14 @@ TEST_GROUP(NetArpTable) {
 
 			return false;
 		}
+
 		static bool start(Os::IoJob::Launcher* launcher, Os::IoJob* item, Uut* uut, AddressIp4 addr) {
 			auto self = static_cast<Job*>(item);
 			self->data.ip = addr;
-			return launcher->launch(uut, &Job::done, &self->data);
+			launcher->launch(uut, &Job::done, &self->data);
+			return true;
 		}
+
 	public:
 		constexpr static auto &entry = start;
 

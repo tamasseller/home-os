@@ -32,7 +32,8 @@ struct DummyProcessJobsBase {
 			Job* self = static_cast<Job*>(item);
 			self->success = -1;
 			self->param = &self->count;
-			return launcher->launch(&DummyProcess<Os>::instance, &Job::writeResult, self);
+			launcher->launch(&DummyProcess<Os>::instance, &Job::writeResult, self);
+			return true;
 		}
 
 	public:
@@ -69,7 +70,8 @@ struct DummyProcessJobsBase {
 				x = -1;
 
 			self->param = 0;
-			return launcher->launch(&process, &MultiJob::writeResult, self);
+			launcher->launch(&process, &MultiJob::writeResult, self);
+			return true;
 		}
 
 	public:
@@ -91,7 +93,8 @@ struct DummyProcessJobsBase {
 			auto self = static_cast<SemJob*>(item);
 			self->done = false;
 			self->param = n;
-			return launcher->launch(&SemaphoreProcess<Os>::instance, &SemJob::callback, self);
+			launcher->launch(&SemaphoreProcess<Os>::instance, &SemJob::callback, self);
+			return true;
 		}
 	public:
 		static constexpr auto entry = &SemJob::start;
@@ -106,8 +109,6 @@ struct DummyProcessJobsBase {
 			typename SemaphoreProcess<Os>::Data semData;
 		};
 
-		int paramToSet;
-
 		static bool step2(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result)
 		{
 		    auto self = static_cast<CompositeJob*>(item);
@@ -120,33 +121,27 @@ struct DummyProcessJobsBase {
 			return false;
 		}
 
-		static void init2(typename Os::IoJob* item) {
-			auto self = static_cast<CompositeJob*>(item);
-		    self->stage = 1;
-		    self->dummyData.param = 0;
-		}
 
 		static bool step1(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, typename Os::IoJob::Result result) {
 		    auto self = static_cast<CompositeJob*>(item);
 
-		    launcher->launch(&Process::instance, &CompositeJob::step2, &self->dummyData, &CompositeJob::init2);
+		    self->stage = 1;
+            self->dummyData.param = 0;
+		    launcher->launch(&Process::instance, &CompositeJob::step2, &self->dummyData);
 
 			return true;
-		}
-
-		static void init(typename Os::IoJob* item) {
-			auto self = static_cast<CompositeJob*>(item);
-
-			self->stage = 0;
-			self->timedOut = false;
-			self->semData.param = self->paramToSet;
 		}
 
 		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, int n)
 		{
 			auto self = static_cast<CompositeJob*>(item);
-			self->paramToSet = n;
-			return launcher->launch(&SemaphoreProcess<Os>::instance, &CompositeJob::step1, &self->semData, &CompositeJob::init);
+
+            self->stage = 0;
+            self->timedOut = false;
+            self->semData.param = n;
+
+			launcher->launch(&SemaphoreProcess<Os>::instance, &CompositeJob::step1, &self->semData);
+			return true;
 		}
 
 	public:

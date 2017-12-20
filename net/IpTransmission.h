@@ -195,8 +195,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		packet.stage1.request.size = static_cast<uint16_t>(size);
 		packet.stage1.request.quota = Pool::Quota::Tx;
 
-		return launcher->launch(&state.pool, callback, &packet.stage1)
-				? AsyncResult::Later : AsyncResult::Error;
+		launcher->launch(&state.pool, callback, &packet.stage1);
+        return AsyncResult::Later;
 	}
 
 	static bool allocated(Launcher *launcher, IoJob* item, Result result)
@@ -291,10 +291,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			 * Wait for the required address.
 			 */
 			self->arp.ip = self->dst; // TODO gateway
-			if(launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp))
-				return true;
-
-            self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+			launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp);
+			return true;
 		} else {
             state.routingTable.releaseRoute(self->route);
             self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
@@ -331,10 +329,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			Packet copy = self->packet.stage2;
 			self->packet.stage3.init(copy);
 
-			if(launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3))
-				return true;
-
-	        self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+			launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3);
+		    return true;
 		} else {
             state.routingTable.releaseRoute(route);
             self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
@@ -405,8 +401,7 @@ public:
 			 */
 			auto resolver = route->getDevice()->getResolver();
 			if(!resolver || resolver->resolveAddress(dst, self->arp.mac)) { // TODO gateway
-				addressResolved(launcher, self, Result::Done);
-				return true;
+				return addressResolved(launcher, self, Result::Done);
 			}
 
 			/*
@@ -460,7 +455,8 @@ public:
 				length,
 				headerChecksum.result());
 
-		return launcher->launch(self->device->getSender(), &IpTxJob::sent, &self->packet.stage3);
+		launcher->launch(self->device->getSender(), &IpTxJob::sent, &self->packet.stage3);
+		return true;
 	}
 };
 
@@ -476,13 +472,15 @@ public:
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{
 		check();
-		return this->launch(&IpTxJob::startPreparation, dst, inLineSize, indirectCount);
+		bool later = this->launch(&IpTxJob::startPreparation, dst, inLineSize, indirectCount);
+		return later || this->error == nullptr;
 	}
 
     inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
     {
         check();
-        return this->launchTimeout(&IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
+        bool later = this->launchTimeout(&IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
+        return later || this->error == nullptr;
     }
 
 	inline bool send(uint8_t protocol, uint8_t ttl = 64)
@@ -490,7 +488,8 @@ public:
 		if(!check())
 			return false;
 
-		return this->launch(&IpTxJob::startTransmission, protocol, ttl);
+		bool later = this->launch(&IpTxJob::startTransmission, protocol, ttl);
+        return later || this->error == nullptr;
 	}
 
     inline bool sendTimeout(size_t timeout, uint8_t protocol, uint8_t ttl = 64)
@@ -498,7 +497,8 @@ public:
         if(!check())
             return false;
 
-        return this->launchTimeout(&IpTxJob::startTransmission, timeout, protocol, ttl);
+        bool later = this->launchTimeout(&IpTxJob::startTransmission, timeout, protocol, ttl);
+        return later || this->error == nullptr;
     }
 
 	inline uint16_t fill(const char* data, uint16_t length)
