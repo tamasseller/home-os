@@ -24,7 +24,7 @@ public:
 		virtual void fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 	};
 
-    inline Interface(size_t headerSize, AddressResolver* resolver): headerSize(headerSize), resolver(resolver) {}
+    inline Interface(uint16_t headerSize, AddressResolver* resolver): resolver(resolver), headerSize(headerSize) {}
 
 	inline void ageContent() {}
 
@@ -36,7 +36,7 @@ public:
         return static_cast<typename Os::IoChannel*>(this);
     }
 
-    inline size_t getHeaderSize() {
+    inline uint16_t getHeaderSize() {
         return headerSize;
     }
 
@@ -46,7 +46,7 @@ public:
 
         if(!ret.hasMore()) {
             this->nBuffersRequested.increment(n);
-            this->launch(&Interface::acquireBuffers, n);
+            this->launch(&Interface::acquireBuffers);
         } else {
             this->takeRxBuffers(ret);
         }
@@ -63,9 +63,9 @@ private:
 	using Launcher = typename IoJob::Launcher;
 	using Callback = typename IoJob::Callback;
 
-	size_t headerSize;
 	AddressResolver* const resolver;
     typename Os::template Atomic<uint16_t> nBuffersRequested;
+	uint16_t headerSize;
 
     static inline bool buffersAcquired(Launcher *launcher, IoJob* item, Result result)
     {
@@ -75,21 +75,16 @@ private:
     	self->takeRxBuffers(static_cast<typename Pool::IoData*>(self)->allocator);
 
     	if(uint16_t n = self->nBuffersRequested.reset()) {
-        	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
-        	if(ret.hasMore()) {
-        		self->takeRxBuffers(ret);
-        		return false;
-        	}
-
-        	self->request.size = n;
-        	self->request.quota = Pool::Quota::Rx;
-    		launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
-    		return true;
+        	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Rx>(
+        			launcher,
+        			&Interface::buffersAcquired,
+        			static_cast<typename Pool::IoData*>(self),
+        			n);
     	} else
     		return false;
     }
 
-    static inline bool acquireBuffers(Launcher *launcher, IoJob* item, uint16_t n)
+    static inline bool acquireBuffers(Launcher *launcher, IoJob* item)
     {
 		auto self = static_cast<Interface*>(item);
 

@@ -183,8 +183,32 @@ public:
 template<class S, class... Args>
 class Network<S, Args...>::Packet
 {
-	friend Network<S, Args...>;
+	friend Network<S, Args...>::PacketQueue;
+	friend Network<S, Args...>::PacketProcessor;
+	friend Network<S, Args...>::PacketDisassembler;
 	Block* first;
+
+	template<typename Pool::Quota quota>
+	static void dropRegion(Block *start, Block* limit) {
+        typename Pool::Deallocator deallocator(start);
+
+        for(Block* current = start->getNext(); current != limit;) {
+            Block* next = current->getNext();
+
+            if(current->isIndirect())
+                current->callIndirectDestructor();
+
+            if(current->isEndOfPacket()) {
+            	deallocator.take(current);
+            	break;
+            } else
+            	deallocator.take(current);
+
+            current = next;
+        }
+
+        deallocator.template deallocate<quota>(&state.pool);
+	}
 
 public:
 	void init(Block* first) {
@@ -193,19 +217,7 @@ public:
 
 	template<typename Pool::Quota quota>
 	void dispose() {
-        typename Pool::Deallocator deallocator(first);
-
-        for(Block* current = first->getNext(); current;) {
-            Block* next = current->getNext();
-
-            if(current->isIndirect())
-                current->callIndirectDestructor();
-
-            deallocator.take(current);
-            current = next;
-        }
-
-        deallocator.template deallocate<quota>(&state.pool);
+		dropRegion<quota>(first, nullptr);
 	}
 };
 
@@ -266,6 +278,28 @@ public:
 		current = p.first;
 	}
 
+	class Cursor {
+		friend PacketDisassembler;
+		Block* point;
+	};
+
+	inline Cursor getCursor() {
+		Cursor ret;
+		ret.point = current;
+		return ret;
+	}
+
+	template<typename Pool::Quota quota>
+	inline bool dropFrom(Cursor cursor)
+	{
+		current = current->getNext();
+
+		Packet::template dropRegion<quota>(cursor.point, current);
+
+        return current != nullptr;
+	}
+
+
 	inline bool advance() {
 		if(current->isEndOfPacket())
 			return false;
@@ -274,7 +308,10 @@ public:
 	}
 
 	inline bool moveToNextPacket() {
-		// assert(current->isEndOfPacket());
+		while(!current->isEndOfPacket())
+			if(!moveToNextBlock())
+				return false; // This line is not intended to be reached (LCOV_EXCL_LINE).
+
 		return moveToNextBlock();
 	}
 
@@ -295,7 +332,7 @@ public:
 
 template<class S, class... Args>
 struct Network<S, Args...>::PacketTransmissionRequest: Packet, Os::IoJob::Data {
-	PacketTransmissionRequest 	*next;
+	PacketTransmissionRequest *next;
 
 	void init(const Packet& packet) {
 		*static_cast<Packet*>(this) = packet;

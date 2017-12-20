@@ -17,21 +17,23 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 	template<class T, void (T::*worker)(PacketReader)>
 	struct Wrapper {
 		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
-			Packet packet;
-			packet.init(reinterpret_cast<Block*>(arg));
-			PacketReader reader(packet);
+			PacketReader reader;
+			Packet chain;
+			chain.init(reinterpret_cast<Block*>(arg));
+			reader.init(chain);
 
 			do {
-				(static_cast<T*>(event)->*worker)(reader);
+				(static_cast<T*>(static_cast<PacketProcessor*>(event))->*worker)(reader);
 			} while(reader.moveToNextPacket());
 		}
 	};
 
 protected:
-	inline PacketProcessor(void (*callback)(typename Os::Event*, uintptr_t)): Os::Event(callback) {}
+	typedef void (*Callback)(typename Os::Event*, uintptr_t);
+	inline PacketProcessor(Callback callback): Os::Event(callback) {}
 
 	template<class T, void (T::*worker)(PacketReader)>
-	static constexpr void (*make(typename Os::Event*, uintptr_t)) () {
+	static constexpr Callback make() {
 		return &Wrapper<T, worker>::trampoline;
 	}
 
@@ -43,14 +45,15 @@ public:
 			last = next;
 
 		Os::submitEvent(this, [first, last](uintptr_t old, uintptr_t& result){
-			last->setNext(reinterpret_cast<Block*>(old));
+    		if(!old)
+    			last->terminate();
+			else
+    			last->setNext(reinterpret_cast<Block*>(old));
+
 			result = reinterpret_cast<uintptr_t>(first);
 			return true;
 		});
 	}
 };
-
-template<class S, class... Args>
-class Network<S, Args...>::IpPacketProcessor: PacketProcessor {};
 
 #endif /* PACKETPROCESSOR_H_ */

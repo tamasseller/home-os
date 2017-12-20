@@ -89,6 +89,11 @@ public:
 		return true;
 	}
 
+	inline void skipToEnd() {
+		while(PacketDisassembler::advance());
+		data = limit = nullptr;
+	}
+
 	inline bool atEop() {
 		return !spaceLeft() && this->current->isEndOfPacket();
 	}
@@ -112,7 +117,7 @@ public:
 			uint16_t b2 = static_cast<uint8_t>(*data++);
 			ret = static_cast<uint16_t>(b1 << 8 | b2);
 		} else {
-			copyOut(reinterpret_cast<char*>(&ret), 2);
+			copyOut(reinterpret_cast<char*>(&ret), 2); // TODO handle error
 			ret = correctEndian(ret);
 		}
 
@@ -129,7 +134,7 @@ public:
 			uint32_t b4 = static_cast<uint8_t>(*data++);
 			ret = b1 << 24 | b2 << 16 | b3 << 8 | b4;
 		} else {
-			copyOut(reinterpret_cast<char*>(&ret), 4);
+			copyOut(reinterpret_cast<char*>(&ret), 4);// TODO handle error
 			ret = correctEndian(ret);
 		}
 

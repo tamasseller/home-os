@@ -34,6 +34,20 @@ struct TestTask: Os::Task
 		self->error = self->run();
 	}
 
+	template<class C>
+	static void doIndirect(C c) {
+		struct Event: Os::Event {
+			C c;
+			static void callback(typename Os::Event* x, uintptr_t) {
+				static_cast<Event*>(x)->c();
+			}
+
+			Event(C c): Os::Event(&Event::callback), c(c) {}
+		} event(c);
+
+		Os::submitEvent(&event);
+	}
+
     template<class... Args>
     void start(Args... args) {
         Os::Task::start(&TestTask::runTest, StackPool::get(), testStackSize, static_cast<Child*>(this), args...);

@@ -25,8 +25,9 @@
 namespace home {
 
 template<class... Args>
-inline void Scheduler<Args...>::submitEvent(Event* event) {
-	state.eventList.issue(event);
+template<class Combiner>
+inline void Scheduler<Args...>::submitEvent(Event* event, Combiner&& combiner) {
+	state.eventList.issue(event, combiner);
 }
 
 template<class... Args>

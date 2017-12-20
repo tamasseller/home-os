@@ -175,7 +175,6 @@ public:
 	 */
 	inline Route* findRouteWithSource(Interface* interface, const AddressIp4& src)
 	{
-
 	    auto entry = this->findBest([&src, &interface](Route* route){
             return (route->up &&										// If route is enabled (ie. link is up)
             		(route->dev == interface) &&						// If device matches

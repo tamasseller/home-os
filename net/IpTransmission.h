@@ -171,34 +171,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
         PacketTransmissionRequest stage3;
 	} packet;
 
-	enum class AsyncResult {
-		Done, Later, Error
-	};
-
-	// TODO make size uin16_t
-	inline AsyncResult allocateBuffers(Launcher *launcher, size_t size, Callback callback)
-	{
-		// This branch is not supposed to be taken ( LCOV_EXCL_START ).
-		if(size > UINT16_MAX) {
-			error = NetErrorStrings::allocError;
-			return AsyncResult::Error;
-		}
-		// LCOV_EXCL_STOP
-
-		auto ret = state.pool.template allocateDirect<Pool::Quota::Tx>(size);
-
-		if(ret.hasMore()) {
-			packet.stage1.allocator = ret;
-			return callback(launcher, this, Result::Done) ? AsyncResult::Later: AsyncResult::Done;
-		}
-
-		packet.stage1.request.size = static_cast<uint16_t>(size);
-		packet.stage1.request.quota = Pool::Quota::Tx;
-
-		launcher->launch(&state.pool, callback, &packet.stage1);
-        return AsyncResult::Later;
-	}
-
 	static bool allocated(Launcher *launcher, IoJob* item, Result result)
 	{
 		auto self = static_cast<IpTxJob*>(item);
@@ -241,12 +213,10 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 					/*
 					 * Restart arp query packet generation and sending.
 					 */
-					const auto size = (arpReqSize + route->getDevice()->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
-					AsyncResult ret = self->allocateBuffers(launcher, size, &IpTxJob::arpPacketAllocated);
+					const uint16_t size = bytesToBlocks(arpReqSize + route->getDevice()->getHeaderSize());
 
-					if(ret != AsyncResult::Error)
-						return ret == AsyncResult::Later;
-
+			    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
+			    			launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
 				} else {
 					/*
 					 * Give up if number of retries exhausted.
@@ -259,12 +229,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Allocate buffer for the business packet.
 			 */
-			AsyncResult ret = self->allocateBuffers(launcher, self->nBlocks, &IpTxJob::allocated);
-
-			if(ret != AsyncResult::Error)
-				return ret == AsyncResult::Later;
-
-			self->error = NetErrorStrings::unknown; // Can be reached only due to internal error. (LCOV_EXCL_LINE)
+	    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
+	    			launcher, &IpTxJob::allocated, &self->packet.stage1, self->nBlocks);
 		} else {
             state.routingTable.releaseRoute(self->route);
             self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
@@ -408,13 +374,10 @@ public:
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
 			self->retry = arpRequestRetry;
-			const auto size = (arpReqSize + route->getDevice()->getHeaderSize() + blockMaxPayload - 1) / blockMaxPayload;
-			if(self->allocateBuffers(launcher, size, &IpTxJob::arpPacketAllocated) != AsyncResult::Error)
-				return true;
+			const uint16_t size = bytesToBlocks(arpReqSize + route->getDevice()->getHeaderSize());
 
-			/* LCOV_EXCL_START: Beginning of a block that is not intended to be executed. */
-			self->error = NetErrorStrings::alreadyUsed;
-			/* LCOV_EXCL_STOP: End of the block that is not intended to be executed. */
+	    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
+	    			launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
 		} else
 			self->error = NetErrorStrings::noRoute;
 

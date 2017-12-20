@@ -248,6 +248,10 @@ public:
 	inline void launch(IoChannel* channel, Callback callback, Data* data) {
 		worker(this, channel, callback, data);
 	}
+
+	inline IoJob* getJob() {
+		return job;
+	}
 };
 
 template<class... Args>

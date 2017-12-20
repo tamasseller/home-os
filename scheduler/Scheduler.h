@@ -199,7 +199,8 @@ struct SchedulerOptions {
 
 		static inline void assert(bool, const char*);
 
-		void static submitEvent(Event*);
+		template<class Combiner = typename EventList::DefaultCombiner>
+		static inline void submitEvent(Event*, Combiner&& = Combiner());
 
 		/**
 		 * Get current low resolution time.

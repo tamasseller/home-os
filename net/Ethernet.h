@@ -15,6 +15,7 @@ template<class Driver>
 class Network<S, Args...>::Ethernet:
 	public Os::template IoChannelBase<Ethernet<Driver>, Interface>,
 	public ArpReplyJob,
+	private PacketProcessor,
 	public Driver
 {
     friend class Ethernet::IoChannelBase;
@@ -50,7 +51,7 @@ class Network<S, Args...>::Ethernet:
 
     PacketTransmissionRequest *currentPacket, *nextPacket;
     pet::LinkedList<PacketTransmissionRequest> items;
-    typename Os::template Atomic<Block*> arpRequestQueue;
+    PacketQueue arpRequestQueue;
 
     union {
     	typename Pool::IoData poolParams;
@@ -132,9 +133,29 @@ class Network<S, Args...>::Ethernet:
         this->jobDone(p);
     }
 
-    inline void arpPacketReceived(Packet packet) {
-    	this->putPacketChain(packet);
-		static_cast<ArpReplyJob*>(this)->launch(&acquireBuffers);
+    inline void arpPacketReceived(Packet packet)
+    {
+		PacketStream reader;
+		reader.init(packet);
+		reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize()); // TODO error handling
+		uint16_t hType = reader.read16net();
+		uint16_t pType = reader.read16net();
+		uint8_t hLen = reader.read8();
+		uint8_t pLen = reader.read8();
+
+		if(hType != 1 || hLen != 6 || pType != 0x800 || pLen != 4) {
+			packet.template dispose<Pool::Quota::Rx>();
+		} else {
+			uint16_t opCode = reader.read16net();
+
+			if(opCode == 0x01) {
+		    	this->arpRequestQueue.putPacketChain(packet);
+				static_cast<ArpReplyJob*>(this)->launch(&acquireBuffers);
+			} else if(opCode == 0x0002) {
+				static_cast<PacketProcessor*>(this)->process(packet);
+			} else
+				packet.template dispose<Pool::Quota::Rx>();
+		}
     }
 
     /*
@@ -146,46 +167,38 @@ class Network<S, Args...>::Ethernet:
 	using Launcher = typename IoJob::Launcher;
 	using Callback = typename IoJob::Callback;
 
-    inline void putPacketChain(Block* first, Block *last) {
-    	this->arpRequestQueue([](Block* old, Block*& result, Block* first, Block* last){
-    		if(!old)
-    			last->terminate();
-			else
-    			last->setNext(old);
-			result = first;
-			return true;
-		}, first, last);
-    }
+	inline void processArpReplyPacket(PacketStream reader)
+	{
+		/*
+		 * Save the handle to the first block for later disposal.
+		 */
+		typename PacketDisassembler::Cursor start = reader.getCursor();
 
-    inline void putPacketChain(Packet packet) {
-		Block* first = packet.first, *last = first;
+		/*
+		 * Skip destination ethernet header and initial fields of the ARP payload all the
+		 * way to the sender hardware address, the initial fields are already processed at
+		 * this point and are known to describe an adequate reply message.
+		 */
+		bool skipOk = reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8));
+		Os::assert(skipOk, NetErrorStrings::unknown);
 
-		while(Block* next = last->getNext())
-			last = next;
+		AddressEthernet replyMac;
+		bool macReadOk = reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6;
+		Os::assert(macReadOk, NetErrorStrings::unknown);
 
-		this->putPacketChain(first, last);
-    }
+		AddressIp4 replyIp;
+		replyIp.addr = reader.read32net(); // TODO handle error
 
-    inline bool takePacketFromQueue(Packet &ret) {
-    	if(Block* first = this->arpRequestQueue.reset()) {
-    		ret.init(first);
+		/*
+		 * Move reader to the end, then dispose of the reply packet.
+		 */
+//		reader.skipToEnd();
+//		reader.template dropFrom<Pool::Quota::Rx>(start);
 
-    		while(!first->isEndOfPacket()) {
-    			first = first->getNext();
-    			Os::assert(first, NetErrorStrings::unknown);
-    		}
-
-    		if(Block* next = first->getNext()) {
-    			Packet remaining;
-    			remaining.init(next);
-    			this->putPacketChain(remaining);
-    		}
-
-    		first->terminate();
-    		return true;
-    	}
-
-    	return false;
+		/*
+		 * Notify the ARP table about the resolved address.
+		 */
+		resolver.handleResolved(replyIp, replyMac, arpTimeout);
 	}
 
     static inline bool replySent(Launcher *launcher, IoJob* item, Result result)
@@ -195,7 +208,7 @@ class Network<S, Args...>::Ethernet:
     	auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
     	self->txReq.template dispose<Pool::Quota::Tx>();
 
-    	if(self->arpRequestQueue) {
+    	if(!self->arpRequestQueue.isEmpty()) {
     		acquireBuffers(launcher, item);
     		return true;
     	}
@@ -205,120 +218,133 @@ class Network<S, Args...>::Ethernet:
 
 	static inline bool buffersAcquired(Launcher *launcher, IoJob* item, Result result)
 	{
+		bool ret = false;
 		Os::assert(result == Result::Done, NetErrorStrings::unknown);
 
 		auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
 		TxPacketBuilder builder;
-		PacketStream reader;
 
 		builder.init(self->poolParams.allocator);
 
 		Packet requestPacket;
-		bool takeOk = self->takePacketFromQueue(requestPacket);
-		Os::assert(takeOk, NetErrorStrings::unknown);
-		reader.init(requestPacket);
+		while(self->arpRequestQueue.takePacketFromQueue(requestPacket)) {
+			PacketStream reader;
+			reader.init(requestPacket);
 
-		/*
-		 * Skip destination address of request (broadcast).
-		 */
-		bool skipOk = reader.skipAhead(6);
-		Os::assert(skipOk, NetErrorStrings::unknown);
+			/*
+			 * Skip destination ethernet header and initial fields of the ARP payload all the
+			 * way to the sender hardware address, the initial fields are already processed at
+			 * this point and are known to describe an adequate request.
+			 */
+			bool skipOk = reader.skipAhead(static_cast<uint16_t>(self->getHeaderSize() + 8));
+			Os::assert(skipOk, NetErrorStrings::unknown);
 
-		/*
-		 * Copy the source address of request (the destination of the reply).
-		 */
-		char requesterMac[6];
-		bool dstReadOk = reader.copyOut(requesterMac, 6) == 6;
-		Os::assert(dstReadOk, NetErrorStrings::unknown);
+			/*
+			 * Save the source address of the request for later use as the destination of the reply.
+			 */
+			AddressEthernet requesterMac;
+			bool dstReadOk = reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6;
+			Os::assert(dstReadOk, NetErrorStrings::unknown);
 
-		bool dstWriteOk = builder.copyIn(requesterMac, 6) == 6;
-		Os::assert(dstWriteOk, NetErrorStrings::unknown);
+			/*
+			 * Read sender IP address.
+			 */
+			char requesterIp[4];
+			bool dstIpReadOk = reader.copyOut(requesterIp, 4) == 4;
+			Os::assert(dstIpReadOk, NetErrorStrings::unknown);
 
-		/*
-		 * Write source address (the MAC of the interface).
-		 */
-		bool srcWriteOk = builder.copyIn(reinterpret_cast<const char*>(self->resolver.getAddress().bytes), 6) == 6;
-		Os::assert(srcWriteOk, NetErrorStrings::unknown);
+			bool skip2Ok = reader.skipAhead(static_cast<uint16_t>(6));
+			Os::assert(skip2Ok, NetErrorStrings::unknown);
 
-		/*
-		 * Write the boilerplate
-		 */
-		static constexpr const char replyBoilerplate[] = {
-			0x08, 0x06,	// Ethertype
-			0x00, 0x01, // hwType
-			0x08, 0x00, // protoType
-			0x06,		// hSize
-			0x04, 		// pSize
-			0x00, 0x02	// opCode
-		};
+			/*
+			 * Read sender IP address.
+			 */
+			AddressIp4 queriedIp;
+			queriedIp.addr = reader.read32net(); // TODO error handling
 
-		bool boilerplateOk = builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate);
-		Os::assert(boilerplateOk, NetErrorStrings::unknown);
+			/*
+			 * Check if the requested
+			 */
+			Route* route = state.routingTable.findRouteWithSource(self, queriedIp);
+			if(!route) {
+				requestPacket.template dispose<Pool::Quota::Rx>();
+				continue;
+			} else
+				state.routingTable.releaseRoute(route);
 
-		/*
-		 * Write source address again.
-		 */
-		bool srcWriteAgainOk = builder.copyIn(reinterpret_cast<const char*>(self->resolver.getAddress().bytes), 6) == 6;
-		Os::assert(srcWriteAgainOk, NetErrorStrings::unknown);
+			/*
+			 * Fill ethernet header with the requester as the destination and write the ARP boilerplate.
+			 */
+			self->resolver.fillHeader(builder, requesterMac, 0x0806);
 
-		/*
-		 * Write source IP address.
-		 */
-		AddressIp4 src = AddressIp4::make(0x0a, 0x0a, 0x0a, 0x0a);
-		bool srcIpWriteOk = builder.write32net(src.addr);
-		Os::assert(srcIpWriteOk, NetErrorStrings::unknown);
+			static constexpr const char replyBoilerplate[] = {
+				0x00, 0x01, // hwType
+				0x08, 0x00, // protoType
+				0x06,		// hSize
+				0x04, 		// pSize
+				0x00, 0x02	// opCode
+			};
 
-		/*
-		 * Write destination address again.
-		 */
-		bool dstWriteAgainOk = builder.copyIn(requesterMac, 6) == 6;
-		Os::assert(dstWriteAgainOk, NetErrorStrings::unknown);
+			bool boilerplateOk = builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate);
+			Os::assert(boilerplateOk, NetErrorStrings::unknown);
 
-		/*
-		 * Skip middle of the packet all the way to the sender IP then read it.
-		 */
-		bool skipMiddleOk = reader.skipAhead(16);
-		Os::assert(skipMiddleOk, NetErrorStrings::unknown);
+			/*
+			 * Write source address again.
+			 */
+			bool srcWriteAgainOk = builder.copyIn(reinterpret_cast<const char*>(self->resolver.getAddress().bytes), 6) == 6;
+			Os::assert(srcWriteAgainOk, NetErrorStrings::unknown);
 
-		char requesterIp[4];
-		bool dstIpReadOk = reader.copyOut(requesterIp, 4) == 4;
-		Os::assert(dstIpReadOk, NetErrorStrings::unknown);
+			/*
+			 * Write source IP address.
+			 */
+			bool srcIpWriteOk = builder.write32net(queriedIp.addr);
+			Os::assert(srcIpWriteOk, NetErrorStrings::unknown);
 
-		/*
-		 * Write destination IP address.
-		 */
-		bool dstIpWriteOk = builder.copyIn(requesterIp, 4) == 4;
-		Os::assert(dstIpWriteOk, NetErrorStrings::unknown);
+			/*
+			 * Write destination address again.
+			 */
+			bool dstWriteAgainOk = builder.copyIn(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6;
+			Os::assert(dstWriteAgainOk, NetErrorStrings::unknown);
 
-		builder.done();
-		self->txReq.init(builder);
+			/*
+			 * Write destination IP address.
+			 */
+			bool dstIpWriteOk = builder.copyIn(requesterIp, 4) == 4;
+			Os::assert(dstIpWriteOk, NetErrorStrings::unknown);
 
-		launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
+			requestPacket.template dispose<Pool::Quota::Rx>();
+			ret = true;
+			break;
+		}
+
+		if(ret) {
+			builder.done();
+			self->txReq.init(builder);
+			launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
+		} else {
+			builder.done();
+			builder.template dispose<Pool::Quota::Tx>();
+		}
+
 		return true;
 	}
 
-	static constexpr uint16_t arpReplySize = 28;
-	static constexpr uint16_t arpPacketBufferCount = (arpReplySize + /* + TODO l2 header + */ + blockMaxPayload - 1) / blockMaxPayload;
-
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item)
     {
-		auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
+    	static constexpr uint16_t arpReplySize = 28;
+    	static constexpr uint16_t bufferCount = (arpReplySize + /* + TODO l2 header + */ + blockMaxPayload - 1) / blockMaxPayload;
 
-    	typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(arpPacketBufferCount);
-
-    	if(ret.hasMore()) {
-            self->poolParams.allocator = ret;
-    	    return buffersAcquired(launcher, item, Result::Done);
-    	} else {
-            self->poolParams.request.size = arpPacketBufferCount;
-            self->poolParams.request.quota = Pool::Quota::Tx;
-            launcher->launch(&state.pool, &Ethernet::buffersAcquired, &self->poolParams);
-            return true;
-    	}
+    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
+    			launcher,
+    			&Ethernet::buffersAcquired,
+    			&static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item))->poolParams,
+    			bufferCount);
     }
 
 public:
-    inline Ethernet(): Ethernet::IoChannelBase(14, &resolver) {}
+    inline Ethernet():
+    	Ethernet::IoChannelBase((uint16_t)14, &resolver),
+    	PacketProcessor(PacketProcessor::template make<Ethernet, &Ethernet::processArpReplyPacket>()) {}
 
     decltype(resolver) *getArpCache() {
         return &resolver;

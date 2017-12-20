@@ -266,6 +266,26 @@ public:
 		return ret;
 	}
 
+	template<Quota quota>
+	inline bool allocateDirectOrDeferred(
+			typename Os::IoJob::Launcher *launcher,
+			typename Os::IoJob::Callback callback,
+			IoData* data,
+			uint16_t size)
+	{
+		auto ret = allocateDirect<quota>(size);
+
+		if(ret.hasMore()) {
+			data->allocator = ret;
+			return callback(launcher, launcher->getJob(), Os::IoJob::Result::Done);
+		} else {
+			data->request.size = size;
+			data->request.quota = quota;
+            launcher->launch(this, callback, data);
+            return true;
+		}
+	}
+
 	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
 

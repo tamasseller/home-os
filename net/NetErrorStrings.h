@@ -29,7 +29,6 @@ struct NetErrorStrings {
 	 */
 	static constexpr const char* unknown = "Shit happens";
 	static constexpr const char* allocError = "Too many buffer blocks requested";
-	static constexpr const char* alreadyUsed = "The asynchronous control block is still being used";
 	static constexpr const char* noRoute = "There is no known route leading to the specified network";
 	static constexpr const char* unresolved = "The destination address could not be resolved (ARP)";
 	static constexpr const char* genericTimeout = "Timeout occurred during communication";

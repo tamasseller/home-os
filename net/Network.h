@@ -22,6 +22,7 @@
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
 	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
+	PET_CONFIG_VALUE(ArpCacheTimeout, size_t);
 	PET_CONFIG_VALUE(BufferSize, size_t);
 	PET_CONFIG_VALUE(BufferCount, size_t);
 	PET_CONFIG_VALUE(TxBufferLimit, size_t);
@@ -48,6 +49,7 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
+		PET_EXTRACT_VALUE(arpTimeout, ArpCacheTimeout, 60, Options);
 		PET_EXTRACT_VALUE(txBufferLimit, TxBufferLimit, bufferCount * 75 / 100, Options);
 		PET_EXTRACT_VALUE(rxBufferLimit, RxBufferLimit, bufferCount * 75 / 100, Options);
 
@@ -62,8 +64,10 @@ struct NetworkOptions {
 
 	public:
 		class Interface;
+		class Packet;
 		class PacketStream;
 		class PacketAssembler;
+		class PacketDisassembler;
 		typedef Scheduler Os;
 
 	private:
@@ -72,8 +76,7 @@ struct NetworkOptions {
 
 		struct Chunk;
 		class Block;
-		class Packet;
-		class PacketDisassembler;
+		class PacketQueue;
 		template <class> class PacketWriterBase;
 		class PacketTransmissionRequest;
 
@@ -120,6 +123,8 @@ struct NetworkOptions {
 				uint16_t length,
 				uint16_t headerChecksum);
 
+		inline static constexpr uint16_t bytesToBlocks(size_t);
+
 	public:
 		static constexpr auto blockMaxPayload = Block::dataSize;
 		typedef typename Pool::Storage Buffers;
@@ -164,13 +169,19 @@ inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sle
 	static_cast<Ager*>(sleeper)->age();
 }
 
+template<class S, class... Args>
+inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
+	return static_cast<uint16_t>((bytes + blockMaxPayload - 1) / blockMaxPayload);
+}
+
 #include "Packet.h"
-#include "PacketProcessor.h"
-#include "PacketBuilder.h"
-#include "PacketStream.h"
 #include "Endian.h"
 #include "Ethernet.h"
 #include "Interfaces.h"
+#include "PacketQueue.h"
+#include "PacketStream.h"
+#include "PacketBuilder.h"
 #include "IpTransmission.h"
+#include "PacketProcessor.h"
 
 #endif /* NETWORK_H_ */

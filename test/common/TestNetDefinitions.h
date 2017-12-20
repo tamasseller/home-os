@@ -17,21 +17,21 @@ template<class Net, uint16_t blockMaxPayload>
 struct DummyIf {
     static constexpr size_t arpCacheEntries = 8;
 	static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
-	static constexpr auto mtu = 100u;
-	static constexpr auto nRxBlocks = (mtu + blockMaxPayload - 1) / blockMaxPayload;
+	static constexpr auto nRxBlocks = 4;
 
-	static bool enabled, delayed;
+	static bool txEnabled, txDelayed;
 	static size_t dummyPrefixSize;
 	static char* rxTable[nRxBlocks];
 	static int rxWriteIdx, rxReadIdx;
 
 	inline static void disableTxIrq() {
-		enabled = false;
+		txEnabled = false;
 	}
 
 	inline static void init() {
 		dummyPrefixSize = 0;
-		enabled = delayed = false;
+		txEnabled = txDelayed = false;
+		rxWriteIdx = rxReadIdx = 0;
 		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nRxBlocks);
 	}
 
@@ -57,9 +57,12 @@ struct DummyIf {
 	}
 
 	template<class... C>
-	static inline void receive(C... c) {
+	static inline bool receive(C... c) {
 		const uint8_t input[] = {static_cast<uint8_t>(c)...}, *p = input;
 		uint16_t length = sizeof...(C), run;
+
+		if((rxWriteIdx - rxReadIdx) == 1)
+			return false;
 
 		typename Net::PacketAssembler assembler;
 		char* chunk = receiveSome(p, length, run);
@@ -73,13 +76,14 @@ struct DummyIf {
 		}
 
 		assembler.done();
+		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nBlocksConsumed);
 
 		if(!input[13]) /* 13: second byte of ethertype */
 			Net::template getEthernetInterface<DummyIf>()->ipPacketReceived(assembler);
 		else
 			Net::template getEthernetInterface<DummyIf>()->arpPacketReceived(assembler);
 
-		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nBlocksConsumed);
+		return true;
 	}
 
 	template<class... C>
@@ -118,14 +122,14 @@ struct DummyIf {
 	}
 
 	static inline void enableTxIrq() {
-		enabled = true;
-		if(!delayed)
+		txEnabled = true;
+		if(!txDelayed)
 			processPackets();
 	}
 
 	static inline void setDelayed(bool x) {
-		delayed = x;
-		if(!delayed && enabled)
+		txDelayed = x;
+		if(!txDelayed && txEnabled)
 			processPackets();
 	}
 
@@ -144,10 +148,10 @@ template<class Net, uint16_t n>
 constexpr AddressEthernet DummyIf<Net, n>::ethernetAddress;
 
 template<class Net, uint16_t n>
-bool DummyIf<Net, n>::enabled;
+bool DummyIf<Net, n>::txEnabled;
 
 template<class Net, uint16_t n>
-bool DummyIf<Net, n>::delayed;
+bool DummyIf<Net, n>::txDelayed;
 
 template<class Net, uint16_t n>
 size_t DummyIf<Net, n>::dummyPrefixSize = 0;
@@ -189,7 +193,7 @@ struct NetworkTestAccessor: Net {
 	using Net::TxPacketBuilder;
 	using Net::RxPacketBuilder;
 
-	static void overrideHeaderSize(typename Net::Interface* interface, size_t headerSize) {
+	static void overrideHeaderSize(typename Net::Interface* interface, uint16_t headerSize) {
 		interface->headerSize = headerSize;
 	}
 };

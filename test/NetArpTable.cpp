@@ -52,41 +52,6 @@ TEST_GROUP(NetArpTable) {
 		bool timedOut = false;
 		bool canceled = false;
 	};
-
-	class AddEvent: public Os::Event {
-		Uut& uut;
-		AddressIp4 ip;
-		AddressEthernet mac;
-
-		static void work(Os::Event* event, uintptr_t arg) {
-			auto self = static_cast<AddEvent*>(event);
-			self->uut.handleResolved(self->ip, self->mac, 100);
-		}
-	public:
-
-		AddEvent(Uut& uut, const AddressIp4 ip, const AddressEthernet mac):
-			Os::Event(work), uut(uut), ip(ip), mac(mac) {}
-
-		void send() {
-			Os::submitEvent(this);
-		}
-	};
-
-	class AgeEvent: public Os::Event {
-		Uut& uut;
-
-		static void work(Os::Event* event, uintptr_t arg) {
-			auto self = static_cast<AgeEvent*>(event);
-			self->uut.ageContent();
-		}
-
-	public:
-		AgeEvent(Uut& uut): Os::Event(work), uut(uut) {}
-
-		void send() {
-			Os::submitEvent(this);
-		}
-	};
 };
 
 TEST(NetArpTable, DirectNotPresent) {
@@ -234,8 +199,12 @@ TEST(NetArpTable, DirectAlreadyAddedViaEvent) {
 
 			AddressEthernet result = AddressEthernet::make(5, 6, 7, 8, 9, 10);
 
-			AddEvent e(uut, AddressIp4::make(1, 2, 3, 4), AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'));
-			e.send();
+			doIndirect([this](){
+				uut.handleResolved(
+						AddressIp4::make(1, 2, 3, 4),
+						AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'),
+						100);
+			});
 
 			if(!uut.lookUp(AddressIp4::make(1, 2, 3, 4), result)) return bad;
 
@@ -267,8 +236,9 @@ TEST(NetArpTable, DirectEntryAgeOut) {
 				if(!uut.lookUp(AddressIp4::make(1, 2, 3, 4), result)) return bad;
 				if(result != AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r')) return bad;
 
-				AgeEvent a(uut);
-				a.send();
+				doIndirect([this](){
+					uut.ageContent();
+				});
 			}
 
 			AddressEthernet result = AddressEthernet::make(5, 6, 7, 8, 9, 10);
@@ -322,8 +292,12 @@ TEST(NetArpTable, JobAlreadyAddedViaEvent) {
 		bool run() {
 			uut.init();
 
-			AddEvent e(uut, AddressIp4::make(1, 2, 3, 4), AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'));
-			e.send();
+			doIndirect([this](){
+				uut.handleResolved(
+						AddressIp4::make(1, 2, 3, 4),
+						AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'),
+						100);
+			});
 
 			Job job;
 			job.launch(Job::entry, &uut, AddressIp4::make(1, 2, 3, 4));
@@ -355,8 +329,12 @@ TEST(NetArpTable, JobAddedLaterViaEvent) {
 
 			if(job.isDone) return bad;
 
-			AddEvent e(uut, AddressIp4::make(1, 2, 3, 4), AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'));
-			e.send();
+			doIndirect([this](){
+				uut.handleResolved(
+						AddressIp4::make(1, 2, 3, 4),
+						AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'),
+						100);
+			});
 
 			if(!job.isDone) return bad;
 			if(job.data.mac != AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r')) return bad;
@@ -385,13 +363,18 @@ TEST(NetArpTable, JobAgedAddedLaterViaEvent) {
 
 			if(job.isDone) return bad;
 
-			AgeEvent a(uut);
-			a.send();
+			doIndirect([this](){
+				uut.ageContent();
+			});
 
 			if(job.isDone) return bad;
 
-			AddEvent e(uut, AddressIp4::make(1, 2, 3, 4), AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'));
-			e.send();
+			doIndirect([this](){
+				uut.handleResolved(
+						AddressIp4::make(1, 2, 3, 4),
+						AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'),
+						100);
+			});
 
 			if(!job.isDone) return bad;
 			if(job.data.mac != AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r')) return bad;
@@ -420,13 +403,15 @@ TEST(NetArpTable, JobAgedToTimeout) {
 
 			if(job.isDone) return bad;
 
-			AgeEvent a(uut);
-			a.send();
+			doIndirect([this](){
+				uut.ageContent();
+			});
 
 			if(job.isDone) return bad;
 
-			AgeEvent b(uut);
-			b.send();
+			doIndirect([this](){
+				uut.ageContent();
+			});
 
 			if(!job.isDone) return bad;
 			if(job.data.mac != AddressEthernet::make(0, 0, 0, 0, 0, 0)) return bad;
@@ -455,8 +440,9 @@ TEST(NetArpTable, JobAgedCanceledResolved) {
 
 			if(job.isDone) return bad;
 
-			AgeEvent a(uut);
-			a.send();
+			doIndirect([this](){
+				uut.ageContent();
+			});
 
 			if(job.isDone) return bad;
 
@@ -464,8 +450,12 @@ TEST(NetArpTable, JobAgedCanceledResolved) {
 
 			if(!job.canceled) return bad;
 
-			AddEvent e(uut, AddressIp4::make(1, 2, 3, 4), AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'));
-			e.send();
+			doIndirect([this](){
+				uut.handleResolved(
+						AddressIp4::make(1, 2, 3, 4),
+						AddressEthernet::make('f', 'o', 'o', 'b', 'a', 'r'),
+						100);
+			});
 
 			if(job.isDone) return bad;
 			if(job.data.ip != AddressIp4::make(1, 2, 3, 4)) return bad;

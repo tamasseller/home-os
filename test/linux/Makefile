@@ -68,10 +68,10 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 
 endif
-SOURCES += $(ROOT)/test/NetArp.cpp
-SOURCES += $(ROOT)/test/NetIcmp.cpp
+SOURCES += $(ROOT)/test/NetArpTrx.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetRouting.cpp
+SOURCES += $(ROOT)/test/NetArpTable.cpp
 SOURCES += $(ROOT)/test/NetChecksum.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp

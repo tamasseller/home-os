@@ -131,7 +131,7 @@ TEST_GROUP(NetIpTransmitter) {
                 work<true, false>(task);
             }
 
-            static inline void runResolved() {
+            static inline void runResolvedByHand() {
                 struct Task: public TestTask<Task> {
                     bool run() {
                         typename Net::IpTransmitter tx;
@@ -150,6 +150,57 @@ TEST_GROUP(NetIpTransmitter) {
                                 AddressEthernet::make(0x00, 0xAC, 0xCE, 0x55, 0x1B, 0x1E),
                                 32768
                         );
+
+                        tx.wait();
+
+                        if(tx.getError())
+                            return Task::bad;
+
+                        if(tx.fill("foobar", 6) != 6)
+                            return Task::bad;
+
+                        expectIp();
+
+                        if(!tx.send(254))
+                            return Task::bad;
+
+                        tx.wait();
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, false>(task);
+            }
+
+            static inline void runResolvedByRx() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter tx;
+                        tx.init();
+
+                        expectArpReq(1);
+
+                        if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
+                            return Task::bad;
+
+                        if(!tx.isOccupied())
+                            return Task::bad;
+
+                        /*
+                         * Multiple identical replies to increase code coverage.
+                         */
+                        Task::doIndirect([](){
+                        	for(int i=0; i<3; i++) {
+								Net::template getEthernetInterface<DummyIf>()->receive(
+									/*            dst                 |                src                | etherType */
+									0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+									/* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+									0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e,
+									/*      sender IP     |          target MAC               |       target IP       */
+									0x0a, 0x0a, 0x0a, 0x01, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x0a, 0x0a, 0x0a, 0x0a
+								);
+                        	}
+                        });
 
                         tx.wait();
 
@@ -444,14 +495,14 @@ TEST_GROUP(NetIpTransmitter) {
                     	typename Net::IpTransmitter tx;
                     	tx.init();
 
-                    	size_t sizes[4] = {
+                    	uint16_t sizes[4] = {
                     			tx.blockMaxPayload - 1,
                     			tx.blockMaxPayload + 1,
                     			2 * tx.blockMaxPayload - 1,
                     			2 * tx.blockMaxPayload + 1
                     	};
 
-                    	for(size_t headerSize: sizes) {
+                    	for(uint16_t headerSize: sizes) {
                     		Accessor::overrideHeaderSize(Net::template getEthernetInterface<DummyIf>(), headerSize);
                     		Net::template getEthernetInterface<DummyIf>()->setFillSize(headerSize);
 
@@ -665,8 +716,12 @@ TEST(NetIpTransmitter, Unresolved##x) {                     \
     TxTests<Net##x>::runUnresolved();                       \
 }                                                           \
                                                             \
-TEST(NetIpTransmitter, Resolved##x) {                       \
-    TxTests<Net##x>::runResolved();                         \
+TEST(NetIpTransmitter, ResolvedByHand##x) {                 \
+    TxTests<Net##x>::runResolvedByHand();                   \
+}														    \
+															\
+TEST(NetIpTransmitter, ResolvedByRx##x) {                   \
+	TxTests<Net##x>::runResolvedByRx();                     \
 }														    \
 															\
 TEST(NetIpTransmitter, Prefetch##x) {                       \
