@@ -8,6 +8,7 @@
 #include "common/TestNetDefinitions.h"
 
 using Net = Net64;
+using Accessor = NetworkTestAccessor<Net>;
 
 TEST_GROUP(NetIcmpArp) {
 
@@ -51,6 +52,8 @@ TEST_GROUP(NetIcmpArp) {
 TEST(NetIcmpArp, ArpRequestSimple) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
         	expectReply(1);
 
         	doIndirect([](){
@@ -66,6 +69,8 @@ TEST(NetIcmpArp, ArpRequestSimple) {
 
         	Net::Os::sleep(1);
 
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
         	return ok;
         }
     } task;
@@ -76,6 +81,8 @@ TEST(NetIcmpArp, ArpRequestSimple) {
 TEST(NetIcmpArp, ArpRequestTriple) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
         	expectReply(3);
 
         	doIndirect([](){
@@ -93,7 +100,9 @@ TEST(NetIcmpArp, ArpRequestTriple) {
 
         	Net::Os::sleep(1);
 
-        	return ok;
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
         }
     } task;
 
@@ -103,6 +112,7 @@ TEST(NetIcmpArp, ArpRequestTriple) {
 TEST(NetIcmpArp, ArpRequestOverflow) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
 
         	doIndirect([](){
         		int16_t n = 0;
@@ -138,7 +148,9 @@ TEST(NetIcmpArp, ArpRequestOverflow) {
 				0x0a, 0x0a, 0x0a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x0a
 			);
 
-        	return ok;
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
         }
     } task;
 
@@ -148,6 +160,8 @@ TEST(NetIcmpArp, ArpRequestOverflow) {
 TEST(NetIcmpArp, ArpRequestWithJunk) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
         	expectReply(1);
 
         	Net::template getEthernetInterface<DummyIf>()->receive(
@@ -165,7 +179,9 @@ TEST(NetIcmpArp, ArpRequestWithJunk) {
 
         	Net::Os::sleep(1);
 
-        	return ok;
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
         }
     } task;
 
@@ -175,6 +191,8 @@ TEST(NetIcmpArp, ArpRequestWithJunk) {
 TEST(NetIcmpArp, ArpRequestNotForUs) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
         	Net::template getEthernetInterface<DummyIf>()->receive(
 				/*            dst                 |                src                | etherType */
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -186,7 +204,9 @@ TEST(NetIcmpArp, ArpRequestNotForUs) {
 
         	Net::Os::sleep(1);
 
-        	return ok;
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
         }
     } task;
 
@@ -196,6 +216,8 @@ TEST(NetIcmpArp, ArpRequestNotForUs) {
 TEST(NetIcmpArp, ArpRequestInvalid) {
     struct Task: public TestTask<Task> {
         bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
 			Net::template getEthernetInterface<DummyIf>()->receive(
 				/*            dst                 |                src                | etherType */
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -216,7 +238,9 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
 
         	Net::Os::sleep(1);
 
-        	return ok;
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
         }
     } task;
 

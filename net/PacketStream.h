@@ -89,10 +89,15 @@ public:
 		return true;
 	}
 
-	inline void skipToEnd() {
-		while(PacketDisassembler::advance());
-		data = limit = nullptr;
-	}
+    inline bool cutCurrentAndMoveToNext() {
+        if(!PacketDisassembler::cutCurrentAndMoveToNext())
+            return false;
+
+        data = this->current->getData();
+        limit = data + this->current->getSize();
+        return true;
+    }
+
 
 	inline bool atEop() {
 		return !spaceLeft() && this->current->isEndOfPacket();

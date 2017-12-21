@@ -175,6 +175,8 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runResolvedByRx() {
                 struct Task: public TestTask<Task> {
                     bool run() {
+                        auto initialRxUsage = Accessor::pool.statRxUsed();
+
                         typename Net::IpTransmitter tx;
                         tx.init();
 
@@ -216,6 +218,10 @@ TEST_GROUP(NetIpTransmitter) {
                             return Task::bad;
 
                         tx.wait();
+
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
+                        if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
                         return Task::ok;
                     }
                 } task;

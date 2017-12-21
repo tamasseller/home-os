@@ -58,7 +58,6 @@ class Network<S, Args...>::Ethernet:
     	PacketTransmissionRequest txReq;
     };
 
-
     inline void init() {
         Ethernet::IoChannelBase::init();
         resolver.init();
@@ -167,38 +166,46 @@ class Network<S, Args...>::Ethernet:
 	using Launcher = typename IoJob::Launcher;
 	using Callback = typename IoJob::Callback;
 
-	inline void processArpReplyPacket(PacketStream reader)
+	inline void processArpReplyPacket(Packet chain)
 	{
-		/*
-		 * Save the handle to the first block for later disposal.
-		 */
-		typename PacketDisassembler::Cursor start = reader.getCursor();
+	    PacketStream reader;
+	    reader.init(chain);
 
-		/*
-		 * Skip destination ethernet header and initial fields of the ARP payload all the
-		 * way to the sender hardware address, the initial fields are already processed at
-		 * this point and are known to describe an adequate reply message.
-		 */
-		bool skipOk = reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8));
-		Os::assert(skipOk, NetErrorStrings::unknown);
+	    while(true) {
+	        /*
+	         * Save the handle to the first block for later disposal.
+	         */
 
-		AddressEthernet replyMac;
-		bool macReadOk = reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6;
-		Os::assert(macReadOk, NetErrorStrings::unknown);
+            Packet start = reader.asPacket();
 
-		AddressIp4 replyIp;
-		replyIp.addr = reader.read32net(); // TODO handle error
+            /*
+             * Skip destination ethernet header and initial fields of the ARP payload all the
+             * way to the sender hardware address, the initial fields are already processed at
+             * this point and are known to describe an adequate reply message.
+             */
+            bool skipOk = reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8));
+            Os::assert(skipOk, NetErrorStrings::unknown);
 
-		/*
-		 * Move reader to the end, then dispose of the reply packet.
-		 */
-//		reader.skipToEnd();
-//		reader.template dropFrom<Pool::Quota::Rx>(start);
+            AddressEthernet replyMac;
+            bool macReadOk = reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6;
+            Os::assert(macReadOk, NetErrorStrings::unknown);
 
-		/*
-		 * Notify the ARP table about the resolved address.
-		 */
-		resolver.handleResolved(replyIp, replyMac, arpTimeout);
+            AddressIp4 replyIp;
+            replyIp.addr = reader.read32net(); // TODO handle error
+
+            /*
+             * Notify the ARP table about the resolved address.
+             */
+            resolver.handleResolved(replyIp, replyMac, arpTimeout);
+
+            /*
+             * Move reader to the end, then dispose of the reply packet.
+             */
+            bool hasMore = reader.cutCurrentAndMoveToNext();
+            start.template dispose<Pool::Quota::Rx>();
+            if(!hasMore)
+                break;
+	    }
 	}
 
     static inline bool replySent(Launcher *launcher, IoJob* item, Result result)

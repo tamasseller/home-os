@@ -188,28 +188,6 @@ class Network<S, Args...>::Packet
 	friend Network<S, Args...>::PacketDisassembler;
 	Block* first;
 
-	template<typename Pool::Quota quota>
-	static void dropRegion(Block *start, Block* limit) {
-        typename Pool::Deallocator deallocator(start);
-
-        for(Block* current = start->getNext(); current != limit;) {
-            Block* next = current->getNext();
-
-            if(current->isIndirect())
-                current->callIndirectDestructor();
-
-            if(current->isEndOfPacket()) {
-            	deallocator.take(current);
-            	break;
-            } else
-            	deallocator.take(current);
-
-            current = next;
-        }
-
-        deallocator.template deallocate<quota>(&state.pool);
-	}
-
 public:
 	void init(Block* first) {
 		this->first = first;
@@ -217,7 +195,24 @@ public:
 
 	template<typename Pool::Quota quota>
 	void dispose() {
-		dropRegion<quota>(first, nullptr);
+        typename Pool::Deallocator deallocator(first);
+
+        for(Block* current = first->getNext(); current;) {
+            Block* next = current->getNext();
+
+            if(current->isIndirect())
+                current->callIndirectDestructor();
+
+            if(current->isEndOfPacket()) {
+                deallocator.take(current);
+                break;
+            } else
+                deallocator.take(current);
+
+            current = next;
+        }
+
+        deallocator.template deallocate<quota>(&state.pool);
 	}
 };
 
@@ -278,27 +273,11 @@ public:
 		current = p.first;
 	}
 
-	class Cursor {
-		friend PacketDisassembler;
-		Block* point;
-	};
-
-	inline Cursor getCursor() {
-		Cursor ret;
-		ret.point = current;
-		return ret;
+	inline Packet asPacket() {
+	    Packet ret;
+	    ret.first = current;
+	    return ret;
 	}
-
-	template<typename Pool::Quota quota>
-	inline bool dropFrom(Cursor cursor)
-	{
-		current = current->getNext();
-
-		Packet::template dropRegion<quota>(cursor.point, current);
-
-        return current != nullptr;
-	}
-
 
 	inline bool advance() {
 		if(current->isEndOfPacket())
@@ -307,12 +286,15 @@ public:
 		return moveToNextBlock();
 	}
 
-	inline bool moveToNextPacket() {
+	inline bool cutCurrentAndMoveToNext() {
 		while(!current->isEndOfPacket())
 			if(!moveToNextBlock())
 				return false; // This line is not intended to be reached (LCOV_EXCL_LINE).
 
-		return moveToNextBlock();
+		Block* next = current->getNext();
+		current->terminate();
+
+		return (current = next) != nullptr;
 	}
 
 	inline Chunk getCurrentChunk() {
