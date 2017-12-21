@@ -147,7 +147,7 @@ class Scheduler<Args...>::IoRequestCommon::TimeoutRequestLauncher: public Reques
         auto time = static_cast<TimeoutRequestLauncher*>(launcher)->time;
 
         reqLauncher->jobSetup(channel, callback, data);
-        state.eventList.issue(reqLauncher->job, typename IoJob::ParamOverwriteCombiner(time)); // TODO assert true
+        state.eventList.issue(reqLauncher->job, typename IoJob::ParamOverwriteCombiner(time));
     }
 
 public:
@@ -177,7 +177,6 @@ class Scheduler<Args...>::IoRequest:
 		return true;
 	}
 
-	// TODO move to parent
 	virtual bool continuation(uintptr_t retval) override final
 	{
 	    typename IoJob::Result result = this->result;

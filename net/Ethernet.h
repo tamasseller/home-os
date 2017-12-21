@@ -27,7 +27,7 @@ class Network<S, Args...>::Ethernet:
     template<class T> static void callPre(TxPacketBuilder& packet, decltype(T::preHeaderFill(packet))*) { return T::preHeaderFill(packet); }
     template<class T> static void callPre(...) {}
 
-    struct Resolver: ArpTable<Os, Driver::arpCacheEntries, typename Interface::AddressResolver> {
+    struct Resolver: ArpTable<Os, Driver::arpCacheEntries, arpAntiSpoof, typename Interface::AddressResolver> {
         virtual const AddressEthernet& getAddress() override final {
             return Driver::ethernetAddress;
         }
@@ -136,7 +136,7 @@ class Network<S, Args...>::Ethernet:
     {
 		PacketStream reader;
 		reader.init(packet);
-		reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize()); // TODO error handling
+		reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize());
 
 		uint16_t hType, pType;
         uint8_t hLen, pLen;
@@ -354,13 +354,14 @@ class Network<S, Args...>::Ethernet:
 
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item)
     {
-    	static constexpr uint16_t arpReplySize = 28;
-    	static constexpr uint16_t bufferCount = (arpReplySize + /* + TODO l2 header + */ + blockMaxPayload - 1) / blockMaxPayload;
+        auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
+    	static const uint16_t arpReplySize = 28;
+    	static const uint16_t bufferCount = bytesToBlocks(static_cast<Interface*>(self)->getHeaderSize() + arpReplySize);
 
     	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
     			launcher,
     			&Ethernet::buffersAcquired,
-    			&static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item))->poolParams,
+    			&self->poolParams,
     			bufferCount);
     }
 

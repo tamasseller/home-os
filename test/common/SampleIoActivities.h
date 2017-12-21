@@ -18,7 +18,6 @@ struct DummyProcessJobsBase {
 	constexpr static Process &process = Process::instance;
 	constexpr static SemProcess &semProcess = SemProcess::instance;
 
-	/* TODO check if visibility can be decreased */
 	class Job: public Os::IoJob, public DummyProcess<Os>::Data {
 		friend typename Os::IoJob;
 

@@ -64,7 +64,11 @@ struct SyscallDb<Cs...>::IdOfWorker<X> {
 
 }
 
-/// TODO explain why the macro.
+/*
+ * This macro is provided to shorten the rather lengthy description of the syscall handle,
+ * the verbose syntax is necessary due to the properties of the language (could only be
+ * avoided with auto typed template parameter).
+ */
 #define SYSCALL(x) detail::Syscall<decltype(&Scheduler<Args...>:: x ), &Scheduler<Args...>:: x >
 
 template<class... Args>

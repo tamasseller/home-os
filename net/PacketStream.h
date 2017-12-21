@@ -114,7 +114,7 @@ public:
 	inline bool read16net(uint16_t &ret)
 	{
 		if(spaceLeft() > 1) {
-			uint16_t b1 = static_cast<uint8_t>(*data++);
+			uint16_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
 			uint16_t b2 = static_cast<uint8_t>(*data++);
 			ret = static_cast<uint16_t>(b1 << 8 | b2);
 		} else {
@@ -129,13 +129,13 @@ public:
 
 	inline bool read32net(uint32_t &ret) {
 		if(spaceLeft() > 3) {
-			uint32_t b1 = static_cast<uint8_t>(*data++);
+			uint32_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
 			uint32_t b2 = static_cast<uint8_t>(*data++);
 			uint32_t b3 = static_cast<uint8_t>(*data++);
 			uint32_t b4 = static_cast<uint8_t>(*data++);
 			ret = b1 << 24 | b2 << 16 | b3 << 8 | b4;
 		} else {
-			if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)// TODO handle error
+			if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)
 			    return false;
 
 			ret = correctEndian(ret);
@@ -146,7 +146,7 @@ public:
 
 	inline bool read16raw(uint16_t &ret) {
         if(spaceLeft() > 1) {
-            uint16_t b1 = static_cast<uint8_t>(*data++);
+            uint16_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
             uint16_t b2 = static_cast<uint8_t>(*data++);
             ret = correctEndian(static_cast<uint16_t>(b1 << 8 | b2));
         } else {
@@ -159,13 +159,13 @@ public:
 
 	inline bool read32raw(uint32_t &ret) {
         if(spaceLeft() > 3) {
-            uint32_t b1 = static_cast<uint8_t>(*data++);
+            uint32_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
             uint32_t b2 = static_cast<uint8_t>(*data++);
             uint32_t b3 = static_cast<uint8_t>(*data++);
             uint32_t b4 = static_cast<uint8_t>(*data++);
             ret = correctEndian(b1 << 24 | b2 << 16 | b3 << 8 | b4);
         } else {
-            if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)// TODO handle error
+            if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)
                 return false;
         }
 

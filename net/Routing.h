@@ -22,7 +22,7 @@ class Route {
 	bool up = false;
 
 public:
-	/// Create an **direct** route (directly reachable, no intermediate router).
+	/// Create a **direct** route (directly reachable, no intermediate router).
 	inline Route(Interface* dev, AddressIp4 addr, uint8_t mask, uint8_t metric = 0):
 	    dev(dev), src(addr), dst(addr), via(AddressIp4::allZero), mask(mask), metric(metric) {}
 

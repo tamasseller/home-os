@@ -150,7 +150,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
     /**
      * Number of blocks to be allocated for user data.
      */
-        uint8_t nBlocks;
+    uint8_t nBlocks;
 
 	union {
 		/**
@@ -170,6 +170,10 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
          */
         PacketTransmissionRequest stage3;
 	} packet;
+
+	AddressIp4 getDestinationIpForL2() {
+	    return route->isDirect() ? dst : route->getGateway();
+	}
 
 	static bool allocated(Launcher *launcher, IoJob* item, Result result)
 	{
@@ -256,7 +260,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			/*
 			 * Wait for the required address.
 			 */
-			self->arp.ip = self->dst; // TODO gateway
+			self->arp.ip = self->getDestinationIpForL2();
 			launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp);
 			return true;
 		} else {
@@ -279,7 +283,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		if(result == Result::Done) {
 			auto allocator = self->packet.stage1.allocator;
 			const uint32_t senderIp = route->getSource().addr;
-			const uint32_t targetIp = self->dst.addr; // TODO gateway
+			const uint32_t targetIp = self->getDestinationIpForL2().addr;
 			const AddressEthernet &senderMac = route->getDevice()->getResolver()->getAddress();
 			auto &packet = self->packet.stage2;
 
@@ -366,7 +370,7 @@ public:
 			 * circuit the ARP querying and cut-through to the completion of it.
 			 */
 			auto resolver = route->getDevice()->getResolver();
-			if(!resolver || resolver->resolveAddress(dst, self->arp.mac)) { // TODO gateway
+			if(!resolver || resolver->resolveAddress(self->getDestinationIpForL2(), self->arp.mac)) {
 				return addressResolved(launcher, self, Result::Done);
 			}
 

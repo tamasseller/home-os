@@ -36,6 +36,19 @@ TEST_GROUP(NetIpTransmitter) {
                 );
             }
 
+            static void expectIp1234(size_t n = 1) {
+                Net::template getEthernetInterface<DummyIf>()->expectN(n,
+                    /*            dst                 |                src                | etherType */
+                    0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                    /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                    0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x21, 0xcd,
+                    /* source IP address  | destination IP address */
+                    0x0a, 0x0a, 0x0a, 0x0a, 0x01, 0x02, 0x03, 0x04,
+                    /* data */
+                    'f', 'o', 'o', 'b', 'a', 'r'
+                );
+            }
+
             static void expectLongIp() {
                 Net::template getEthernetInterface<DummyIf>()->expectN(1,
                         /*            dst                 |                src                | etherType */
@@ -65,6 +78,18 @@ TEST_GROUP(NetIpTransmitter) {
                     			8
 							),
                     		true
+                    );
+
+                    // Default route
+                    Net::addRoute(
+                            typename Net::Route(
+                                Net::template getEthernetInterface<DummyIf>(),
+                                AddressIp4::make(0, 0, 0, 0),       // Destination
+                                0,                                  // Mask
+                                AddressIp4::make(10, 10, 10, 1),    // Gateway router
+                                AddressIp4::make(10, 10, 10, 10)    // Source address
+                            ),
+                            true
                     );
                 }
 
@@ -258,6 +283,37 @@ TEST_GROUP(NetIpTransmitter) {
 
                 work<true, true>(task);
             }
+
+            static inline void runThroughDefaultRoute() {
+                struct Task: public TestTask<Task> {
+                    bool run() {
+                        typename Net::IpTransmitter tx;
+                        tx.init();
+                        if(!tx.prepare(AddressIp4::make(1, 2, 3, 4), 6))
+                            return Task::bad;
+
+                        if(tx.isOccupied() || tx.getError())
+                            return Task::bad;
+
+                        if(tx.fill("foobar", 6) != 6)
+                            return Task::bad;
+
+                        expectIp1234();
+
+                        if(!tx.send(254))
+                            return Task::bad;
+
+                        tx.wait();
+
+                        if(Accessor::pool.statTxUsed()) return Task::bad;
+
+                        return Task::ok;
+                    }
+                } task;
+
+                work<true, true>(task);
+            }
+
 
             static inline void runLonger() {
                 struct Task: public TestTask<Task> {
@@ -696,6 +752,10 @@ TEST(NetIpTransmitter, NoRoute##x) {                        \
                                                             \
 TEST(NetIpTransmitter, Successful##x) {                     \
     TxTests<Net##x>::runSuccessful();                       \
+}                                                           \
+                                                            \
+TEST(NetIpTransmitter, ThroughDefaultRoute##x) {            \
+    TxTests<Net##x>::runThroughDefaultRoute();              \
 }                                                           \
                                                             \
 TEST(NetIpTransmitter, Longer##x) {                         \

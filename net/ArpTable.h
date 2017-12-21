@@ -29,8 +29,8 @@ public:
 	};
 };
 
-template<class Os, size_t nEntries, class Base = typename Os::IoChannel>
-class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries, Base>, Base>
+template<class Os, size_t nEntries, bool allowRequestedOnly = false, class Base = typename Os::IoChannel>
+class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries, allowRequestedOnly, Base>, Base>
 {
 	friend class ArpTable::IoChannelBase;
 
@@ -67,7 +67,8 @@ private:
 	}
 
 	/// Implementation of the IoChannelBase interface.
-	inline bool removeCanceled(typename Os::IoJob::Data* job) {
+	inline bool removeCanceled(typename Os::IoJob::Data* job)
+	{
 		auto data = static_cast<Data*>(job);
 
 		if(!newItems.remove(data))
@@ -99,7 +100,8 @@ public:
 	 *
 	 * @return True on success.
 	 */
-	inline bool lookUp(AddressIp4 ip, AddressEthernet& mac) {
+	inline bool lookUp(AddressIp4 ip, AddressEthernet& mac)
+	{
 		if(auto x = this->find([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			mac = x->access().mac;
 			return true;
@@ -111,7 +113,8 @@ public:
 	/**
 	 * Add an ARP entry manually.
 	 */
-	inline void set(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout) {
+	inline void set(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout)
+	{
 		while(auto ret = this->findOrAllocate([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			if(ret->isValid()) {
 				ret->erase();
@@ -131,11 +134,15 @@ public:
 	 *
 	 * @NOTE Allowed to be called from event handler context only!
 	 */
-	inline void handleResolved(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout) {
-		this->set(ip, mac, timeout);
+	inline void handleResolved(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout)
+	{
 		if(!flushRequests(newItems.iterator(), ip, mac)) {
-			flushRequests(agedItems.iterator(), ip, mac);
+			if(!flushRequests(agedItems.iterator(), ip, mac))
+		        if(allowRequestedOnly)
+		            return;
 		}
+
+        this->set(ip, mac, timeout);
 	}
 
 	/**
@@ -143,7 +150,8 @@ public:
 	 *
 	 * @NOTE Allowed to be called from event handler context only!
 	 */
-	inline void ageContent() {
+	inline void ageContent()
+	{
 		this->ageingCounter++;
 		while(auto *x = this->find([this](const ArpEntry* e){
 			return (static_cast<int16_t>(ageingCounter - e->timeout) > 0);
@@ -162,7 +170,8 @@ public:
 	/**
 	 * Remove an ARP entry manually.
 	 */
-	inline void kill(AddressIp4 ip) {
+	inline void kill(AddressIp4 ip)
+	{
 		while(auto ret = this->find([ip](const ArpEntry* entry){return entry->ip == ip;})) {
 			ret->erase();
 		}

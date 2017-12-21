@@ -29,6 +29,7 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(RxBufferLimit, size_t);
 	PET_CONFIG_VALUE(TicksPerSecond, size_t);
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
+	PET_CONFIG_VALUE(ArpAntiSpoof, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
 	template<template<class, uint16_t> class Driver> struct EthernetInterface {
@@ -47,6 +48,7 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
+		PET_EXTRACT_VALUE(arpAntiSpoof, ArpAntiSpoof, false, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
 		PET_EXTRACT_VALUE(arpTimeout, ArpCacheTimeout, 60, Options);

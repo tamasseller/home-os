@@ -274,7 +274,7 @@ class Scheduler<Args...>::IoJob::TimeoutLauncher: public Launcher {
 	{
 		auto time = static_cast<TimeoutLauncher*>(launcher)->time;
         launcher->jobSetup(channel, callback, data);
-        state.eventList.issue(launcher->job, ParamOverwriteCombiner(time)); // TODO assert true
+        state.eventList.issue(launcher->job, ParamOverwriteCombiner(time));
 	}
 
 public:
