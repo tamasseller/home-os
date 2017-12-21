@@ -428,7 +428,7 @@ public:
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob> { // TODO reduce visibility
+class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob> {
 	bool check() {
 		if(this->isOccupied())
 			this->wait();
@@ -436,6 +436,11 @@ class Network<S, Args...>::IpTransmitter: public Os::template IoRequest<IpTxJob>
 		return this->error == nullptr;
 	}
 public:
+	using IpTransmitter::IoRequest::init;
+	using IpTransmitter::IoRequest::isOccupied;
+	using IpTransmitter::IoRequest::wait;
+	using IpTransmitter::IoRequest::cancel;
+
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{
 		check();

@@ -355,7 +355,7 @@ TEST_GROUP(NetIpTransmitter) {
                         tx1.init();
                         tx2.init();
 
-                        static constexpr auto nBytesAvailable = tx1.blockMaxPayload * (64 * 75 / 100);
+                        static constexpr auto nBytesAvailable = Net::blockMaxPayload * (64 * 75 / 100);
 
                         if(!tx1.prepare(AddressIp4::make(10, 10, 10, 1), nBytesAvailable - 14 - 20))
                             return Task::bad;
@@ -558,10 +558,10 @@ TEST_GROUP(NetIpTransmitter) {
                     	tx.init();
 
                     	uint16_t sizes[4] = {
-                    			tx.blockMaxPayload - 1,
-                    			tx.blockMaxPayload + 1,
-                    			2 * tx.blockMaxPayload - 1,
-                    			2 * tx.blockMaxPayload + 1
+                    			Net::blockMaxPayload - 1,
+                    			Net::blockMaxPayload + 1,
+                    			2 * Net::blockMaxPayload - 1,
+                    			2 * Net::blockMaxPayload + 1
                     	};
 
                     	for(uint16_t headerSize: sizes) {
@@ -608,7 +608,7 @@ TEST_GROUP(NetIpTransmitter) {
                             tx1.init();
                             tx2.init();
 
-                            static constexpr auto nBytesAvailable = tx1.blockMaxPayload * (64 * 75 / 100);
+                            static constexpr auto nBytesAvailable = Net::blockMaxPayload * (64 * 75 / 100);
 
                             if(!tx1.prepare(AddressIp4::make(10, 10, 10, 1), nBytesAvailable - 14 - 20))
                                 return Task::bad;
