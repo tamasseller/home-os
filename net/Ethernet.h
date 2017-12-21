@@ -137,17 +137,23 @@ class Network<S, Args...>::Ethernet:
 		PacketStream reader;
 		reader.init(packet);
 		reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize()); // TODO error handling
-		uint16_t hType = reader.read16net();
-		uint16_t pType = reader.read16net();
-		uint8_t hLen = reader.read8();
-		uint8_t pLen = reader.read8();
 
-		if(hType != 1 || hLen != 6 || pType != 0x800 || pLen != 4) {
+		uint16_t hType, pType;
+        uint8_t hLen, pLen;
+
+		if(!reader.read16net(hType) ||
+		   !reader.read16net(pType) ||
+           !reader.read8(hLen) ||
+           !reader.read8(pLen)) {
+		    packet.template dispose<Pool::Quota::Rx>();
+		} else if(hType != 1 || hLen != 6 || pType != 0x800 || pLen != 4) {
 			packet.template dispose<Pool::Quota::Rx>();
 		} else {
-			uint16_t opCode = reader.read16net();
+			uint16_t opCode;
 
-			if(opCode == 0x01) {
+			if(!reader.read16net(opCode)) {
+			    packet.template dispose<Pool::Quota::Rx>();
+			} else if(opCode == 0x01) {
 		    	this->arpRequestQueue.putPacketChain(packet);
 				static_cast<ArpReplyJob*>(this)->launch(&acquireBuffers);
 			} else if(opCode == 0x0002) {
@@ -191,7 +197,7 @@ class Network<S, Args...>::Ethernet:
             Os::assert(macReadOk, NetErrorStrings::unknown);
 
             AddressIp4 replyIp;
-            replyIp.addr = reader.read32net(); // TODO handle error
+            Os::assert(reader.read32net(replyIp.addr), NetErrorStrings::unknown);
 
             /*
              * Notify the ARP table about the resolved address.
@@ -241,33 +247,43 @@ class Network<S, Args...>::Ethernet:
 			/*
 			 * Skip destination ethernet header and initial fields of the ARP payload all the
 			 * way to the sender hardware address, the initial fields are already processed at
-			 * this point and are known to describe an adequate request.
+			 * this point and are known to describe an adequate request. The packet is already
+			 * checked for having enough payload content to do this, so this must not fail.
 			 */
-			bool skipOk = reader.skipAhead(static_cast<uint16_t>(self->getHeaderSize() + 8));
-			Os::assert(skipOk, NetErrorStrings::unknown);
+            bool skipOk = reader.skipAhead(static_cast<uint16_t>(self->getHeaderSize() + 8));
+            Os::assert(skipOk, NetErrorStrings::unknown);
 
 			/*
 			 * Save the source address of the request for later use as the destination of the reply.
 			 */
 			AddressEthernet requesterMac;
-			bool dstReadOk = reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6;
-			Os::assert(dstReadOk, NetErrorStrings::unknown);
+			if(reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) != 6) {
+                requestPacket.template dispose<Pool::Quota::Rx>();
+                continue;
+			}
 
 			/*
 			 * Read sender IP address.
 			 */
 			char requesterIp[4];
-			bool dstIpReadOk = reader.copyOut(requesterIp, 4) == 4;
-			Os::assert(dstIpReadOk, NetErrorStrings::unknown);
+			if(reader.copyOut(requesterIp, 4) != 4) {
+                requestPacket.template dispose<Pool::Quota::Rx>();
+                continue;
+            }
 
-			bool skip2Ok = reader.skipAhead(static_cast<uint16_t>(6));
-			Os::assert(skip2Ok, NetErrorStrings::unknown);
+			if(!reader.skipAhead(static_cast<uint16_t>(6))) {
+                requestPacket.template dispose<Pool::Quota::Rx>();
+                continue;
+            }
 
 			/*
 			 * Read sender IP address.
 			 */
 			AddressIp4 queriedIp;
-			queriedIp.addr = reader.read32net(); // TODO error handling
+			if(!reader.read32net(queriedIp.addr)) {
+                requestPacket.template dispose<Pool::Quota::Rx>();
+                continue;
+			}
 
 			/*
 			 * Check if the requested
@@ -328,12 +344,12 @@ class Network<S, Args...>::Ethernet:
 			builder.done();
 			self->txReq.init(builder);
 			launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
+	        return true;
 		} else {
 			builder.done();
 			builder.template dispose<Pool::Quota::Tx>();
+	        return false;
 		}
-
-		return true;
 	}
 
     static inline bool acquireBuffers(Launcher *launcher, IoJob* item)

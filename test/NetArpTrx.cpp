@@ -227,6 +227,10 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
 				0x0a, 0x0a, 0x0a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x0a
 			);
 
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
 			Net::template getEthernetInterface<DummyIf>()->receive(
 				/*            dst                 |                src                | etherType */
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -236,10 +240,93 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
 				0x0a, 0x0a, 0x0a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x0a
 			);
 
-        	Net::Os::sleep(1);
-
+            Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0xac
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e,
+                  /*      sender IP     |          target MAC               |       target IP       */
+                  0x0a
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e,
+                  /*      sender IP     |          target MAC               |       target IP       */
+                  0x0a, 0x0a, 0x0a, 0x01, 0x00, 0x00
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                  /*            dst                 |                src                | etherType */
+                  0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
+                  /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                  0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e,
+                  /*      sender IP     |          target MAC               |       target IP       */
+                  0x0a, 0x0a, 0x0a, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a
+            );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
             return ok;
         }
     } task;

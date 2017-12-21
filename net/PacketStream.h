@@ -103,35 +103,31 @@ public:
 		return !spaceLeft() && this->current->isEndOfPacket();
 	}
 
- 	inline uint8_t read8() {
-		uint8_t ret;
-
-		if(spaceLeft() > 0)
+ 	inline bool read8(uint8_t &ret) {
+		if(spaceLeft() > 0) {
 			ret = *data++;
-		else
-			copyOut(reinterpret_cast<char*>(&ret), 1);
-
-		return ret;
+			return true;
+		} else
+			return copyOut(reinterpret_cast<char*>(&ret), 1) == 1;
 	}
 
-	inline uint16_t read16net() {
-		uint16_t ret;
-
+	inline bool read16net(uint16_t &ret)
+	{
 		if(spaceLeft() > 1) {
 			uint16_t b1 = static_cast<uint8_t>(*data++);
 			uint16_t b2 = static_cast<uint8_t>(*data++);
 			ret = static_cast<uint16_t>(b1 << 8 | b2);
 		} else {
-			copyOut(reinterpret_cast<char*>(&ret), 2); // TODO handle error
+			if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
+			    return false;
+
 			ret = correctEndian(ret);
 		}
 
-		return ret;
+        return true;
 	}
 
-	inline uint32_t read32net() {
-		uint32_t ret;
-
+	inline bool read32net(uint32_t &ret) {
 		if(spaceLeft() > 3) {
 			uint32_t b1 = static_cast<uint8_t>(*data++);
 			uint32_t b2 = static_cast<uint8_t>(*data++);
@@ -139,19 +135,41 @@ public:
 			uint32_t b4 = static_cast<uint8_t>(*data++);
 			ret = b1 << 24 | b2 << 16 | b3 << 8 | b4;
 		} else {
-			copyOut(reinterpret_cast<char*>(&ret), 4);// TODO handle error
+			if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)// TODO handle error
+			    return false;
+
 			ret = correctEndian(ret);
 		}
 
-		return ret;
+		return true;
 	}
 
-	inline uint16_t read16raw() {
-		return correctEndian(read16net());
+	inline bool read16raw(uint16_t &ret) {
+        if(spaceLeft() > 1) {
+            uint16_t b1 = static_cast<uint8_t>(*data++);
+            uint16_t b2 = static_cast<uint8_t>(*data++);
+            ret = correctEndian(static_cast<uint16_t>(b1 << 8 | b2));
+        } else {
+            if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
+                return false;
+        }
+
+        return true;
 	}
 
-	inline uint32_t read32raw() {
-		return correctEndian(read32net());
+	inline bool read32raw(uint32_t &ret) {
+        if(spaceLeft() > 3) {
+            uint32_t b1 = static_cast<uint8_t>(*data++);
+            uint32_t b2 = static_cast<uint8_t>(*data++);
+            uint32_t b3 = static_cast<uint8_t>(*data++);
+            uint32_t b4 = static_cast<uint8_t>(*data++);
+            ret = correctEndian(b1 << 24 | b2 << 16 | b3 << 8 | b4);
+        } else {
+            if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)// TODO handle error
+                return false;
+        }
+
+        return true;
 	}
 };
 

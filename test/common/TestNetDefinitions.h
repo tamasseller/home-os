@@ -109,7 +109,9 @@ struct DummyIf {
 	        uint32_t sum = 0;
 	        size_t skip = dummyPrefixSize;
 	        while(!packet.atEop()) {
-	        	auto b = packet.read8();
+	        	uint8_t b;
+	        	packet.read8(b);
+
 	        	if(skip)
 	        		skip--;
 	        	else
