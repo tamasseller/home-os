@@ -395,3 +395,74 @@ TEST(NetPacket, Indirect) {
     work(task);
 }
 
+TEST(NetPacket, OffsetDropSimple) {
+    struct Task: TaskBase<Task> {
+        bool checkFrom(Net::Packet p, uint8_t from)
+        {
+            Net::PacketStream reader;
+            reader.init(p);
+
+            for(uint8_t i = from; i < 3 * Net::blockMaxPayload; i++)
+                if(reader.read8() != i) return false;
+
+            return reader.atEop();
+        }
+
+        bool run() {
+            init(3);
+
+            for(uint8_t i=0; i< 3 * Net::blockMaxPayload; i++)
+                if(!builder.write8(i)) return bad;
+
+            builder.done();
+            if(Accessor::pool.statTxUsed() != 3) return Task::bad;
+            Net::Packet p = builder;
+
+            if(!checkFrom(p, 0)) return Task::bad;
+
+            for(uint8_t i=1; i<Net::blockMaxPayload; i++) {
+                p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+                if(Accessor::pool.statTxUsed() != 3) return Task::bad;
+                if(!checkFrom(p, i)) return Task::bad;
+            }
+
+            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+            if(Accessor::pool.statTxUsed() != 2) return Task::bad;
+            if(!checkFrom(p, Net::blockMaxPayload)) return Task::bad;
+
+            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload + 1);
+            if(Accessor::pool.statTxUsed() != 1) return Task::bad;
+
+            if(!checkFrom(p, 2 * Net::blockMaxPayload + 1)) return Task::bad;
+
+            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100);
+            if(Accessor::pool.statTxUsed() != 0) return Task::bad;
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, OffsetDropAtOnce) {
+    struct Task: TaskBase<Task> {
+        bool run() {
+            init(3);
+
+            for(uint8_t i=0; i< 3 * Net::blockMaxPayload; i++)
+                if(!builder.write8(i)) return bad;
+
+            builder.done();
+            if(Accessor::pool.statTxUsed() != 3) return Task::bad;
+            Net::Packet p = builder;
+
+            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100);
+            if(Accessor::pool.statTxUsed() != 0) return Task::bad;
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}

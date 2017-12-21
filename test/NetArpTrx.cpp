@@ -10,8 +10,8 @@
 using Net = Net64;
 using Accessor = NetworkTestAccessor<Net>;
 
-TEST_GROUP(NetIcmpArp) {
-
+TEST_GROUP(NetIcmpArp)
+{
 	static inline void expectReply(uint16_t n) {
         Net::template getEthernetInterface<DummyIf>()->expectN(n,
             /*            dst                 |                src                | etherType */

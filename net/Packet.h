@@ -29,6 +29,7 @@ public:
 	typedef void (*Destructor)(void*, const char*, uint16_t);
 
 private:
+    friend Network<S, Args...>::Packet;
 
 	/*
 	 * Helper types.
@@ -44,6 +45,16 @@ private:
 	 */
 	struct Header {
 		int16_t nextOffset = 0;
+		/**
+		 * Packet size, offset and end of packet flags.
+		 *
+		 * | EOP:1 | offset:2 | size: 13 |
+		 *
+		 * Special value:
+		 *  - If the value of the offset field is maximal then the actual offset is contained in the
+		 *    the first two bytes of in-line data area, otherwise it is the offset value itself.
+		 *  - If the size field is maximal then the packet is indirect (and can not have an offset).
+		 */
 		uint16_t sizeAndFlags = 0;
 	};
 
@@ -54,16 +65,21 @@ private:
 		uint16_t size;
 	};
 
+public:
 	/*
 	 * Constant definitions
 	 */
-public:
 	static constexpr size_t dataSize = bufferSize - sizeof(Header);
 
 private:
 	static constexpr uint16_t endOfPacket = 0x8000;
+	static constexpr uint16_t offsetMask = 0x6000;
+	static constexpr size_t offsetShift = 13;
+	static constexpr uint16_t sizeMask = 0x1fff;
 
 	static_assert(dataSize >= sizeof(IndirectEntry), "Pool blocks are too small");
+    static_assert(bufferSize < Block::sizeMask, "Pool blocks are too big");
+
 
 	/*
 	 * Data members.
@@ -82,6 +98,26 @@ private:
 	static constexpr size_t dataOffset() {
 		return reinterpret_cast<size_t>(reinterpret_cast<Block*>(0)->bytes);
 	}
+
+    /**
+     * Set the size field in _sizeAndFlags_.
+     */
+    inline void setSizeInternal(uint16_t size) {
+        header.sizeAndFlags = static_cast<uint16_t>(header.sizeAndFlags & ~sizeMask) | size;
+    }
+
+    /**
+     * Get offset of usable data inside the in-line data area.
+     */
+    inline void writeOffset(uint16_t newOffset) {
+        if(newOffset < (offsetMask >> offsetShift))
+            header.sizeAndFlags = static_cast<uint16_t>((header.sizeAndFlags & ~offsetMask) | (newOffset << offsetShift));
+        else {
+            header.sizeAndFlags = static_cast<uint16_t>(header.sizeAndFlags | offsetMask);
+            bytes[0] = static_cast<uint8_t>(newOffset);
+            bytes[1] = static_cast<uint8_t>(newOffset >> 8);
+        }
+    }
 
 public:
 	/**
@@ -119,14 +155,34 @@ public:
 	 * Get the size of the stored in-line data.
 	 */
 	inline uint16_t getSize() const {
-		return header.sizeAndFlags & static_cast<uint16_t>(~endOfPacket);
+		return header.sizeAndFlags & sizeMask;
 	}
+
+    /**
+     * Get offset of usable data inside the in-line data area.
+     */
+    inline uint16_t getOffset() const {
+        auto maskedOffset = (header.sizeAndFlags & offsetMask);
+
+        if(!maskedOffset)
+            return 0;
+
+        Os::assert(!isIndirect(), NetErrorStrings::unknown);
+
+        auto immediateOffset = maskedOffset >> offsetShift;
+
+        if(immediateOffset < 3)
+            return static_cast<uint16_t>(immediateOffset);
+
+        return static_cast<uint16_t>(bytes[0] | bytes[1] << 8);
+    }
 
 	/**
 	 * Set the size of the contained data (implies in-line storage).
 	 */
 	inline void setSize(uint16_t size) {
-		header.sizeAndFlags = (header.sizeAndFlags & endOfPacket) | (size & static_cast<uint16_t>(~endOfPacket));
+	    Os::assert(size < sizeMask, NetErrorStrings::unknown);
+		setSizeInternal(size);
 	}
 
 	/**
@@ -147,7 +203,7 @@ public:
 	 * Get the pointer to the data (in-line or indirect).
 	 */
 	inline char* getData() {
-		return &bytes[0];
+		return &bytes[0] + getOffset();
 	}
 
 	inline const char* getIndirectData() {
@@ -163,11 +219,11 @@ public:
 	    entry.size = length;
 	    entry.destructor = destructor;
 	    entry.user = userData;
-	    setSize(0x7fff);
+	    setSizeInternal(sizeMask);
 	}
 
-    inline bool isIndirect() {
-        return getSize() == 0x7fff;
+    inline bool isIndirect() const {
+        return getSize() == sizeMask;
     }
 
 	inline void callIndirectDestructor() {
@@ -214,6 +270,45 @@ public:
 
         deallocator.template deallocate<quota>(&state.pool);
 	}
+
+    /**
+     * Increase data offset at the start of the packet.
+     *
+     * If block becomes empty it is dropped.
+     */
+	template<typename Pool::Quota quota>
+    inline void dropInitialBytes(size_t n) {
+        Os::assert(!first->isIndirect(), NetErrorStrings::unknown);
+
+        while(n) {
+            if(n < first->getSize()) {
+                first->writeOffset(static_cast<uint16_t>(first->getOffset() + n));
+                first->setSize(static_cast<uint16_t>(first->getSize() - n));
+                break;
+            } else {
+                Block* current = first->getNext();
+                n -= first->getSize();
+
+                typename Pool::Deallocator deallocator(first);
+
+                while(current && (n >= current->getSize())) {
+                    Os::assert(!current->isIndirect(), NetErrorStrings::unknown);
+
+                    Block* next = current->getNext();
+
+                    n -= first->getSize();
+                    deallocator.take(first);
+
+                    current = next;
+                }
+
+                deallocator.template deallocate<quota>(&state.pool);
+
+                if((first = current) == nullptr)
+                    break;
+            }
+        }
+    }
 };
 
 template<class S, class... Args>

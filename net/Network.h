@@ -60,7 +60,6 @@ struct NetworkOptions {
 
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 		static_assert(bufferCount < 32768, "Too many blocks requested");
-		static_assert(bufferSize < 16384, "Pool blocks are too big");
 
 	public:
 		class Interface;
