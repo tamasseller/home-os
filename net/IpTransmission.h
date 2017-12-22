@@ -113,11 +113,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
 	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
 
-	/*
-	 * Data fields that store information during the various steps of the process.
-	 */
-	const char* error;
-
 	union {
 	        /**
 	         * The route the packed is to be sent over.
@@ -197,11 +192,13 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			fillInitialIpHeader(packet, route->getSource(), self->dst);
 
 			self->device = dev;
-			return static_cast<Child*>(self)->onPreparationDone(launcher, item, result);
-		} else
-		    self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
+			return static_cast<Child*>(self)->onPreparationDone(launcher, item);
+		} else if(result == Result::TimedOut) {
+		    return static_cast<Child*>(self)->onTimeout(launcher, item);
+	    } else {
+	        return static_cast<Child*>(self)->onCancel(launcher, item);
+	    }
 
-		return false;
 	}
 
 	/**
@@ -228,8 +225,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 					/*
 					 * Give up if number of retries exhausted.
 					 */
-					self->error = NetErrorStrings::unresolved;
-					return false;
+					return static_cast<Child*>(self)->onArpTimeout(launcher, item);
 				}
 			}
 
@@ -240,10 +236,12 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	    			launcher, &IpTxJob::allocated, &self->packet.stage1, self->nBlocks);
 		} else {
             state.routingTable.releaseRoute(self->route);
-            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-		}
 
-		return false;
+            if(result == Result::TimedOut)
+                return static_cast<Child*>(self)->onTimeout(launcher, item);
+            else
+                return static_cast<Child*>(self)->onCancel(launcher, item);
+		}
 	}
 
 	/**
@@ -268,10 +266,12 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			return true;
 		} else {
             state.routingTable.releaseRoute(self->route);
-            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-		}
 
-		return false;
+            if(result == Result::TimedOut)
+                return static_cast<Child*>(self)->onTimeout(launcher, item);
+            else
+                return static_cast<Child*>(self)->onCancel(launcher, item);
+		}
 	}
 
 	/**
@@ -306,10 +306,12 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		    return true;
 		} else {
             state.routingTable.releaseRoute(route);
-            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-		}
 
-		return false;
+            if(result == Result::TimedOut)
+                return static_cast<Child*>(self)->onTimeout(launcher, item);
+            else
+                return static_cast<Child*>(self)->onCancel(launcher, item);
+		}
 	}
 
 	/*
@@ -318,10 +320,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	static bool sent(Launcher *launcher, IoJob* item, Result result)
 	{
 		auto self = static_cast<IpTxJob*>(item);
-
-        if(result != Result::Done)
-            self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-
 		return static_cast<Child*>(self)->onSent(launcher, item, result);
 	}
 
@@ -331,11 +329,9 @@ public:
 	/**
 	 * Initiate the packet preparation sequence.
 	 */
-	static bool startPreparation(Launcher *launcher, IoJob* item, AddressIp4 dst, size_t nInLine, size_t nIndirect)
+	static bool startPreparation(Launcher *launcher, IoJob* item, AddressIp4 dst, size_t nInLine, size_t nIndirect, uint8_t arpRetry)
 	{
 		auto self = static_cast<IpTxJob*>(item);
-
-		self->error = nullptr;
 
 		/*
 		 * Find the right network and save arguments.
@@ -378,15 +374,13 @@ public:
 			/*
 			 * If not found: allocate buffer for ARP query and set up retry counter.
 			 */
-			self->retry = arpRequestRetry;
-			const uint16_t size = bytesToBlocks(arpReqSize + route->getDevice()->getHeaderSize());
+			self->retry = arpRetry;
+            const uint16_t size = bytesToBlocks(arpReqSize + route->getDevice()->getHeaderSize());
 
-	    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
-	    			launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
+            return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
+                    launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
 		} else
-			self->error = NetErrorStrings::noRoute;
-
-		return false;
+		    return static_cast<Child*>(self)->onNoRoute(launcher, item);
 	}
 
 	static bool startTransmission(Launcher *launcher, IoJob* item, uint8_t protocol, uint8_t ttl)
@@ -409,10 +403,7 @@ public:
 				ttl,
 				protocol);
 
-		if(length == (size_t)-1) {
-			self->error = NetErrorStrings::unknown;
-			return false;
-		}
+		Os::assert(length != (uint16_t)-1, NetErrorStrings::unknown);
 
 		PacketStream modifier;
 		modifier.init(self->packet.stage3);
@@ -432,19 +423,44 @@ template<class S, class... Args>
 class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob<IpTransmitter>> {
 	friend class IpTransmitter::IpTxJob;
 
+	const char* error;
+
 	bool check() {
 		if(this->isOccupied())
 			this->wait();
 
-		return this->error == nullptr;
+		return error == nullptr;
 	}
 
-	static inline bool onPreparationDone(Launcher *launcher, IoJob* item, Result result) { return false; }
+	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) { return false; }
 
 	inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
-		this->packet.stage3.template dispose<Pool::Quota::Tx>();
-		return false;
+        if(result != Result::Done)
+            error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
+
+        this->packet.stage3.template dispose<Pool::Quota::Tx>();
+        return false;
 	}
+
+    inline bool onNoRoute(Launcher *launcher, IoJob* item) {
+        error = NetErrorStrings::noRoute;
+        return false;
+    }
+
+    inline bool onArpTimeout(Launcher *launcher, IoJob* item) {
+        error = NetErrorStrings::unresolved;
+        return false;
+    }
+
+    inline bool onTimeout(Launcher *launcher, IoJob* item) {
+        error = NetErrorStrings::genericTimeout;
+        return false;
+    }
+
+    inline bool onCancel(Launcher *launcher, IoJob* item) {
+        error = NetErrorStrings::genericCancel;
+        return false;
+    }
 
 public:
 	using IpTransmitter::IoRequest::init;
@@ -455,14 +471,16 @@ public:
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{
 		check();
-		bool later = this->launch(&IpTransmitter::IpTxJob::startPreparation, dst, inLineSize, indirectCount);
+		error = nullptr;
+		bool later = this->launch(&IpTransmitter::IpTxJob::startPreparation, dst, inLineSize, indirectCount, arpRequestRetry);
 		return later || this->error == nullptr;
 	}
 
     inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
     {
         check();
-        bool later = this->launchTimeout(&IpTransmitter::IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
+        error = nullptr;
+        bool later = this->launchTimeout(&IpTransmitter::IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount, arpRequestRetry);
         return later || this->error == nullptr;
     }
 

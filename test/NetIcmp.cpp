@@ -101,6 +101,73 @@ TEST(NetIcmpIcmp, IcmpRequestSimple) {
     work(task);
 }
 
+TEST(NetIcmpIcmp, IcmpRequestMartian) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x13, 0xbd,
+                /* source IP address  | destination IP address */
+                0x09, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* type | code | checksum  |     id    |  seqnum   | */
+                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
+                /* data */
+                'f', 'o', 'o', 'b', 'a', 'r'
+            );
+
+            Net::Os::sleep(1);
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetIcmpIcmp, IcmpRequestNoArp) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::template getEthernetInterface<DummyIf>()->expectN(1,
+                /*            dst                 |                src                | etherType */
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x06,
+                /* hwType | protoType |hSize|pSize|   opCode  |           sender MAC              */
+                0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00,
+                /*      sender IP     |          target MAC               |       target IP       */
+                0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x0a, 0x0a, 0x02
+            );
+
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbc,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x2, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* type | code | checksum  |     id    |  seqnum   | */
+                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
+                /* data */
+                'f', 'o', 'o', 'b', 'a', 'r'
+            );
+
+            Net::Os::sleep(40);
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
 TEST(NetIcmpIcmp, IcmpRequestLong) {
     struct Task: public TestTask<Task> {
         bool run() {

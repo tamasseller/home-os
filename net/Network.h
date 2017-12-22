@@ -21,7 +21,7 @@
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
-	PET_CONFIG_VALUE(ArpRequestRetry, size_t);
+	PET_CONFIG_VALUE(ArpRequestRetry, uint8_t);
 	PET_CONFIG_VALUE(ArpCacheTimeout, size_t);
 	PET_CONFIG_VALUE(BufferSize, size_t);
 	PET_CONFIG_VALUE(BufferCount, size_t);
