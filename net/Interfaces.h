@@ -54,6 +54,29 @@ public:
 
     virtual void takeRxBuffers(typename Pool::Allocator allocator) = 0;
 
+    template<class Reader>
+    inline bool checkIcmp(Reader& reader) {
+            uint16_t typeCode;
+            if(!reader.read16net(typeCode) ||
+                    (typeCode != 0x0800)) { // Echo request.
+                // TODO add the other allowed ICMP message type+codes.
+
+                return false;
+            }
+
+            InetChecksumDigester sum;
+            size_t offset = 0;
+            while(!reader.atEop()) {
+                Chunk chunk = reader.getChunk();
+                sum.consume(chunk.start, chunk.length(), offset & 1);
+                offset += chunk.length();
+                reader.advance(static_cast<uint16_t>(chunk.length()));
+            }
+
+            sum.patch(0, correctEndian(typeCode));
+            return sum.result() == 0;
+    }
+
     inline void ipPacketReceived(Packet packet, Interface* dev) {
     	struct ChecksumValidatorObserver: InetChecksumDigester {
     		size_t remainingHeaderLength;
@@ -65,22 +88,18 @@ public:
     		}
 
     		void observeInternalBlock(char* start, char* end) {
-    			if(!remainingHeaderLength)
-    				return;
-
-    			size_t length = end - start;
+                size_t length = end - start;
+                totalLength += length;
 
     			if(length < remainingHeaderLength) {
     				this->consume(start, length, remainingHeaderLength & 1);
     				remainingHeaderLength -= length;
-    			}
-    			else {
+    			} else if(remainingHeaderLength) {
     				this->consume(start, remainingHeaderLength, remainingHeaderLength & 1);
     				remainingHeaderLength = 0;
     				valid = this->result() == 0;
     			}
 
-    			totalLength += length;
     		}
 
     		void observeFirstBlock(char* start, char* end) {
@@ -125,6 +144,15 @@ public:
     	if(!reader.read16net(fragmentOffsetAndFlags)) {
         	packet.template dispose<Pool::Quota::Rx>();
         	return;
+    	}
+
+    	static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
+    	if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
+    	    /*
+    	     * IP defragmentation could be done here.
+    	     */
+            packet.template dispose<Pool::Quota::Rx>();
+            return;
     	}
 
     	/*
@@ -173,20 +201,15 @@ public:
 			state.routingTable.releaseRoute(route);
 		} else {
 			/*
-			 * If this host is not the final destination then, routing could be done here.
+			 * If this host not the final destination then, routing could be done here.
 			 */
         	packet.template dispose<Pool::Quota::Rx>();
         	return;
 		}
 
-    	if(protocol == 1) { // ICMP
-	    	uint16_t typeCode;
-	    	if(!reader.read16net(typeCode) ||
-	    			(typeCode != 0x0800)) { // Echo request.
-	    		// TODO add the other allowed ICMP message type+codes.
-	        	packet.template dispose<Pool::Quota::Rx>();
-	        	return;
-	    	}
+    	if((protocol == 1) && !checkIcmp(reader)) {
+            packet.template dispose<Pool::Quota::Rx>();
+            return;
     	}
 
     	bool infinitePacket = reader.skipAhead(0xffff);
