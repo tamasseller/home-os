@@ -90,7 +90,12 @@
  *    2. Buffer release: after the packet has been transmitted the packet contents are
  *       no longer required to be kept, thus are freed up and reclaimed by the pool.
  */
+
+static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
+static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
+
 template<class S, class... Args>
+template<class Child>
 struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	friend class Os::IoChannel;
 	using IoJob = typename Os::IoJob;
@@ -101,9 +106,6 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	/*
 	 * Constant packet pieces and parameters for well-known management protocols.
 	 */
-
-	static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
-	static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
 
 	static constexpr size_t ipHeaderSize = 20;
 	static const size_t arpReqSize = 28;
@@ -195,6 +197,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			fillInitialIpHeader(packet, route->getSource(), self->dst);
 
 			self->device = dev;
+			return static_cast<Child*>(self)->onPreparationDone(launcher, item, result);
 		} else
 		    self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 
@@ -316,12 +319,10 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	{
 		auto self = static_cast<IpTxJob*>(item);
 
-		self->packet.stage3.template dispose<Pool::Quota::Tx>();
-
         if(result != Result::Done)
             self->error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 
-		return false;
+		return static_cast<Child*>(self)->onSent(launcher, item, result);
 	}
 
 public:
@@ -428,13 +429,23 @@ public:
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob> {
+class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob<IpTransmitter>> {
+	friend class IpTransmitter::IpTxJob;
+
 	bool check() {
 		if(this->isOccupied())
 			this->wait();
 
 		return this->error == nullptr;
 	}
+
+	static inline bool onPreparationDone(Launcher *launcher, IoJob* item, Result result) { return false; }
+
+	inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
+		this->packet.stage3.template dispose<Pool::Quota::Tx>();
+		return false;
+	}
+
 public:
 	using IpTransmitter::IoRequest::init;
 	using IpTransmitter::IoRequest::isOccupied;
@@ -444,14 +455,14 @@ public:
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{
 		check();
-		bool later = this->launch(&IpTxJob::startPreparation, dst, inLineSize, indirectCount);
+		bool later = this->launch(&IpTransmitter::IpTxJob::startPreparation, dst, inLineSize, indirectCount);
 		return later || this->error == nullptr;
 	}
 
     inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
     {
         check();
-        bool later = this->launchTimeout(&IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
+        bool later = this->launchTimeout(&IpTransmitter::IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount);
         return later || this->error == nullptr;
     }
 
@@ -460,7 +471,7 @@ public:
 		if(!check())
 			return false;
 
-		bool later = this->launch(&IpTxJob::startTransmission, protocol, ttl);
+		bool later = this->launch(&IpTransmitter::IpTxJob::startTransmission, protocol, ttl);
         return later || this->error == nullptr;
 	}
 
@@ -469,7 +480,7 @@ public:
         if(!check())
             return false;
 
-        bool later = this->launchTimeout(&IpTxJob::startTransmission, timeout, protocol, ttl);
+        bool later = this->launchTimeout(&IpTransmitter::IpTxJob::startTransmission, timeout, protocol, ttl);
         return later || this->error == nullptr;
     }
 
@@ -492,11 +503,5 @@ public:
 		return this->error;
 	}
 };
-
-template<class S, class... Args>
-constexpr const char Network<S, Args...>::IpTxJob::arpRequestPreamble[];
-
-template<class S, class... Args>
-constexpr const char Network<S, Args...>::IpTxJob::arpReplyPreamble[];
 
 #endif /* IPTRANSMISSION_H_ */

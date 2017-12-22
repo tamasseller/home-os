@@ -353,7 +353,6 @@ class Network<S, Args...>::PacketDisassembler
 protected:
 	Block* current;
 
-private:
 	bool moveToNextBlock() {
 		if(Block* next = current->getNext())
 			current = next;
@@ -379,17 +378,6 @@ public:
 			return false;
 
 		return moveToNextBlock();
-	}
-
-	inline bool cutCurrentAndMoveToNext() {
-		while(!current->isEndOfPacket())
-			if(!moveToNextBlock())
-				return false; // This line is not intended to be reached (LCOV_EXCL_LINE).
-
-		Block* next = current->getNext();
-		current->terminate();
-
-		return (current = next) != nullptr;
 	}
 
 	inline Chunk getCurrentChunk() {

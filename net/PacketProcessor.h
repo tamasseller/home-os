@@ -25,7 +25,6 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 
 protected:
 	typedef void (*Callback)(typename Os::Event*, uintptr_t);
-	inline PacketProcessor(Callback callback): Os::Event(callback) {}
 
 	template<class T, void (T::*worker)(Packet)>
 	static constexpr Callback make() {
@@ -33,6 +32,8 @@ protected:
 	}
 
 public:
+	inline PacketProcessor(Callback callback): Os::Event(callback) {}
+
 	void process(Packet packet) {
 		Block* first = packet.first, *last = first;
 
@@ -51,6 +52,15 @@ public:
 	}
 };
 
+template<class S, class... Args>
+struct Network<S, Args...>::ArpPacketProcessor: PacketProcessor {
+	inline ArpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
+};
+
+template<class S, class... Args>
+struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor {
+	inline IcmpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
+};
 
 
 #endif /* PACKETPROCESSOR_H_ */

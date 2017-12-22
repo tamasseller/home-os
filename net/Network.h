@@ -78,14 +78,26 @@ struct NetworkOptions {
 		struct Chunk;
 		class Block;
 		class PacketQueue;
-		template <class> class PacketWriterBase;
+		template<class> class PacketWriterBase;
+		class NullObserver;
 		class PacketTransmissionRequest;
+		template<class> class ObservedPacketStream;
 
 		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
 		template<typename Pool::Quota> class PacketBuilder;
 		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
 		using RxPacketBuilder = PacketBuilder<Pool::Quota::Rx>;
+
+		class DummyDigester;
+
+		template<class> class IpTxJob;
+		class IcmpReplyJob;
+		class ArpReplyJob;
+
+		class PacketProcessor;
+		class ArpPacketProcessor;
+		class IcmpPacketProcessor;
 
 		static struct State {
 			struct Ager: Os::Timeout {
@@ -95,16 +107,15 @@ struct NetworkOptions {
 			} ager;
 
             inline void* operator new(size_t, void* x) { return x; }
+
+            IcmpReplyJob icmpReplyJob;
+			IcmpPacketProcessor icmpPacketProcessor;
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
-		} state;
 
-		class IpTxJob;
-		class DummyDigester;
-		class PacketProcessor;
-		class IpPacketProcessor;
-		class ArpReplyJob;
+			inline State();
+		} state;
 
 		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
@@ -125,6 +136,13 @@ struct NetworkOptions {
 				uint16_t headerChecksum);
 
 		inline static constexpr uint16_t bytesToBlocks(size_t);
+
+		using IoJob = typename Os::IoJob;
+		using Result = typename IoJob::Result;
+		using Launcher = typename IoJob::Launcher;
+		using Callback = typename IoJob::Callback;
+
+		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
 
 	public:
 		static constexpr auto blockMaxPayload = Block::dataSize;
@@ -160,6 +178,10 @@ template<class S, class... Args>
 typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
 
 template<class S, class... Args>
+inline Network<S, Args...>::State::State():
+	icmpPacketProcessor(&Network<S, Args...>::processIcmpPacket){}
+
+template<class S, class... Args>
 inline void Network<S, Args...>::State::Ager::age() {
 	state.interfaces.ageContent();
 	this->extend(secTicks);
@@ -175,6 +197,8 @@ inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
 	return static_cast<uint16_t>((bytes + blockMaxPayload - 1) / blockMaxPayload);
 }
 
+#include "Arp.h"
+#include "Icmp.h"
 #include "Packet.h"
 #include "Endian.h"
 #include "Ethernet.h"

@@ -80,7 +80,9 @@ TEST_GROUP(NetPacket) {
 	};
 
 	typedef Accessor::TxPacketBuilder::PacketWriterBase Writer;
-	template<const char* padding, class Data, bool (Writer::* write)(Data), bool(Accessor::PacketStream::* read)(Data&)>
+	typedef Accessor::PacketStream::ObservedPacketStream Reader;
+
+	template<const char* padding, class Data, bool (Writer::* write)(Data), bool(Reader::* read)(Data&)>
 	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {
 		static constexpr Data value1 = static_cast<Data>(0xb16b00b5);
 		static constexpr Data value2 = static_cast<Data>(0x600dc0de);

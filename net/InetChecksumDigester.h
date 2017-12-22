@@ -32,7 +32,7 @@ public:
 	 * a|bc|de|f  ->  swap(bc+de+fa) -> swap(b, d, f + c, e, a)
 	 * a|bc|de|0  ->  swap(bc+de+0a) -> swap(b, d, 0 + c, e, a)
 	 */
-	void consume(const char* data, size_t length, bool oddOffset = false)
+	inline void consume(const char* data, size_t length, bool oddOffset = false)
 	{
 		if(!length)
 			return;
@@ -66,11 +66,11 @@ public:
 		state += result;
 	}
 
-	void patch(uint16_t old, uint16_t updated) {
+	inline void patch(uint16_t old, uint16_t updated) {
 		state += updated - old;
 	}
 
-	uint16_t result() {
+	inline uint16_t result() {
 		return static_cast<uint16_t>(~reduce(state));
 	}
 };

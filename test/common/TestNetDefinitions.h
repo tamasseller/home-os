@@ -76,12 +76,14 @@ struct DummyIf {
 		}
 
 		assembler.done();
-		Net::template getEthernetInterface<DummyIf>()->requestRxBuffers(nBlocksConsumed);
+
+		auto self = Net::template getEthernetInterface<DummyIf>();
+		self->requestRxBuffers(nBlocksConsumed);
 
 		if(!input[13]) /* 13: second byte of ethertype */
-			Net::template getEthernetInterface<DummyIf>()->ipPacketReceived(assembler);
+			self->ipPacketReceived(assembler, self);
 		else
-			Net::template getEthernetInterface<DummyIf>()->arpPacketReceived(assembler);
+			self->arpPacketReceived(assembler);
 
 		return true;
 	}

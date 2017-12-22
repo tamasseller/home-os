@@ -9,9 +9,13 @@
 #define PACKETSTREAM_H_
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketStream: public PacketDisassembler, public PacketWriterBase<PacketStream>
+template<class Observer>
+class Network<S, Args...>::ObservedPacketStream:
+	public Observer,
+	public PacketDisassembler,
+	public PacketWriterBase<PacketStream>
 {
-	friend class PacketStream::PacketWriterBase;
+	friend class ObservedPacketStream::PacketWriterBase;
 
 	char *data, *limit;
 
@@ -26,6 +30,8 @@ class Network<S, Args...>::PacketStream: public PacketDisassembler, public Packe
 		Chunk ret = this->getCurrentChunk();
 		data = ret.start;
 		limit = ret.end;
+
+		static_cast<Observer*>(this)->observeInternalBlock(data, limit);
 		return true;
 	}
 
@@ -38,6 +44,7 @@ public:
 		 */
 		data = this->current->getData();
 		limit = data + this->current->getSize();
+		static_cast<Observer*>(this)->observeFirstBlock(data, limit);
 	}
 
 	inline Chunk getChunk()
@@ -90,14 +97,25 @@ public:
 	}
 
     inline bool cutCurrentAndMoveToNext() {
-        if(!PacketDisassembler::cutCurrentAndMoveToNext())
-            return false;
+		while(!this->current->isEndOfPacket()) {
+			if(!this->moveToNextBlock())
+				return false; // This line is not intended to be reached (LCOV_EXCL_LINE).
+
+			static_cast<Observer*>(this)->observeInternalBlock(
+					this->current->getData(), this->current->getData() + this->current->getSize());
+		}
+
+		Block* next = this->current->getNext();
+		this->current->terminate();
+
+		if((this->current = next) == nullptr)
+			return false;
 
         data = this->current->getData();
         limit = data + this->current->getSize();
+        static_cast<Observer*>(this)->observeFirstBlock(data, limit);
         return true;
     }
-
 
 	inline bool atEop() {
 		return !spaceLeft() && this->current->isEndOfPacket();
@@ -172,5 +190,16 @@ public:
         return true;
 	}
 };
+
+template<class S, class... Args>
+struct Network<S, Args...>::NullObserver {
+	inline void observeFirstBlock(char*, char*) {}
+	inline void observeInternalBlock(char*, char*) {}
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::PacketStream: public ObservedPacketStream<NullObserver> {};
+
+
 
 #endif /* PACKETSTREAM_H_ */

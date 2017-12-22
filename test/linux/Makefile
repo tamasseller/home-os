@@ -66,6 +66,8 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 # Networking related tests.
 
 
+endif
+SOURCES += $(ROOT)/test/NetIcmp.cpp
 SOURCES += $(ROOT)/test/NetArpTrx.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetRouting.cpp
@@ -73,8 +75,6 @@ SOURCES += $(ROOT)/test/NetArpTable.cpp
 SOURCES += $(ROOT)/test/NetChecksum.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
-SOURCES += $(ROOT)/test/NetIpTransmission.cpp
-endif
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
 # Testing utilities.
