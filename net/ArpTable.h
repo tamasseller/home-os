@@ -30,9 +30,9 @@ public:
 };
 
 template<class Os, size_t nEntries, bool allowRequestedOnly = false, class Base = typename Os::IoChannel>
-class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template IoChannelBase<ArpTable<Os, nEntries, allowRequestedOnly, Base>, Base>
+class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template SynchronousIoChannelBase<ArpTable<Os, nEntries, allowRequestedOnly, Base>, Base>
 {
-	friend class ArpTable::IoChannelBase;
+	friend class ArpTable::SynchronousIoChannelBase;
 
 public:
 	typedef ArpTableIoData<Os> Data;

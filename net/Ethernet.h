@@ -124,7 +124,6 @@ class Network<S, Args...>::Ethernet:
     /*
      * Internal
      */
-
 	using IoJob = typename Os::IoJob;
 	using Result = typename IoJob::Result;
 	using Launcher = typename IoJob::Launcher;

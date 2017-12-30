@@ -26,9 +26,20 @@ template<class... Args>
 class Scheduler<Args...>::Event: SharedAtomicList::Element
 {
 	friend EventList;
-	void (* const callback)(Event*, uintptr_t);
+
+public:
+	typedef void (*Callback)(Event*, uintptr_t);
+
+private:
+	const Callback callback;
+
 protected:
 	inline Event(void (* callback)(Event*, uintptr_t)): callback(callback) {}
+
+public:
+	inline Callback getCallback() const {
+		return callback;
+	}
 };
 
 }

@@ -9,16 +9,16 @@
 #define SEMAPHOREPROCESS_H_
 
 template<class Os>
-class SemaphoreProcess: public Os::template IoChannelBase<SemaphoreProcess<Os>>
+class SemaphoreProcess: public Os::template SynchronousIoChannelBase<SemaphoreProcess<Os>>
 {
-	friend class SemaphoreProcess::IoChannelBase;
+	friend class SemaphoreProcess::SynchronousIoChannelBase;
 
 public:
 
 	void init() {
 		this->items.clear();
 		count = 0;
-		this->SemaphoreProcess::IoChannelBase::init();
+		this->SemaphoreProcess::SynchronousIoChannelBase::init();
 	}
 
 	struct Data: Os::IoJob::Data {
@@ -32,10 +32,6 @@ private:
 
 	int count;
 	pet::LinkedList<Data> items;
-
-	bool hasJob() {
-		return this->items.iterator().current() != nullptr;
-	}
 
 	bool addItem(typename Os::IoJob::Data* ioItem)
 	{
@@ -65,15 +61,9 @@ private:
 		this->items.remove(static_cast<Data*>(item));
 		return true;
 	}
-
-	void enableProcess() {}
-	void disableProcess() {}
 };
 
 template<class Os>
 SemaphoreProcess<Os> SemaphoreProcess<Os>::instance;
-
-
-
 
 #endif /* SEMAPHOREPROCESS_H_ */

@@ -92,7 +92,8 @@ struct NetworkOptions {
 		class DummyDigester;
 
 		template<class> class IpTxJob;
-		class IcmpReplyJob;
+		template<class> class IpReplyJob;
+		class IcmpEchoReplyJob;
 		class ArpReplyJob;
 
 		class PacketProcessor;
@@ -108,7 +109,7 @@ struct NetworkOptions {
 
             inline void* operator new(size_t, void* x) { return x; }
 
-            IcmpReplyJob icmpReplyJob;
+            IcmpEchoReplyJob icmpReplyJob;
 			IcmpPacketProcessor icmpPacketProcessor;
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
@@ -142,7 +143,9 @@ struct NetworkOptions {
 		using Launcher = typename IoJob::Launcher;
 		using Callback = typename IoJob::Callback;
 
+		template<class Reader> static inline bool checkIcmpPacket(Reader&);
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
+		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:
 		static constexpr auto blockMaxPayload = Block::dataSize;
@@ -203,6 +206,8 @@ inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
 #include "Endian.h"
 #include "Ethernet.h"
 #include "Interfaces.h"
+#include "IpReplyJob.h"
+#include "IpReception.h"
 #include "PacketQueue.h"
 #include "PacketStream.h"
 #include "PacketBuilder.h"

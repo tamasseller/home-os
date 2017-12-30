@@ -118,7 +118,11 @@ public:
 };
 
 /**
- * Implementation template of IoChannel.
+ * Implementation template of a regular IoChannel.
+ *
+ * This implementation expects the process to be interrupt driven,
+ * and routes completion notifications through the asynchronous
+ * event dispatch mechanism.
  *
  * User implementations are supposed to use this in CRTP fashion.
  */
@@ -132,26 +136,23 @@ class Scheduler<Args...>::IoChannelBase: public Base {
 	/**
 	 * Enable the asynchronous process.
 	 *
-	 * For interrupt-driven processes this should enable the interrupt associated with
-	 * the channel. A default empty implementation is provided for synchronous ones.
+	 * Enable the interrupt associated with the channel.
 	 */
 	inline void enableProcess() {}
 
 	/**
 	 * Disable the asynchronous process.
 	 *
-	 * For interrupt-driven processes this should disable the interrupt associated with
-	 * the channel. A default empty implementation is provided for synchronous ones.
+	 * Disable the interrupt associated with the channel.
 	 */
 	inline void disableProcess() {}
 
 	/**
 	 * Start processing an item.
 	 *
-	 * For interrupt-driven processes this should start processing or queue the job
-	 * if can not be started immediately, once the job is done the process shall call
-	 * the _jobDone_ method to signal this (possibly from an interrupt handler). A
-	 * synchronous one may process it and call the _jobDone_ method from within this method.
+	 * Start processing or queue the job if can not be started immediately,
+	 * once the job is done the process shall call the _jobDone_ method to
+	 * signal this (possibly from an interrupt handler).
 	 */
 	inline bool addItem(Data*);
 
@@ -163,7 +164,7 @@ class Scheduler<Args...>::IoChannelBase: public Base {
 	/**
 	 * Query the presence of waiting jobs.
 	 *
-	 * This method is used by the template to find out wether the process needs to be
+	 * This method is used by the template to find out whether the process needs to be
 	 * re-enabled after an erase operation or disabled after a job completion event.
 	 */
 	inline bool hasJob();
@@ -241,6 +242,93 @@ public:
 	inline IoChannelBase(C... c): Base(c...) {}
 
 	inline IoChannelBase() = default;
+};
+
+/**
+ * Implementation template of a synchronous IoChannel.
+ *
+ * This implementation template can be used when the completion of
+ * the jobs is done in a non-interrupt driven way, although locking
+ * needs to be implemented (for example via the asynchronous event
+ * dispatching).
+ *
+ * User implementations are supposed to use this in CRTP fashion.
+ */
+template<class... Args>
+template<class Child, class Base>
+class Scheduler<Args...>::SynchronousIoChannelBase: public Base {
+	friend class Scheduler<Args...>;
+	using RemoveResult = typename IoChannel::RemoveResult;
+	using Data = typename IoJob::Data;
+
+	/**
+	 * Start processing an item.
+	 *
+	 * Start processing or queue the job if can not be started immediately, once
+	 * the job is done the process shall call the _jobDone_ method to signal this.
+	 *
+	 * @NOTE It is called from a synchronized context.
+	 */
+	inline bool addItem(Data*);
+
+	/**
+	 * TODO
+	 */
+	inline bool removeCanceled(Data* data);
+
+	/**
+	 * Implementation of the _IoChannel_ interface.
+	 *
+	 * The process specific functionality is accessed based on the CRTP
+	 * accessible methods provided by the user and described above.
+	 */
+	virtual RemoveResult remove(IoJob* job, typename IoJob::Result result) override final
+	{
+		auto self = static_cast<Child*>(this);
+
+		bool ret = self->removeCanceled(job->data);
+
+		if(ret)
+			job->channel = nullptr;
+
+		return ret ? RemoveResult::Ok : RemoveResult::Denied;
+	}
+
+	/**
+	 * Implementation of the _IoChannel_ interface.
+	 *
+	 * The process specific functionality is accessed based on the CRTP
+	 * accessible methods provided by the user and described above.
+	 */
+	virtual bool add(IoJob* job) override final
+	{
+		auto self = static_cast<Child*>(this);
+		return self->addItem(job->data);
+	}
+
+protected:
+
+	/**
+	 * Notify the listener of the job of completion.
+	 *
+	 * This method is called from the user provided implementation when the
+	 * processing of a job has completed.
+	 *
+	 * @NOTE
+	 * 		It must only be called from a synchronized context (including an invocation
+	 * 		of the _addItem_ method).
+	 */
+	void jobDone(Data* data) {
+		auto self = static_cast<Child*>(this);
+		assert(data->job, ErrorStrings::ioRequestState);
+		(data->job->getCallback())(data->job, IoJob::doneValue);
+	}
+
+public:
+	template<class... C>
+	inline SynchronousIoChannelBase(C... c): Base(c...) {}
+
+	inline SynchronousIoChannelBase() = default;
 };
 
 }

@@ -96,7 +96,7 @@ static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06,
 
 template<class S, class... Args>
 template<class Child>
-struct Network<S, Args...>::IpTxJob: Os::IoJob {
+class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	friend class Os::IoChannel;
 	using IoJob = typename Os::IoJob;
 	using Result = typename IoJob::Result;
@@ -193,12 +193,8 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 
 			self->device = dev;
 			return static_cast<Child*>(self)->onPreparationDone(launcher, item);
-		} else if(result == Result::TimedOut) {
-		    return static_cast<Child*>(self)->onTimeout(launcher, item);
-	    } else {
-	        return static_cast<Child*>(self)->onCancel(launcher, item);
-	    }
-
+		} else
+			return static_cast<Child*>(self)->onPreparationAborted(launcher, item, result);
 	}
 
 	/**
@@ -236,11 +232,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 	    			launcher, &IpTxJob::allocated, &self->packet.stage1, self->nBlocks);
 		} else {
             state.routingTable.releaseRoute(self->route);
-
-            if(result == Result::TimedOut)
-                return static_cast<Child*>(self)->onTimeout(launcher, item);
-            else
-                return static_cast<Child*>(self)->onCancel(launcher, item);
+		    return static_cast<Child*>(self)->onPreparationAborted(launcher, item, result);
 		}
 	}
 
@@ -266,11 +258,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 			return true;
 		} else {
             state.routingTable.releaseRoute(self->route);
-
-            if(result == Result::TimedOut)
-                return static_cast<Child*>(self)->onTimeout(launcher, item);
-            else
-                return static_cast<Child*>(self)->onCancel(launcher, item);
+		    return static_cast<Child*>(self)->onPreparationAborted(launcher, item, result);
 		}
 	}
 
@@ -306,11 +294,7 @@ struct Network<S, Args...>::IpTxJob: Os::IoJob {
 		    return true;
 		} else {
             state.routingTable.releaseRoute(route);
-
-            if(result == Result::TimedOut)
-                return static_cast<Child*>(self)->onTimeout(launcher, item);
-            else
-                return static_cast<Child*>(self)->onCancel(launcher, item);
+		    return static_cast<Child*>(self)->onPreparationAborted(launcher, item, result);
 		}
 	}
 
@@ -417,6 +401,14 @@ public:
 		launcher->launch(self->device->getSender(), &IpTxJob::sent, &self->packet.stage3);
 		return true;
 	}
+
+	inline TxPacketBuilder& accessPacket() {
+		return packet.stage2;
+	}
+
+	inline void disposePacket() {
+		packet.stage3.template dispose<Pool::Quota::Tx>();
+	}
 };
 
 template<class S, class... Args>
@@ -438,7 +430,7 @@ class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob<IpTrans
         if(result != Result::Done)
             error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
 
-        this->packet.stage3.template dispose<Pool::Quota::Tx>();
+        this->disposePacket();
         return false;
 	}
 
@@ -452,13 +444,8 @@ class Network<S, Args...>::IpTransmitter: Os::template IoRequest<IpTxJob<IpTrans
         return false;
     }
 
-    inline bool onTimeout(Launcher *launcher, IoJob* item) {
-        error = NetErrorStrings::genericTimeout;
-        return false;
-    }
-
-    inline bool onCancel(Launcher *launcher, IoJob* item) {
-        error = NetErrorStrings::genericCancel;
+    inline bool onPreparationAborted(Launcher *launcher, IoJob* item, Result result) {
+        error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
         return false;
     }
 
@@ -507,14 +494,14 @@ public:
 		if(!check())
 			return false;
 
-		return this->packet.stage2.copyIn(data, length);
+		return this->accessPacket().copyIn(data, length);
 	}
 
     inline bool addIndirect(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr) {
 		if(!check())
 			return false;
 
-        return this->packet.stage2.addByReference(data, length, destructor, userData);
+        return this->accessPacket().addByReference(data, length, destructor, userData);
     }
 
 	inline const char* getError() {

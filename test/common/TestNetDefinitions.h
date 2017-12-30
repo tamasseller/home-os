@@ -81,7 +81,7 @@ struct DummyIf {
 		self->requestRxBuffers(nBlocksConsumed);
 
 		if(!input[13]) /* 13: second byte of ethertype */
-			self->ipPacketReceived(assembler, self);
+			self->ipPacketReceived(assembler);
 		else
 			self->arpPacketReceived(assembler);
 

@@ -226,6 +226,27 @@ TEST(IoSemaphoreChannel) {
 	CHECK(!task.error);
 }
 
+TEST(IoSemaphoreChannelCancel) {
+	struct Task: Base, public TestTask<Task> {
+		bool run() {
+			SemJob job;
+
+			job.launch(SemJob::entry, -1);
+
+			if(job.done) return bad;
+
+			job.cancel();
+
+			return ok;
+		}
+	} task;
+
+	Base::semProcess.init();
+	task.start();
+	CommonTestUtils::start();
+	CHECK(!task.error);
+}
+
 TEST(IoChannelComposite) {
 	struct Task: Base, public TestTask<Task> {
 		bool run() {

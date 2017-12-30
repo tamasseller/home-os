@@ -105,6 +105,7 @@ struct SchedulerOptions {
 
 		class IoChannel;
 		template<class, class = IoChannel> class IoChannelBase;
+		template<class, class = IoChannel> class SynchronousIoChannelBase;
 
 		class IoJob;
 		template<class> class IoRequest;

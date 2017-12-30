@@ -23,9 +23,9 @@
 #include "DataContainer.h"
 
 template<class Os, size_t nBlocks, class Data, size_t txQuota = nBlocks, size_t rxQuota = nBlocks>
-class BufferPool: public Os::template IoChannelBase<BufferPool<Os, nBlocks, Data, txQuota, rxQuota>>, Os::Event
+class BufferPool: public Os::template SynchronousIoChannelBase<BufferPool<Os, nBlocks, Data, txQuota, rxQuota>>, Os::Event
 {
-	friend class BufferPool::IoChannelBase;
+	friend class BufferPool::SynchronousIoChannelBase;
 
 	union Block {
 		DataContainer<Data> data;
@@ -212,10 +212,6 @@ private:
 		return true;
 	}
 
-	inline bool hasJob() { return false; }
-	inline void enableProcess() {}	// This method is never called ( LCOV_EXCL_LINE )
-	inline void disableProcess() {}
-
 public:
 	inline size_t statUsed() {
 		return nBlocks - memQueue.stat();
@@ -240,7 +236,7 @@ public:
 
 		blocks[nBlocks - 1].next = nullptr;
 
-		BufferPool::IoChannelBase::init();
+		BufferPool::SynchronousIoChannelBase::init();
 	}
 
 	template<Quota quota>
