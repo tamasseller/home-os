@@ -78,7 +78,7 @@ SOURCES += $(ROOT)/test/NetIpReception.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
-	
+
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp

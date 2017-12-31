@@ -44,6 +44,22 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 }
 
 template<class S, class... Args>
+template<class Reader>
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader)
+{
+	RxPacketHandler* ret = nullptr;
+	return ret;
+}
+
+template<class S, class... Args>
+template<class Reader>
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader)
+{
+	RxPacketHandler* ret = nullptr;
+	return ret;
+}
+
+template<class S, class... Args>
 inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev) {
 	struct ChecksumValidatorObserver: InetChecksumDigester {
 		size_t remainingHeaderLength;
@@ -132,20 +148,22 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 
 	uint8_t protocol;
 	if(!reader.read8(protocol)
-			|| (protocol != 1)) { // TODO add the other protocols.
-
+			|| (protocol != 1		// ICMP
+			&& protocol != 2		// IGMP
+			&& protocol != 6		// TCP
+			&& protocol != 17)) {	// UDP
 		// TODO send ICMP unreachable message.
 		packet.template dispose<Pool::Quota::Rx>();
 		return;
 	}
 
-	if(!reader.skipAhead(6)) {
+	if(!reader.skipAhead(2)) {
 		packet.template dispose<Pool::Quota::Rx>();
 		return;
 	}
 
-	AddressIp4 dstIp;
-	if(!reader.read32net(dstIp.addr)) {
+	AddressIp4 srcIp, dstIp;
+	if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr)) {
 		packet.template dispose<Pool::Quota::Rx>();
 		return;
 	}
@@ -179,6 +197,12 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	switch(protocol) {
 	case 1:
 		handler = checkIcmpPacket(reader);
+		break;
+	case 6:
+		handler = checkTcpPacket(reader);
+		break;
+	case 17:
+		handler = checkUdpPacket(reader);
 		break;
 	}
 
