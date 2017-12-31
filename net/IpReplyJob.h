@@ -12,7 +12,7 @@
 
 template<class S, class... Args>
 template<class Child>
-class Network<S, Args...>::IpReplyJob: IpTxJob<IpReplyJob<Child>>
+class Network<S, Args...>::IpReplyJob: IpTxJob<IpReplyJob<Child>>, public RxPacketHandler
 {
 	friend class IpReplyJob::IpTxJob;
 
@@ -90,7 +90,7 @@ private:
 
 
 public:
-    void arrangeReply(Packet packet) {
+    virtual void handlePacket(Packet packet) {
     	this->requestQueue.putPacketChain(packet);
 		this->launch(&IpReplyJob::startReplySequence);
     }

@@ -58,8 +58,13 @@ struct Network<S, Args...>::ArpPacketProcessor: PacketProcessor {
 };
 
 template<class S, class... Args>
-struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor {
+struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor, RxPacketHandler {
 	inline IcmpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
+
+private:
+	virtual void handlePacket(Packet packet) {
+		this->process(packet);
+	}
 };
 
 

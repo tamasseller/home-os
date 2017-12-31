@@ -10,7 +10,7 @@
 using Net = Net64;
 using Accessor = NetworkTestAccessor<Net>;
 
-TEST_GROUP(NetIcmpIcmp)
+TEST_GROUP(NetIcmp)
 {
 	static inline void expectReply(uint16_t n) {
         Net::template getEthernetInterface<DummyIf>()->expectN(n,
@@ -43,6 +43,51 @@ TEST_GROUP(NetIcmpIcmp)
         );
     }
 
+    static inline void receiveRequest() {
+		Net::template getEthernetInterface<DummyIf>()->receive(
+			/*            dst                 |                src                | etherType */
+			0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
+			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+			0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
+			/* source IP address  | destination IP address */
+			0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+			/* type | code | checksum  |     id    |  seqnum   | */
+			0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
+			/* data */
+			'f', 'o', 'o', 'b', 'a', 'r'
+		);
+    }
+
+    static inline void receiveReply() {
+		Net::template getEthernetInterface<DummyIf>()->receive(
+			/*            dst                 |                src                | etherType */
+			0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
+			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+			0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
+			/* source IP address  | destination IP address */
+			0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+			/* type | code | checksum  |     id    |  seqnum   | */
+			0x00,     0x00,  0xc8, 0xb9, 0x00, 0x01, 0x00, 0x01,
+			/* data */
+			'f', 'o', 'o', 'b', 'a', 'r'
+		);
+    }
+
+	static bool checkReplyContent(Net::IcmpReceiver &r) {
+		const uint8_t expected[] = {
+				0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd, 0x0a, 0x0a, 0x0a, 0x1,
+				0x0a, 0x0a, 0x0a, 0x0a, 0x00, 0x00, 0xc8, 0xb9, 0x00, 0x01, 0x00, 0x01, 'f', 'o', 'o', 'b',
+				'a', 'r'
+		};
+
+		for(uint8_t c: expected) {
+			uint8_t a;
+			if(!r.read8(a) || a != c)
+				return false;
+		}
+
+		return true;
+	}
 
 	template<class Task>
 	static inline void work(Task& task)
@@ -70,25 +115,13 @@ TEST_GROUP(NetIcmpIcmp)
 	}
 };
 
-TEST(NetIcmpIcmp, IcmpRequestSimple) {
+TEST(NetIcmp, IcmpRequestSimple) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
         	expectReply(1);
-
-			Net::template getEthernetInterface<DummyIf>()->receive(
-				/*            dst                 |                src                | etherType */
-				0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-				/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-				0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
-				/* source IP address  | destination IP address */
-				0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-				/* type | code | checksum  |     id    |  seqnum   | */
-				0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-				/* data */
-				'f', 'o', 'o', 'b', 'a', 'r'
-			);
+        	receiveRequest();
 
         	Net::Os::sleep(1);
 
@@ -101,7 +134,7 @@ TEST(NetIcmpIcmp, IcmpRequestSimple) {
     work(task);
 }
 
-TEST(NetIcmpIcmp, IcmpRequestMartian) {
+TEST(NetIcmp, IcmpRequestMartian) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
@@ -130,7 +163,7 @@ TEST(NetIcmpIcmp, IcmpRequestMartian) {
     work(task);
 }
 
-TEST(NetIcmpIcmp, IcmpRequestNoArp) {
+TEST(NetIcmp, IcmpRequestNoArp) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
@@ -168,7 +201,7 @@ TEST(NetIcmpIcmp, IcmpRequestNoArp) {
     work(task);
 }
 
-TEST(NetIcmpIcmp, IcmpRequestLong) {
+TEST(NetIcmp, IcmpRequestLong) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
@@ -200,8 +233,7 @@ TEST(NetIcmpIcmp, IcmpRequestLong) {
     work(task);
 }
 
-
-TEST(NetIcmpIcmp, IcmpRequestMultiple) {
+TEST(NetIcmp, IcmpRequestMultiple) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
@@ -210,18 +242,7 @@ TEST(NetIcmpIcmp, IcmpRequestMultiple) {
 
         	doIndirect([](){
         		for(int i=0; i<3; i++) {
-					Net::template getEthernetInterface<DummyIf>()->receive(
-						/*            dst                 |                src                | etherType */
-						0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-						/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-						0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
-						/* source IP address  | destination IP address */
-						0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-						/* type | code | checksum  |     id    |  seqnum   | */
-						0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-						/* data */
-						'f', 'o', 'o', 'b', 'a', 'r'
-					);
+        			receiveRequest();
         		}
         	});
 
@@ -236,7 +257,7 @@ TEST(NetIcmpIcmp, IcmpRequestMultiple) {
     work(task);
 }
 
-TEST(NetIcmpIcmp, IcmpReceptionInvalid) {
+TEST(NetIcmp, IcmpReceptionInvalid) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
@@ -280,232 +301,141 @@ TEST(NetIcmpIcmp, IcmpReceptionInvalid) {
     work(task);
 }
 
-TEST(NetIcmpIcmp, IpReceptionInvalid) {
+TEST(NetIcmp, IcmpReceiveReplyNoListener) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0x55, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                0x35
-            );
+            receiveReply();
 
-            Net::Os::sleep(1);
+        	Net::Os::sleep(1);
+
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+        	return ok;
+        }
+    } task;
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                0x45
-            );
+    work(task);
+}
 
-            Net::Os::sleep(1);
+TEST(NetIcmp, IcmpReceiveReplyWithListener) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IcmpReceiver r;
+
+            r.init();
+            r.receive();
+
+            receiveReply();
+
+			r.wait();
+
+			if(!checkReplyContent(r))
+				return Task::bad;
+
+			r.close();
+
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+        	return ok;
+        }
+    } task;
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                0x45, 0x00
-            );
+    work(task);
+}
 
-            Net::Os::sleep(1);
+TEST(NetIcmp, IcmpReceiveMultipleRepliesWithListener) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IcmpReceiver r;
+
+            r.init();
+            r.receive();
+
+            for(int i=0; i < 3; i++)
+            {
+                receiveReply();
+
+    			r.wait();
+
+    			if(!checkReplyContent(r))
+    				return Task::bad;
+            }
+
+			r.close();
+
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+        	return ok;
+        }
+    } task;
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length  */
-                0x45, 0x00, 0x00, 0x22
-            );
+    work(task);
+}
 
-            Net::Os::sleep(1);
+TEST(NetIcmp, IcmpReceiveMultipleRepliesWithFullRestart) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IcmpReceiver r;
+
+            r.init();
+
+            for(int i=0; i < 3; i++)
+            {
+                r.receive();
+
+            	receiveReply();
+
+    			r.wait();
+
+    			if(!checkReplyContent(r))
+    				return Task::bad;
+
+    			r.close();
+            }
+
+
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+        	return ok;
+        }
+    } task;
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00
-            );
+    work(task);
+}
 
-            Net::Os::sleep(1);
+TEST(NetIcmp, IcmpReceiveMultipleRepliesWithListenerAtOnce) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IcmpReceiver r;
+
+            r.init();
+            r.receive();
+
+            doIndirect([](){
+                for(int i=0; i < 3; i++)
+                    receiveReply();
+            });
+
+			r.wait();
+
+			if(!checkReplyContent(r))
+				return Task::bad;
+
+			r.close();
+
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00
-            );
-
-            /*
-             * First fragment
-             */
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x60, 0x00
-            );
-
-            /*
-             * Internal fragment
-             */
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x60, 0x01
-            );
-
-            /*
-             * Last fragment
-             */
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x02
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            /*
-             * Truncated content.
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbd,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* type | code | checksum  |     id    |  seqnum   | */
-                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            /*
-             * Truncated header (should be 24 bytes)
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x46, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0xef, 0x01,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a
-            );
-
-            /*
-             * Bad checksum
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0xf0, 0x01,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* type | code | checksum  |     id    |  seqnum   | */
-                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            /*
-             * Unassigned protocol number.
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfc, 0x12, 0xbd,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* type | code | checksum  |     id    |  seqnum   | */
-                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            /*
-             * Not for us.
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0x12, 0xbe,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x09,
-                /* type | code | checksum  |     id    |  seqnum   | */
-                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-
-            return ok;
+        	return ok;
         }
     } task;
 

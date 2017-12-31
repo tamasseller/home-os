@@ -10,26 +10,37 @@
 
 template<class S, class... Args>
 template<class Reader>
-inline bool Network<S, Args...>::checkIcmpPacket(Reader& reader) {
-		uint16_t typeCode;
-		if(!reader.read16net(typeCode) ||
-				(typeCode != 0x0800)) { // Echo request.
-			// TODO add the other allowed ICMP message type+codes.
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkIcmpPacket(Reader& reader)
+{
+	RxPacketHandler* ret;
+	uint16_t typeCode;
 
-			return false;
-		}
+	if(!reader.read16net(typeCode))
+		return nullptr;
 
-		InetChecksumDigester sum;
-		size_t offset = 0;
-		while(!reader.atEop()) {
-			Chunk chunk = reader.getChunk();
-			sum.consume(chunk.start, chunk.length(), offset & 1);
-			offset += chunk.length();
-			reader.advance(static_cast<uint16_t>(chunk.length()));
-		}
+	switch(typeCode) {
+		case 0x0000: // Echo reply.
+			ret = &state.icmpPacketProcessor;
+			break;
+		case 0x0800: // Echo request.
+			ret = &state.icmpReplyJob;
+			break;
+		default:
+			return nullptr;
+	}
 
-		sum.patch(0, correctEndian(typeCode));
-		return sum.result() == 0;
+	InetChecksumDigester sum;
+	size_t offset = 0;
+	while(!reader.atEop()) {
+		Chunk chunk = reader.getChunk();
+		sum.consume(chunk.start, chunk.length(), offset & 1);
+		offset += chunk.length();
+		reader.advance(static_cast<uint16_t>(chunk.length()));
+	}
+
+	sum.patch(0, correctEndian(typeCode));
+
+	return (sum.result() == 0) ? ret : nullptr;
 }
 
 template<class S, class... Args>
@@ -163,23 +174,26 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		return;
 	}
 
-	if((protocol == 1) && !checkIcmpPacket(reader)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
-
-	bool infinitePacket = reader.skipAhead(0xffff);
-	Os::assert(!infinitePacket, NetErrorStrings::unknown);
-
-	if(reader.totalLength != ipLength) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	RxPacketHandler* handler = nullptr;
 
 	switch(protocol) {
-	case 1: // ICMP
-		state.icmpReplyJob.arrangeReply(packet);
+	case 1:
+		handler = checkIcmpPacket(reader);
 		break;
+	}
+
+	if(handler) {
+		bool infinitePacket = reader.skipAhead(0xffff);
+		Os::assert(!infinitePacket, NetErrorStrings::unknown);
+
+		if(reader.totalLength != ipLength) {
+			packet.template dispose<Pool::Quota::Rx>();
+			return;
+		}
+
+		handler->handlePacket(packet);
+	} else {
+		packet.template dispose<Pool::Quota::Rx>();
 	}
 }
 

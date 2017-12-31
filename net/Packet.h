@@ -249,6 +249,10 @@ public:
 		this->first = first;
 	}
 
+	bool isValid() {
+		return this->first != nullptr;
+	}
+
 	template<typename Pool::Quota quota>
 	void dispose() {
         typename Pool::Deallocator deallocator(first);

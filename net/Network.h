@@ -78,10 +78,15 @@ struct NetworkOptions {
 		struct Chunk;
 		class Block;
 		class PacketQueue;
+
+		class NullTag;
+		template<class> class PacketInputChannel;
+		typedef PacketInputChannel<NullTag> IcmpInputChannel;
+
 		template<class> class PacketWriterBase;
 		class NullObserver;
-		class PacketTransmissionRequest;
 		template<class> class ObservedPacketStream;
+		class PacketTransmissionRequest;
 
 		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
@@ -91,8 +96,10 @@ struct NetworkOptions {
 
 		class DummyDigester;
 
+		class RxPacketHandler;
 		template<class> class IpTxJob;
 		template<class> class IpReplyJob;
+		class IcmpRxJob;
 		class IcmpEchoReplyJob;
 		class ArpReplyJob;
 
@@ -111,6 +118,8 @@ struct NetworkOptions {
 
             IcmpEchoReplyJob icmpReplyJob;
 			IcmpPacketProcessor icmpPacketProcessor;
+			IcmpInputChannel icmpInputChannel;
+
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
@@ -143,7 +152,7 @@ struct NetworkOptions {
 		using Launcher = typename IoJob::Launcher;
 		using Callback = typename IoJob::Callback;
 
-		template<class Reader> static inline bool checkIcmpPacket(Reader&);
+		template<class Reader> static inline RxPacketHandler* checkIcmpPacket(Reader&);
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
@@ -153,6 +162,7 @@ struct NetworkOptions {
 		using Route = typename RoutingTable::Route;
 
 		class IpTransmitter;
+		class IcmpReceiver;
 
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);
@@ -160,6 +170,7 @@ struct NetworkOptions {
 		static inline void init(Buffers &buffers) {
 		    state.~State();
 		    new(&state) State();
+		    state.icmpInputChannel.init();
 			state.pool.init(buffers);
 			state.interfaces.init();
 			state.ager.start(secTicks);
@@ -200,6 +211,11 @@ inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
 	return static_cast<uint16_t>((bytes + blockMaxPayload - 1) / blockMaxPayload);
 }
 
+template<class S, class... Args>
+struct Network<S, Args...>::RxPacketHandler {
+	virtual void handlePacket(Packet packet) = 0;
+};
+
 #include "Arp.h"
 #include "Icmp.h"
 #include "Packet.h"
@@ -213,5 +229,6 @@ inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
 #include "PacketBuilder.h"
 #include "IpTransmission.h"
 #include "PacketProcessor.h"
+#include "PacketInputChannel.h"
 
 #endif /* NETWORK_H_ */

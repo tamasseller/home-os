@@ -49,11 +49,6 @@ private:
 	uint16_t ageingCounter = 0;
 
 	/// Implementation of the IoChannelBase interface.
-	inline bool hasJob() {
-		return true;
-	}
-
-	/// Implementation of the IoChannelBase interface.
 	inline bool addItem(typename Os::IoJob::Data* job)
 	{
 		Data* data = static_cast<Data*>(job);

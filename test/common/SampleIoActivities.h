@@ -86,7 +86,6 @@ struct DummyProcessJobsBase {
 		}
 
 		friend class Os::IoChannel;
-		template <class> friend class Os::IoRequest;
 
 		static bool start(typename Os::IoJob::Launcher* launcher, typename Os::IoJob* item, int n) {
 			auto self = static_cast<SemJob*>(item);

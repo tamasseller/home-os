@@ -77,8 +77,9 @@ class Scheduler<Args...>::IoRequestCommon:
 	 * The rest should be check for test coverage. ( LCOV_EXCL_STOP )
 	 */
 
-    virtual Blocker* getTakeable(Task*) override final {
-        return (this->result == IoJob::Result::NotYet) ? nullptr : this;
+    virtual Blocker* getTakeable(Task* task) override {
+    	// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
+    	return static_cast<Blocker*>(this)->getTakeable(task);
     }
 
 	virtual inline bool continuation(uintptr_t retval) override {
@@ -108,7 +109,6 @@ public:
 template<class... Args>
 class Scheduler<Args...>::IoRequestCommon::RequestLauncher: public IoJob::Launcher
 {
-	template<class> friend class IoRequest;
 	friend class IoRequestCommon;
 
 	IoRequestCommon* self;
@@ -156,7 +156,7 @@ public:
 };
 
 template<class... Args>
-template<class Job>
+template<class Job, bool (Job::*isBlocking)()>
 class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
@@ -179,6 +179,7 @@ class Scheduler<Args...>::IoRequest:
 
 	virtual bool continuation(uintptr_t retval) override final
 	{
+		// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
 	    typename IoJob::Result result = this->result;
 	    auto job = static_cast<IoJob*>(this);
 
@@ -200,6 +201,18 @@ class Scheduler<Args...>::IoRequest:
 
 		return this->isOccupied();
 	}
+
+    virtual Blocker* getTakeable(Task* task) override final {
+    	// TODO explain in details, this is really crazy (re-virtualization of a de-virtualized call).
+
+    	if(this->result != IoJob::Result::NotYet)
+    		return this;
+
+    	if(isBlocking && !(this->*isBlocking)())
+    		return this;
+
+        return nullptr;
+    }
 
 public:
 	inline void init() {

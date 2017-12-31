@@ -15,6 +15,36 @@ inline void Network<S, Args...>::processIcmpPacket(typename Os::Event*, uintptr_
 {
 	Packet chain;
 	chain.init(reinterpret_cast<Block*>(arg));
+
+    PacketStream reader;
+    reader.init(chain);
+
+    while(true) {
+        /*
+         * Save the handle to the first block.
+         */
+        Packet start = reader.asPacket();
+
+        /*
+         * Skip initial fields of the IP header payload all the way to the source address.
+         */
+        bool skipOk = reader.skipAhead(12);
+        Os::assert(skipOk, NetErrorStrings::unknown);
+
+        AddressIp4 src;
+        Os::assert(reader.read32net(src.addr), NetErrorStrings::unknown);
+
+        /*
+         * Move reader to the end, then dispose of the reply packet.
+         */
+        bool hasMore = reader.cutCurrentAndMoveToNext();
+
+        if(!state.icmpInputChannel.takePacket(start))
+        	start.template dispose<Pool::Quota::Rx>();
+
+        if(!hasMore)
+            break;
+    }
 }
 
 template<class S, class... Args>
@@ -79,6 +109,78 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 		}
 
 		return typename Base::FinalReplyInfo{0x01 /* ICMP */, 0xff};
+	}
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::IcmpRxJob: public Os::IoJob, public PacketStream {
+	typename IcmpInputChannel::IoData data;
+	Packet packet;
+
+	static bool received(Launcher *launcher, IoJob* item, Result result)
+	{
+		auto self = static_cast<IcmpRxJob*>(item);
+
+		if(result == Result::Done) {
+			if(self->packet.isValid() && static_cast<PacketStream*>(self)->atEop()) {
+				self->packet.template dispose<Pool::Quota::Rx>();
+				self->packet.init(nullptr);
+			}
+
+			if(!self->packet.isValid()) {
+				if(self->data.packets.takePacketFromQueue(self->packet))
+					static_cast<PacketStream*>(self)->init(self->packet);
+			}
+
+			return true;
+		} else {
+			if(self->packet.isValid())
+				self->packet.template dispose<Pool::Quota::Rx>();
+
+			while(self->data.packets.takePacketFromQueue(self->packet))
+				self->packet.template dispose<Pool::Quota::Rx>();
+
+			self->packet.init(nullptr);
+			return false;
+		}
+	}
+
+public:
+	void init() {
+		packet.init(nullptr);
+	}
+
+	bool isEmpty() {
+		return !packet.isValid() && data.packets.isEmpty();
+	}
+
+	static bool startReception(Launcher *launcher, IoJob* item)
+	{
+		auto self = static_cast<IcmpRxJob*>(item);
+
+		Os::assert(!self->packet.isValid(), NetErrorStrings::unknown);
+
+		launcher->launch(&state.icmpInputChannel, &IcmpRxJob::received, &self->data);
+		return true;
+	}
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::IcmpReceiver: public Os::template IoRequest<IcmpRxJob, &IcmpRxJob::isEmpty>
+{
+public:
+	void init() {
+		IcmpRxJob::init();
+		IcmpReceiver::IoRequest::init();
+	}
+
+	bool receive() {
+		return this->launch(&IcmpReceiver::IcmpRxJob::startReception);
+	}
+
+	void close() {
+		this->cancel();
+		this->wait();
 	}
 };
 
