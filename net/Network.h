@@ -163,8 +163,8 @@ struct NetworkOptions {
 		using Callback = typename IoJob::Callback;
 
 		template<class Reader> static inline RxPacketHandler* checkIcmpPacket(Reader&);
-		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&);
-		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&);
+		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&, AddressIp4 srcIp, AddressIp4 dstIp, size_t);
+		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&, AddressIp4 srcIp, AddressIp4 dstIp, size_t);
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
 		static inline void processRawPacket(typename Os::Event*, uintptr_t);
 		static inline void processUdpPacket(typename Os::Event*, uintptr_t);

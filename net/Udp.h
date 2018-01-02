@@ -10,9 +10,33 @@
 
 template<class S, class... Args>
 template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader)
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, AddressIp4 srcIp, AddressIp4 dstIp, size_t length)
 {
 	RxPacketHandler* ret = &state.udpPacketProcessor;
+
+	InetChecksumDigester sum;
+
+	if(length < 8)
+		return nullptr;
+
+	size_t offset = 0;
+	while(!reader.atEop()) {
+		Chunk chunk = reader.getChunk();
+		sum.consume(chunk.start, chunk.length(), offset & 1);
+		offset += chunk.length();
+		reader.advance(static_cast<uint16_t>(chunk.length()));
+	}
+
+	sum.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
+	sum.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
+	sum.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
+	sum.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
+	sum.patch(0, correctEndian(static_cast<uint16_t>(length)));
+	sum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
+
+	if(sum.result())
+		return nullptr;
+
 	return ret;
 }
 

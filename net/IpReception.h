@@ -41,9 +41,12 @@ inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t
 
 template<class S, class... Args>
 template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader)
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, AddressIp4 srcIp, AddressIp4 dstIp, size_t)
 {
 	RxPacketHandler* ret = nullptr;
+
+
+
 	return ret;
 }
 
@@ -182,10 +185,10 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		handler = checkIcmpPacket(reader);
 		break;
 	case 6:
-		handler = checkTcpPacket(reader);
+		handler = checkTcpPacket(reader, srcIp, dstIp, ipLength - ((versionAndHeaderLength & 0x0f) << 2));
 		break;
 	case 17:
-		handler = checkUdpPacket(reader);
+		handler = checkUdpPacket(reader, srcIp, dstIp, ipLength - ((versionAndHeaderLength & 0x0f) << 2));
 		break;
 	}
 

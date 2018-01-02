@@ -405,7 +405,7 @@ public:
 		for(size_t left = 8; left;) {
 			Chunk chunk = modifier.getChunk();
 			size_t run = left < chunk.length() ? left : chunk.length();
-			payloadChecksum.consume(chunk.start, run);
+			payloadChecksum.consume(chunk.start, run, left & 1);
 			modifier.advance(static_cast<uint16_t>(run));
 			left -= run;
 		}

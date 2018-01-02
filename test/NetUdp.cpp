@@ -137,6 +137,77 @@ TEST(NetUdp, ReceiveSimple) {
     work(task);
 }
 
+TEST(NetUdp, ReceiveBad) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::UdpReceiver r;
+
+            r.init();
+            r.receive(1234);
+
+            receiveSimple();
+
+            /*
+             * Checksum error
+             */
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x22, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x47,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* srcport|  dstport  | udplength | checksum */
+                0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0, 0x01,
+                /* payload */
+                'f', 'o', 'o', 'b', 'a', 'r'
+            );
+
+            /*
+             * Payload truncated
+             */
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x1f, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x4a,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* srcport|  dstport  | udplength | checksum */
+                0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0, 0x01,
+                /* payload */
+                'f', 'o', 'o'
+            );
+
+            /*
+             * Payload truncated
+             */
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x1b, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x4e,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* srcport|  dstport  | udplength | checksum */
+                0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0
+            );
+
+            if(r.wait(1)) return Task::bad;
+
+            r.close();
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
 TEST(NetUdp, ReceiveMultiple) {
     struct Task: public TestTask<Task> {
         bool run() {
@@ -169,7 +240,7 @@ TEST(NetUdp, ReceiveMultiple) {
 
     work(task);
 }
-#if 1
+
 TEST(NetUdp, SendSimple) {
     struct Task: public TestTask<Task> {
         bool run() {
@@ -207,4 +278,3 @@ TEST(NetUdp, SendSimple) {
 
     work(task);
 }
-#endif
