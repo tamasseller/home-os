@@ -80,9 +80,12 @@ struct NetworkOptions {
 		class PacketQueue;
 
 		class NullTag;
+		class DstPortTag;
+
 		template<class> class PacketInputChannel;
 		typedef PacketInputChannel<NullTag> IcmpInputChannel;
 		typedef PacketInputChannel<NullTag> RawInputChannel;
+		typedef PacketInputChannel<DstPortTag> UdpInputChannel;
 
 		template<class> class PacketWriterBase;
 		class NullObserver;
@@ -108,6 +111,7 @@ struct NetworkOptions {
 		class ArpPacketProcessor;
 		class IcmpPacketProcessor;
 		class RawPacketProcessor;
+		class UdpPacketProcessor;
 
 		static struct State {
 			struct Ager: Os::Timeout {
@@ -124,6 +128,9 @@ struct NetworkOptions {
 
 			RawInputChannel rawInputChannel;
 			RawPacketProcessor rawPacketProcessor;
+
+			UdpInputChannel udpInputChannel;
+			UdpPacketProcessor udpPacketProcessor;
 
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
@@ -160,6 +167,7 @@ struct NetworkOptions {
 		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&);
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
 		static inline void processRawPacket(typename Os::Event*, uintptr_t);
+		static inline void processUdpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:
@@ -170,6 +178,7 @@ struct NetworkOptions {
 		class IpTransmitter;
 		class IpReceiver;
 		class IcmpReceiver;
+		class UdpReceiver;
 
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);
@@ -179,6 +188,7 @@ struct NetworkOptions {
 		    new(&state) State();
 		    state.icmpInputChannel.init();
 		    state.rawInputChannel.init();
+		    state.udpInputChannel.init();
 			state.pool.init(buffers);
 			state.interfaces.init();
 			state.ager.start(secTicks);
@@ -221,6 +231,7 @@ struct Network<S, Args...>::RxPacketHandler {
 };
 
 #include "Arp.h"
+#include "Udp.h"
 #include "Icmp.h"
 #include "Packet.h"
 #include "Endian.h"

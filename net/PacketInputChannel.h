@@ -18,6 +18,19 @@ struct Network<S, Args...>:: NullTag {
 };
 
 template<class S, class... Args>
+class Network<S, Args...>:: DstPortTag {
+	uint16_t n;
+public:
+	bool operator ==(const DstPortTag& other) {
+		return n == other.n;
+	}
+
+	inline DstPortTag(uint16_t n): n(n) {}
+	inline DstPortTag(): n(0) {}
+};
+
+
+template<class S, class... Args>
 template<class Tag>
 class Network<S, Args...>::PacketInputChannel: public Os::template SynchronousIoChannelBase<PacketInputChannel<Tag>>
 {
@@ -29,11 +42,11 @@ public:
 		friend class pet::LinkedList<IoData>;
 		IoData* next;
 
+	public:
 		Tag &accessTag() {
 			return *this;
 		}
 
-	public:
 		PacketQueue packets;
 	};
 

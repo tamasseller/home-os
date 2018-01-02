@@ -41,49 +41,6 @@ inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t
 
 template<class S, class... Args>
 template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkIcmpPacket(Reader& reader)
-{
-	RxPacketHandler* ret;
-	uint16_t typeCode;
-
-	if(!reader.read16net(typeCode))
-		return nullptr;
-
-	switch(typeCode) {
-		case 0x0000: // Echo reply.
-			ret = &state.icmpPacketProcessor;
-			break;
-		case 0x0800: // Echo request.
-			ret = &state.icmpReplyJob;
-			break;
-		default:
-			return nullptr;
-	}
-
-	InetChecksumDigester sum;
-	size_t offset = 0;
-	while(!reader.atEop()) {
-		Chunk chunk = reader.getChunk();
-		sum.consume(chunk.start, chunk.length(), offset & 1);
-		offset += chunk.length();
-		reader.advance(static_cast<uint16_t>(chunk.length()));
-	}
-
-	sum.patch(0, correctEndian(typeCode));
-
-	return (sum.result() == 0) ? ret : nullptr;
-}
-
-template<class S, class... Args>
-template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader)
-{
-	RxPacketHandler* ret = nullptr;
-	return ret;
-}
-
-template<class S, class... Args>
-template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader)
 {
 	RxPacketHandler* ret = nullptr;
@@ -249,10 +206,11 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 template<class S, class... Args>
 template<class Child, class Channel>
 class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
-    typename Channel::IoData data;
     Packet packet;
 
 protected:
+    typename Channel::IoData data;
+
     inline void preprocess() {}
     inline void reset() {}
 

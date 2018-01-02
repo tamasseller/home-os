@@ -72,16 +72,7 @@ TEST(NetIpReception, DropRawNoListener) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
+            receiveSimple();
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
@@ -200,6 +191,7 @@ TEST(NetIpReception, ReceiveRawMultiple) {
 
             doIndirect([](){
                 receiveSimple();
+
                 Net::template getEthernetInterface<DummyIf>()->receive(
                     /*            dst                 |                src                | etherType */
                     0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
@@ -428,25 +420,6 @@ TEST(NetIpReception, IpReceptionInvalid) {
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
                 /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
                 0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0x01, 0xf0, 0x01,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* type | code | checksum  |     id    |  seqnum   | */
-                0x08,     0x00,  0xc0, 0xb9, 0x00, 0x01, 0x00, 0x01,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
-
-            Net::Os::sleep(1);
-            if(Accessor::pool.statTxUsed()) return Task::bad;
-            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
-
-            /*
-             * Unassigned protocol number.
-             */
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfc, 0x12, 0xbd,
                 /* source IP address  | destination IP address */
                 0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
                 /* type | code | checksum  |     id    |  seqnum   | */
