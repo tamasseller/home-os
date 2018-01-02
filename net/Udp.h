@@ -110,5 +110,81 @@ public:
 	}
 };
 
+template<class S, class... Args>
+class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitter> {
+	friend class UdpTransmitter::IpTransmitterBase::IpTxJob;
+
+	uint16_t dstPort, srcPort;
+
+	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) {
+		auto self = static_cast<UdpTransmitter*>(item);
+		Os::assert(self->accessPacket().write16net(self->srcPort), NetErrorStrings::unknown);
+		Os::assert(self->accessPacket().write16net(self->dstPort), NetErrorStrings::unknown);
+		Os::assert(self->accessPacket().write32raw(0), NetErrorStrings::unknown);
+
+		return false;
+	}
+
+	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
+		Os::assert(stream.skipAhead(4), NetErrorStrings::unknown);
+		stream.write16net(static_cast<uint16_t>(payload));
+
+		checksum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
+		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
+		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
+		Os::assert(stream.write16raw(checksum.result()), NetErrorStrings::unknown);
+	}
+public:
+
+	inline void setSourcePort(uint16_t srcPort) {
+		this->srcPort = srcPort;
+	}
+
+	inline void init(uint16_t srcPort) {
+		this->srcPort = srcPort;
+		UdpTransmitter::IpTransmitterBase::init();
+	}
+
+	inline bool prepare(AddressIp4 dst, uint16_t dstPort, size_t inLineSize, size_t indirectCount = 0)
+	{
+    	this->reset();
+    	inLineSize += 8; // UDP header size;
+    	this->dstPort = dstPort;
+		bool later = this->launch(&UdpTransmitter::IpTransmitterBase::IpTxJob::startPreparation, dst, inLineSize, indirectCount, arpRequestRetry);
+		return later || this->getError() == nullptr;
+	}
+
+    inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
+    {
+    	this->reset();
+    	inLineSize += 8; // UDP header size;
+    	this->dstPort = dstPort;
+        bool later = this->launchTimeout(&UdpTransmitter::IpTransmitterBase::IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount, arpRequestRetry);
+        return later || this->getError() == nullptr;
+    }
+
+	inline bool send(uint8_t ttl = 64)
+	{
+		if(!this->check())
+			return false;
+
+		bool later = this->launch(
+				&UdpTransmitter::IpTransmitterBase::IpTxJob::template startTransmission<InetChecksumDigester>,
+				'\x11', ttl);
+        return later || this->getError() == nullptr;
+	}
+
+    inline bool sendTimeout(size_t timeout, uint8_t ttl = 64)
+    {
+        if(!this->check())
+            return false;
+
+        bool later = this->launchTimeout(
+        		&UdpTransmitter::IpTransmitterBase::IpTxJob::template startTransmission<InetChecksumDigester>, timeout,
+        		'\x11', ttl);
+        return later || this->getError() == nullptr;
+    }
+};
+
 
 #endif /* UDP_H_ */

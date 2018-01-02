@@ -211,7 +211,7 @@ class Scheduler<Args...>::IoRequest:
     	if(onBlocking && !(this->*onBlocking)())
     		return this;
 
-        return nullptr;
+        return this->isOccupied() ? nullptr : this;
     }
 
 public:

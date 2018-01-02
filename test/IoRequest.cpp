@@ -195,6 +195,9 @@ TEST(IoRequestProtection) {
 			if(!reqs[1].launchTimeout(Req::entry, 10)) return bad;
 			if(reqs[2].launchTimeout(Req::entry, 0)) return bad;
 
+			reqs[0].cancel();
+			reqs[1].cancel();
+
 			return ok;
 		}
 	} task;

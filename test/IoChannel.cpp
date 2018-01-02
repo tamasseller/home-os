@@ -359,6 +359,8 @@ TEST(IoChannelCompositeTimeoutCumulative) {
             if(jobs[0].isOccupied()) return bad;
             if(!jobs[0].timedOut) return bad;
 
+            jobs[1].cancel();
+
 			return ok;
         }
     } task;

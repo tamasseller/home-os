@@ -379,11 +379,6 @@ TEST_GROUP(NetIpTransmitter) {
 
                         tx1.wait();
 
-                        tx2.wait();
-
-                        if(tx2.isOccupied() || tx2.getError())
-                            return Task::bad;
-
                         if(tx2.fill("foobar", 6) != 6)
                             return Task::bad;
 

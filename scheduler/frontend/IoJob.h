@@ -197,6 +197,7 @@ public:
 	IoJob(IoJob&&) = delete;
 	void operator =(const IoJob&) = delete;
 	void operator =(IoJob&&) = delete;
+	inline ~IoJob() {assert(acquire(), ErrorStrings::ioJobDelete);}
 };
 
 template<class... Args>

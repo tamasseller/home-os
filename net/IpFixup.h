@@ -172,7 +172,7 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 
 	/*
 	 * If the header is done, go over the rest of the packet to find
-	 * the size and calculat the checksum of the payload as well.
+	 * the size and calculate the checksum of the payload as well.
 	 */
 	while(disassembler.advance()) {
 		Chunk chunk = disassembler.getCurrentChunk();
@@ -197,17 +197,11 @@ inline void Network<S, Args...>::headerFixupStepTwo(
 	static constexpr size_t lengthOffset = 2;
 	static constexpr size_t skipBetweenLengthAndChecksum = 6;
 
-	bool skipOk = modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset));
-	Os::assert(skipOk, NetErrorStrings::unknown);
+	Os::assert(modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset)), NetErrorStrings::unknown);
+	Os::assert(modifier.write16net(static_cast<uint16_t>(length)), NetErrorStrings::unknown);
 
-	bool lengthOk = modifier.write16net(static_cast<uint16_t>(length));
-	Os::assert(lengthOk, NetErrorStrings::unknown);
-
-	bool skip2ok = modifier.skipAhead(skipBetweenLengthAndChecksum);
-	Os::assert(skip2ok, NetErrorStrings::unknown);
-
-	bool checksumOk = modifier.write16raw(headerChecksum);
-	Os::assert(checksumOk, NetErrorStrings::unknown);
+	Os::assert(modifier.skipAhead(skipBetweenLengthAndChecksum), NetErrorStrings::unknown);
+	Os::assert(modifier.write16raw(headerChecksum), NetErrorStrings::unknown);
 }
 
 #endif /* IPFIXUP_H_ */

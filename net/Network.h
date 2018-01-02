@@ -170,12 +170,16 @@ struct NetworkOptions {
 		static inline void processUdpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
+		template<class> class IpTransmitterBase;
+
 	public:
 		static constexpr auto blockMaxPayload = Block::dataSize;
 		typedef typename Pool::Storage Buffers;
 		using Route = typename RoutingTable::Route;
 
 		class IpTransmitter;
+		class UdpTransmitter;
+
 		class IpReceiver;
 		class IcmpReceiver;
 		class UdpReceiver;
