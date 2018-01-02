@@ -378,7 +378,7 @@ public:
 	}
 
 	inline bool advance() {
-		if(current->isEndOfPacket())
+		if(!current || current->isEndOfPacket())
 			return false;
 
 		return moveToNextBlock();

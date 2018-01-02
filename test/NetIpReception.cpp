@@ -28,6 +28,19 @@ TEST_GROUP(NetIpReception)
         return true;
     }
 
+    static inline void receiveSimple() {
+        Net::template getEthernetInterface<DummyIf>()->receive(
+            /*            dst                 |                src                | etherType */
+            0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+            /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+            0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
+            /* source IP address  | destination IP address */
+            0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+            /* data */
+            'f', 'o', 'o', 'b', 'a', 'r'
+        );
+    }
+
 	template<class Task>
 	static inline void work(Task& task)
 	{
@@ -89,16 +102,7 @@ TEST(NetIpReception, ReceiveRawWithListener) {
             r.init();
             r.receive();
 
-            Net::template getEthernetInterface<DummyIf>()->receive(
-                /*            dst                 |                src                | etherType */
-                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
-                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
-                /* source IP address  | destination IP address */
-                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                /* data */
-                'f', 'o', 'o', 'b', 'a', 'r'
-            );
+            receiveSimple();
 
             r.wait();
 
@@ -117,6 +121,73 @@ TEST(NetIpReception, ReceiveRawWithListener) {
     work(task);
 }
 
+TEST(NetIpReception, ReceiveRawRestart) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IpReceiver r;
+
+            r.init();
+
+            for(int i=0; i<3; i++) {
+                r.receive();
+
+                receiveSimple();
+
+                r.wait();
+
+                if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
+                if(r.getProtocol() != 0xfe) return Task::bad;
+                if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+                r.close();
+            }
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetIpReception, Misusage) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::IpReceiver r;
+
+            r.init();
+
+            if(checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+            r.receive();
+
+            if(checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+            receiveSimple();
+
+            if(checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+            r.wait();
+
+            if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+            r.close();
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+
 TEST(NetIpReception, ReceiveRawMultiple) {
     struct Task: public TestTask<Task> {
         bool run() {
@@ -128,27 +199,29 @@ TEST(NetIpReception, ReceiveRawMultiple) {
             r.receive();
 
             doIndirect([](){
-                Net::template getEthernetInterface<DummyIf>()->receive(
-                    /*            dst                 |                src                | etherType */
-                    0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
-                    /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-                    0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
-                    /* source IP address  | destination IP address */
-                    0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
-                    /* data */
-                    'f', 'o', 'o', 'b', 'a', 'r'
-                );
-
+                receiveSimple();
                 Net::template getEthernetInterface<DummyIf>()->receive(
                     /*            dst                 |                src                | etherType */
                     0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
                     /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
                     0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfd, 0x11, 0xc8,
                     /* source IP address  | destination IP address */
-                    0x0a, 0x0a, 0x0a, 0x2, 0x0a, 0x0a, 0x0a, 0x0a,
+                    0x0a, 0x0a, 0x0a, 0x02, 0x0a, 0x0a, 0x0a, 0x0a,
                     /* data */
                     'f', 'r', 'o', 'b', 'b', 'r'
                 );
+
+                for(int i=0; i<2; i++)
+                    Net::template getEthernetInterface<DummyIf>()->receive(
+                          /*            dst                 |                src                | etherType */
+                          0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                          /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                          0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfc, 0x11, 0xc8,
+                          /* source IP address  | destination IP address */
+                          0x0a, 0x0a, 0x0a, 0x03, 0x0a, 0x0a, 0x0a, 0x0a,
+                          /* data */
+                          '1', '2', '3', '4', '5', '6'
+                    );
             });
 
             r.wait();
@@ -163,6 +236,13 @@ TEST(NetIpReception, ReceiveRawMultiple) {
             if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 2)) return Task::bad;
             if(r.getProtocol() != 0xfd) return Task::bad;
             if(!checkContent(r, 'f', 'r', 'o', 'b', 'b', 'r')) return Task::bad;
+            if(!r.atEop()) return Task::bad;
+
+            r.wait();
+
+            if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 3)) return Task::bad;
+            if(r.getProtocol() != 0xfc) return Task::bad;
+            if(!checkContent(r, '1', '2', '3', '4', '5', '6')) return Task::bad;
 
             r.close();
 

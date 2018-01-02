@@ -20,7 +20,7 @@ class Network<S, Args...>::ObservedPacketStream:
 	char *data, *limit;
 
 	constexpr inline uint16_t spaceLeft() const {
-		return static_cast<uint16_t>(limit - data);
+	    return data ? static_cast<uint16_t>(limit - data) : 0;
 	}
 
 	inline bool takeNext() {
@@ -48,6 +48,9 @@ public:
 	}
 
     void invalidate() {
+        Packet nullPacket;
+        nullPacket.init(nullptr);
+        PacketDisassembler::init(nullPacket);
         data = limit = nullptr;
     }
 
