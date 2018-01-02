@@ -221,4 +221,58 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	}
 }
 
+template<class S, class... Args>
+template<class Channel>
+class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
+    typename Channel::IoData data;
+    Packet packet;
+
+    static bool received(Launcher *launcher, IoJob* item, Result result)
+    {
+        auto self = static_cast<IpRxJob*>(item);
+
+        if(result == Result::Done) {
+            if(self->packet.isValid() && static_cast<PacketStream*>(self)->atEop()) {
+                self->packet.template dispose<Pool::Quota::Rx>();
+                self->packet.init(nullptr);
+            }
+
+            if(!self->packet.isValid()) {
+                if(self->data.packets.takePacketFromQueue(self->packet))
+                    static_cast<PacketStream*>(self)->init(self->packet);
+            }
+
+            return true;
+        } else {
+            if(self->packet.isValid())
+                self->packet.template dispose<Pool::Quota::Rx>();
+
+            while(self->data.packets.takePacketFromQueue(self->packet))
+                self->packet.template dispose<Pool::Quota::Rx>();
+
+            self->packet.init(nullptr);
+            return false;
+        }
+    }
+
+public:
+    void init() {
+        packet.init(nullptr);
+    }
+
+    bool isEmpty() {
+        return !packet.isValid() && data.packets.isEmpty();
+    }
+
+    static bool startReception(Launcher *launcher, IoJob* item, Channel* channel)
+    {
+        auto self = static_cast<IpRxJob*>(item);
+
+        Os::assert(!self->packet.isValid(), NetErrorStrings::unknown);
+
+        launcher->launch(channel, &IpRxJob::received, &self->data);
+        return true;
+    }
+};
+
 #endif /* IPRECEPTION_H_ */

@@ -113,69 +113,16 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IcmpRxJob: public Os::IoJob, public PacketStream {
-	typename IcmpInputChannel::IoData data;
-	Packet packet;
-
-	static bool received(Launcher *launcher, IoJob* item, Result result)
-	{
-		auto self = static_cast<IcmpRxJob*>(item);
-
-		if(result == Result::Done) {
-			if(self->packet.isValid() && static_cast<PacketStream*>(self)->atEop()) {
-				self->packet.template dispose<Pool::Quota::Rx>();
-				self->packet.init(nullptr);
-			}
-
-			if(!self->packet.isValid()) {
-				if(self->data.packets.takePacketFromQueue(self->packet))
-					static_cast<PacketStream*>(self)->init(self->packet);
-			}
-
-			return true;
-		} else {
-			if(self->packet.isValid())
-				self->packet.template dispose<Pool::Quota::Rx>();
-
-			while(self->data.packets.takePacketFromQueue(self->packet))
-				self->packet.template dispose<Pool::Quota::Rx>();
-
-			self->packet.init(nullptr);
-			return false;
-		}
-	}
-
-public:
-	void init() {
-		packet.init(nullptr);
-	}
-
-	bool isEmpty() {
-		return !packet.isValid() && data.packets.isEmpty();
-	}
-
-	static bool startReception(Launcher *launcher, IoJob* item)
-	{
-		auto self = static_cast<IcmpRxJob*>(item);
-
-		Os::assert(!self->packet.isValid(), NetErrorStrings::unknown);
-
-		launcher->launch(&state.icmpInputChannel, &IcmpRxJob::received, &self->data);
-		return true;
-	}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::IcmpReceiver: public Os::template IoRequest<IcmpRxJob, &IcmpRxJob::isEmpty>
+class Network<S, Args...>::IcmpReceiver: public Os::template IoRequest<IpRxJob<IcmpInputChannel>, &IpRxJob<IcmpInputChannel>::isEmpty>
 {
 public:
 	void init() {
-		IcmpRxJob::init();
+		IpRxJob<IcmpInputChannel>::init();
 		IcmpReceiver::IoRequest::init();
 	}
 
 	bool receive() {
-		return this->launch(&IcmpReceiver::IcmpRxJob::startReception);
+		return this->launch(&IcmpReceiver::IpRxJob::startReception, &state.icmpInputChannel);
 	}
 
 	void close() {

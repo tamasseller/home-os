@@ -98,8 +98,8 @@ struct NetworkOptions {
 
 		class RxPacketHandler;
 		template<class> class IpTxJob;
+		template<class> class IpRxJob;
 		template<class> class IpReplyJob;
-		class IcmpRxJob;
 		class IcmpEchoReplyJob;
 		class ArpReplyJob;
 
