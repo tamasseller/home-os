@@ -156,7 +156,7 @@ public:
 };
 
 template<class... Args>
-template<class Job, bool (Job::*isBlocking)()>
+template<class Job, bool (Job::*onBlocking)()>
 class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
@@ -208,7 +208,7 @@ class Scheduler<Args...>::IoRequest:
     	if(this->result != IoJob::Result::NotYet)
     		return this;
 
-    	if(isBlocking && !(this->*isBlocking)())
+    	if(onBlocking && !(this->*onBlocking)())
     		return this;
 
         return nullptr;

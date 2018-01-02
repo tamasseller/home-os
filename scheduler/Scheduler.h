@@ -108,7 +108,7 @@ struct SchedulerOptions {
 		template<class, class = IoChannel> class SynchronousIoChannelBase;
 
 		class IoJob;
-		template<class Job, bool (Job::*isBlocking)() = nullptr> class IoRequest;
+		template<class Job, bool (Job::*)() = nullptr> class IoRequest;
 
 		class Event;
 

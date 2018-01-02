@@ -80,13 +80,16 @@ TEST_GROUP(NetIcmp)
 				'a', 'r'
 		};
 
+		int n=0;
 		for(uint8_t c: expected) {
 			uint8_t a;
 			if(!r.read8(a) || a != c)
 				return false;
+
+			n++;
 		}
 
-		return true;
+		return n == sizeof(expected);
 	}
 
 	template<class Task>
@@ -438,10 +441,12 @@ TEST(NetIcmp, IcmpReceiveMultipleRepliesWithListenerAtOnce) {
                     receiveReply();
             });
 
-			r.wait();
+			for(int i=0; i < 3; i++) {
+	            r.wait();
 
-			if(!checkReplyContent(r))
-				return Task::bad;
+			    if(!checkReplyContent(r))
+			        return Task::bad;
+			}
 
 			r.close();
 

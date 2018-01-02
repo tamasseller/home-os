@@ -47,6 +47,10 @@ public:
 		static_cast<Observer*>(this)->observeFirstBlock(data, limit);
 	}
 
+    void invalidate() {
+        data = limit = nullptr;
+    }
+
 	inline Chunk getChunk()
 	{
 		if(!spaceLeft()) {
@@ -118,7 +122,7 @@ public:
     }
 
 	inline bool atEop() {
-		return !spaceLeft() && this->current->isEndOfPacket();
+		return !data || (!spaceLeft() && this->current->isEndOfPacket());
 	}
 
  	inline bool read8(uint8_t &ret) {

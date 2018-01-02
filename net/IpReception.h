@@ -9,6 +9,37 @@
 #define IPRECEPTION_H_
 
 template<class S, class... Args>
+struct Network<S, Args...>::RawPacketProcessor: PacketProcessor, RxPacketHandler {
+    inline RawPacketProcessor(): PacketProcessor(&Network<S, Args...>::processRawPacket) {}
+
+private:
+    virtual void handlePacket(Packet packet) {
+        this->process(packet);
+    }
+};
+
+template<class S, class... Args>
+inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t arg)
+{
+    Packet chain;
+    chain.init(reinterpret_cast<Block*>(arg));
+
+    PacketStream reader; // TODO optimize with PacketDisassembler
+    reader.init(chain);
+
+    while(true) {
+        Packet start = reader.asPacket();
+        bool hasMore = reader.cutCurrentAndMoveToNext();
+
+        if(!state.rawInputChannel.takePacket(start))
+            start.template dispose<Pool::Quota::Rx>();
+
+        if(!hasMore)
+            break;
+    }
+}
+
+template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkIcmpPacket(Reader& reader)
 {
@@ -147,12 +178,7 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	}
 
 	uint8_t protocol;
-	if(!reader.read8(protocol)
-			|| (protocol != 1		// ICMP
-			&& protocol != 2		// IGMP
-			&& protocol != 6		// TCP
-			&& protocol != 17)) {	// UDP
-		// TODO send ICMP unreachable message.
+	if(!reader.read8(protocol)) {
 		packet.template dispose<Pool::Quota::Rx>();
 		return;
 	}
@@ -192,7 +218,7 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		return;
 	}
 
-	RxPacketHandler* handler = nullptr;
+	RxPacketHandler* handler = &state.rawPacketProcessor;
 
 	switch(protocol) {
 	case 1:
@@ -206,42 +232,57 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		break;
 	}
 
-	if(handler) {
-		bool infinitePacket = reader.skipAhead(0xffff);
-		Os::assert(!infinitePacket, NetErrorStrings::unknown);
+    bool infinitePacket = reader.skipAhead(0xffff);
+    Os::assert(!infinitePacket, NetErrorStrings::unknown);
 
-		if(reader.totalLength != ipLength) {
-			packet.template dispose<Pool::Quota::Rx>();
-			return;
-		}
+    if(reader.totalLength != ipLength) {
+        packet.template dispose<Pool::Quota::Rx>();
+        return;
+    }
 
-		handler->handlePacket(packet);
-	} else {
-		packet.template dispose<Pool::Quota::Rx>();
-	}
+    if(handler)
+        handler->handlePacket(packet);
+    else
+        packet.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>
-template<class Channel>
+template<class Child, class Channel>
 class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
     typename Channel::IoData data;
     Packet packet;
+
+protected:
+    inline void preprocess() {}
+    inline void reset() {}
+
+private:
+    inline void invalidateAllStates() {
+        packet.init(nullptr);
+        static_cast<PacketStream*>(this)->invalidate();
+        static_cast<Child*>(this)->reset();
+    }
+
+    inline void fetchPacket() {
+        if(packet.isValid() && this->atEop()) {
+            packet.template dispose<Pool::Quota::Rx>();
+            invalidateAllStates();
+        }
+
+        if(!packet.isValid()) {
+            if(data.packets.takePacketFromQueue(packet)) {
+                static_cast<PacketStream*>(this)->init(packet);
+                static_cast<Child*>(this)->preprocess();
+            }
+        }
+    }
 
     static bool received(Launcher *launcher, IoJob* item, Result result)
     {
         auto self = static_cast<IpRxJob*>(item);
 
         if(result == Result::Done) {
-            if(self->packet.isValid() && static_cast<PacketStream*>(self)->atEop()) {
-                self->packet.template dispose<Pool::Quota::Rx>();
-                self->packet.init(nullptr);
-            }
-
-            if(!self->packet.isValid()) {
-                if(self->data.packets.takePacketFromQueue(self->packet))
-                    static_cast<PacketStream*>(self)->init(self->packet);
-            }
-
+            self->fetchPacket();
             return true;
         } else {
             if(self->packet.isValid())
@@ -250,14 +291,25 @@ class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
             while(self->data.packets.takePacketFromQueue(self->packet))
                 self->packet.template dispose<Pool::Quota::Rx>();
 
-            self->packet.init(nullptr);
+            self->invalidateAllStates();
             return false;
         }
     }
 
 public:
+    // Internal!
+    bool onBlocking()
+    {
+        if(isEmpty())
+            return true;
+
+        fetchPacket();
+        return false;
+    }
+
+
     void init() {
-        packet.init(nullptr);
+        invalidateAllStates();
     }
 
     bool isEmpty() {
@@ -272,6 +324,56 @@ public:
 
         launcher->launch(channel, &IpRxJob::received, &self->data);
         return true;
+    }
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::IpReceiver: public Os::template IoRequest<IpRxJob<IpReceiver, RawInputChannel>, &IpRxJob<IpReceiver, RawInputChannel>::onBlocking>
+{
+    friend class IpReceiver::IpRxJob;
+
+    AddressIp4 peerAddress;
+    uint8_t protocol;
+
+    inline void reset() {
+        protocol = -1;
+        peerAddress = AddressIp4::allZero;
+    }
+
+    inline void preprocess() {
+        uint8_t ihl;
+        Os::assert(this->read8(ihl), NetErrorStrings::unknown);
+
+        Os::assert(this->skipAhead(8), NetErrorStrings::unknown);
+        Os::assert(this->read8(this->protocol), NetErrorStrings::unknown);
+
+        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
+        Os::assert(this->read32net(this->peerAddress.addr), NetErrorStrings::unknown);
+
+        Os::assert(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)), NetErrorStrings::unknown);
+    }
+
+public:
+    void init() {
+        IpReceiver::IpRxJob::init();
+        IpReceiver::IoRequest::init();
+    }
+
+    AddressIp4 getPeerAddress() const {
+        return peerAddress;
+    }
+
+    uint8_t getProtocol() const {
+        return protocol;
+    }
+
+    bool receive() {
+        return this->launch(&IpReceiver::IpRxJob::startReception, &state.rawInputChannel);
+    }
+
+    void close() {
+        this->cancel();
+        this->wait();
     }
 };
 

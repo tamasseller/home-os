@@ -82,6 +82,7 @@ struct NetworkOptions {
 		class NullTag;
 		template<class> class PacketInputChannel;
 		typedef PacketInputChannel<NullTag> IcmpInputChannel;
+		typedef PacketInputChannel<NullTag> RawInputChannel;
 
 		template<class> class PacketWriterBase;
 		class NullObserver;
@@ -98,7 +99,7 @@ struct NetworkOptions {
 
 		class RxPacketHandler;
 		template<class> class IpTxJob;
-		template<class> class IpRxJob;
+		template<class, class> class IpRxJob;
 		template<class> class IpReplyJob;
 		class IcmpEchoReplyJob;
 		class ArpReplyJob;
@@ -106,6 +107,7 @@ struct NetworkOptions {
 		class PacketProcessor;
 		class ArpPacketProcessor;
 		class IcmpPacketProcessor;
+		class RawPacketProcessor;
 
 		static struct State {
 			struct Ager: Os::Timeout {
@@ -120,11 +122,12 @@ struct NetworkOptions {
 			IcmpPacketProcessor icmpPacketProcessor;
 			IcmpInputChannel icmpInputChannel;
 
+			RawInputChannel rawInputChannel;
+			RawPacketProcessor rawPacketProcessor;
+
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
-
-			inline State();
 		} state;
 
 		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
@@ -156,6 +159,7 @@ struct NetworkOptions {
 		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&);
 		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&);
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
+		static inline void processRawPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:
@@ -164,6 +168,7 @@ struct NetworkOptions {
 		using Route = typename RoutingTable::Route;
 
 		class IpTransmitter;
+		class IpReceiver;
 		class IcmpReceiver;
 
 		static inline constexpr uint32_t correctEndian(uint32_t);
@@ -173,6 +178,7 @@ struct NetworkOptions {
 		    state.~State();
 		    new(&state) State();
 		    state.icmpInputChannel.init();
+		    state.rawInputChannel.init();
 			state.pool.init(buffers);
 			state.interfaces.init();
 			state.ager.start(secTicks);
@@ -192,10 +198,6 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 
 template<class S, class... Args>
 typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
-
-template<class S, class... Args>
-inline Network<S, Args...>::State::State():
-	icmpPacketProcessor(&Network<S, Args...>::processIcmpPacket){}
 
 template<class S, class... Args>
 inline void Network<S, Args...>::State::Ager::age() {

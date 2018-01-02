@@ -11,6 +11,17 @@
 #include "Network.h"
 
 template<class S, class... Args>
+struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor, RxPacketHandler {
+    inline IcmpPacketProcessor():
+            PacketProcessor(&Network<S, Args...>::processIcmpPacket) {}
+
+private:
+    virtual void handlePacket(Packet packet) {
+        this->process(packet);
+    }
+};
+
+template<class S, class... Args>
 inline void Network<S, Args...>::processIcmpPacket(typename Os::Event*, uintptr_t arg)
 {
 	Packet chain;
@@ -113,11 +124,12 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::IcmpReceiver: public Os::template IoRequest<IpRxJob<IcmpInputChannel>, &IpRxJob<IcmpInputChannel>::isEmpty>
+class Network<S, Args...>::IcmpReceiver:
+    public Os::template IoRequest<IpRxJob<IcmpReceiver, IcmpInputChannel>, &IpRxJob<IcmpReceiver, IcmpInputChannel>::onBlocking>
 {
 public:
 	void init() {
-		IpRxJob<IcmpInputChannel>::init();
+	    IcmpReceiver::IpRxJob::init();
 		IcmpReceiver::IoRequest::init();
 	}
 

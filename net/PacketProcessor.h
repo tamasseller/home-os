@@ -52,20 +52,4 @@ public:
 	}
 };
 
-template<class S, class... Args>
-struct Network<S, Args...>::ArpPacketProcessor: PacketProcessor {
-	inline ArpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
-};
-
-template<class S, class... Args>
-struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor, RxPacketHandler {
-	inline IcmpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
-
-private:
-	virtual void handlePacket(Packet packet) {
-		this->process(packet);
-	}
-};
-
-
 #endif /* PACKETPROCESSOR_H_ */
