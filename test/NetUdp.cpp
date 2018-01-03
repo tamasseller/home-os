@@ -25,7 +25,7 @@ TEST_GROUP(NetUdp)
         return true;
     }
 
-    static inline void receiveSimple() {
+        static inline void receiveSimple() {
         Net::template getEthernetInterface<DummyIf>()->receive(
             /*            dst                 |                src                | etherType */
             0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
@@ -35,6 +35,21 @@ TEST_GROUP(NetUdp)
             0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
             /* srcport|  dstport  | udplength | checksum */
             0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0x19, 0x62,
+            /* payload */
+            'f', 'o', 'o', 'b', 'a', 'r'
+        );
+    }
+
+    static inline void receiveNoChecksum() {
+        Net::template getEthernetInterface<DummyIf>()->receive(
+            /*            dst                 |                src                | etherType */
+            0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+            /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+            0x45, 0x00, 0x00, 0x22, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x47,
+            /* source IP address  | destination IP address */
+            0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+            /* srcport|  dstport  | udplength | checksum */
+            0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0x00, 0x00,
             /* payload */
             'f', 'o', 'o', 'b', 'a', 'r'
         );
@@ -137,6 +152,36 @@ TEST(NetUdp, ReceiveSimple) {
     work(task);
 }
 
+TEST(NetUdp, ReceiveNoChecksum) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::UdpReceiver r;
+
+            r.init();
+            r.receive(1234);
+
+            receiveNoChecksum();
+
+            r.wait();
+
+            if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+
+            if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
+            if(r.getPeerPort() != 0x823b) return Task::bad;
+
+            r.close();
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
 TEST(NetUdp, ReceiveBad) {
     struct Task: public TestTask<Task> {
         bool run() {
@@ -182,7 +227,7 @@ TEST(NetUdp, ReceiveBad) {
             );
 
             /*
-             * Payload truncated
+             * Header truncated (consistent IP payload size)
              */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 /*            dst                 |                src                | etherType */
@@ -193,6 +238,34 @@ TEST(NetUdp, ReceiveBad) {
                 0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
                 /* srcport|  dstport  | udplength | checksum */
                 0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0
+            );
+
+            /*
+             * Header truncated (in-consistent IP payload size)
+             */
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x1f, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x4a,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* srcport|  dstport  | udplength | checksum */
+                0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0
+            );
+
+            /*
+             * Header truncated (in-consistent IP payload size)
+             */
+            Net::template getEthernetInterface<DummyIf>()->receive(
+                /*            dst                 |                src                | etherType */
+                0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+                /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+                0x45, 0x00, 0x00, 0x1f, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x4a,
+                /* source IP address  | destination IP address */
+                0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+                /* srcport|  dstport  | udplength | checksum */
+                0x82, 0x3b, 0x04
             );
 
             if(r.wait(1)) return Task::bad;

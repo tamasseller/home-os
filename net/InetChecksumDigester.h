@@ -26,6 +26,10 @@ class InetChecksumDigester {
 	}
 
 public:
+	inline void reset() {
+		state = 0;
+	}
+
 	/*
 	 * |ab|cd|ef| ->  ab+cd+ef -> a, c, e + b, d, f
 	 * |ab|cd|e0| ->  ab+cd+e0 -> a, c, e + b, d, 0

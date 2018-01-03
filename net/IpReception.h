@@ -41,43 +41,40 @@ inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t
 
 template<class S, class... Args>
 template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, AddressIp4 srcIp, AddressIp4 dstIp, size_t)
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, uint16_t)
 {
 	RxPacketHandler* ret = nullptr;
-
-
-
 	return ret;
 }
 
 template<class S, class... Args>
 inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev) {
 	struct ChecksumValidatorObserver: InetChecksumDigester {
-		size_t remainingHeaderLength;
+		size_t remainingLength;
 		size_t totalLength;
 		bool valid;
 
 		bool isDone() {
-			return !remainingHeaderLength;
+			return !remainingLength;
 		}
 
 		void observeInternalBlock(char* start, char* end) {
 			size_t length = end - start;
 			totalLength += length;
 
-			if(length < remainingHeaderLength) {
-				this->consume(start, length, remainingHeaderLength & 1);
-				remainingHeaderLength -= length;
-			} else if(remainingHeaderLength) {
-				this->consume(start, remainingHeaderLength, remainingHeaderLength & 1);
-				remainingHeaderLength = 0;
+			if(length < remainingLength) {
+				this->consume(start, length, remainingLength & 1);
+				remainingLength -= length;
+			} else if(remainingLength) {
+				this->consume(start, remainingLength, remainingLength & 1);
+				remainingLength = 0;
 				valid = this->result() == 0;
 			}
 
 		}
 
 		void observeFirstBlock(char* start, char* end) {
-			remainingHeaderLength = (start[0] & 0xf) << 2;
+			remainingLength = (start[0] & 0xf) << 2;
 			totalLength = 0;
 			observeInternalBlock(start, end);
 		}
@@ -154,7 +151,7 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		return;
 	}
 
-	if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingHeaderLength))) {
+	if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength))) {
 		packet.template dispose<Pool::Quota::Rx>();
 		return;
 	}
@@ -185,24 +182,36 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		handler = checkIcmpPacket(reader);
 		break;
 	case 6:
-		handler = checkTcpPacket(reader, srcIp, dstIp, ipLength - ((versionAndHeaderLength & 0x0f) << 2));
-		break;
-	case 17:
-		handler = checkUdpPacket(reader, srcIp, dstIp, ipLength - ((versionAndHeaderLength & 0x0f) << 2));
-		break;
+	case 17: {
+			auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
+			reader.InetChecksumDigester::reset();
+			reader.remainingLength = payloadLength;
+			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
+			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
+			reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
+			reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
+			auto chunk = reader.getChunk();
+			reader.consume(chunk.start, chunk.length());
+
+			if(protocol == 6)
+				handler = checkTcpPacket(reader, payloadLength);
+			else
+				handler = checkUdpPacket(reader, payloadLength);
+
+			break;
+		}
 	}
 
-    bool infinitePacket = reader.skipAhead(0xffff);
-    Os::assert(!infinitePacket, NetErrorStrings::unknown);
+    if(handler) {
+        Os::assert(!reader.skipAhead(0xffff), NetErrorStrings::unknown);
 
-    if(reader.totalLength != ipLength) {
-        packet.template dispose<Pool::Quota::Rx>();
-        return;
-    }
+        if(reader.totalLength != ipLength) {
+            packet.template dispose<Pool::Quota::Rx>();
+            return;
+        }
 
-    if(handler)
         handler->handlePacket(packet);
-    else
+    } else
         packet.template dispose<Pool::Quota::Rx>();
 }
 

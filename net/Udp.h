@@ -10,32 +10,38 @@
 
 template<class S, class... Args>
 template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, AddressIp4 srcIp, AddressIp4 dstIp, size_t length)
+inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, uint16_t length)
 {
 	RxPacketHandler* ret = &state.udpPacketProcessor;
-
-	InetChecksumDigester sum;
 
 	if(length < 8)
 		return nullptr;
 
 	size_t offset = 0;
-	while(!reader.atEop()) {
-		Chunk chunk = reader.getChunk();
-		sum.consume(chunk.start, chunk.length(), offset & 1);
-		offset += chunk.length();
-		reader.advance(static_cast<uint16_t>(chunk.length()));
-	}
 
-	sum.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
-	sum.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
-	sum.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
-	sum.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
-	sum.patch(0, correctEndian(static_cast<uint16_t>(length)));
-	sum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
-
-	if(sum.result())
+	if(!reader.skipAhead(6))
 		return nullptr;
+
+	uint16_t cheksumField;
+
+	if(!reader.read16net(cheksumField))
+		return nullptr;
+
+	/*
+	 * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
+	 *
+	 * 		"An all zero transmitted checksum value means that the transmitter generated
+	 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
+	 */
+	if(cheksumField) {
+		Os::assert(!reader.skipAhead(0xffff), NetErrorStrings::unknown);
+
+		reader.patch(0, correctEndian(static_cast<uint16_t>(length)));
+		reader.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
+
+		if(reader.result())
+			return nullptr;
+	}
 
 	return ret;
 }
@@ -156,7 +162,19 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
-		Os::assert(stream.write16raw(checksum.result()), NetErrorStrings::unknown);
+
+		uint16_t result = checksum.result();
+
+		/*
+		 * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
+		 *
+		 * 		"If the computed checksum is zero, it is transmitted as all
+		 * 		 ones (the equivalent in one's complement arithmetic). An all
+		 * 		 zero transmitted checksum value means that the transmitter
+		 * 		 generated  no checksum  (for debugging or for higher level
+		 * 		 protocols that don't care)."
+		 */
+		Os::assert(stream.write16raw(result ? result : static_cast<uint16_t>(~result)), NetErrorStrings::unknown);
 	}
 public:
 
