@@ -12,9 +12,9 @@
 
 template<class S, class... Args>
 struct Network<S, Args...>::Chunk {
-	char *start, *end;
+	char *start, *end;  // TODO refactor as start&length.
 
-	inline size_t length() {
+	inline size_t length() { // TODO make uint16_t
 		return end-start;
 	}
 };

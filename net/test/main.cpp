@@ -11,6 +11,39 @@
 
 Net::Buffers packetBuffers;
 
+class UdpEchoTask: Os::Task {
+	friend class Os::Task;
+	size_t stack[1024*1024];
+
+	Net::UdpReceiver rx;
+	Net::UdpTransmitter tx;
+
+	void run() {
+		rx.init();
+        rx.receive(1234);
+        tx.init(1234);
+
+        while(true) {
+            rx.wait();
+            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), 128);
+
+            while(!rx.atEop()) {
+                Net::Chunk c = rx.getChunk();
+                rx.advance((uint16_t)c.length());
+				if(tx.fill(c.start, (uint16_t)c.length()) != c.length())
+					break;
+            }
+
+            tx.send();
+        }
+	}
+
+public:
+	void start() {
+		Os::Task::start<UdpEchoTask, &UdpEchoTask::run>(&stack, sizeof(stack));
+	}
+} udpEchoTask;
+
 class MainTask: Os::Task
 {
 	friend class Os::Task;
@@ -23,6 +56,8 @@ class MainTask: Os::Task
 				Net::getEthernetInterface<LinuxTapDevice>(), AddressIp4::make(172, 23, 45, 67), 12), true);
 
 		Net::template getEthernetInterface<LinuxTapDevice>()->setTapPeerAddress("172.23.45.1");
+
+		udpEchoTask.start();
 
 		Os::sleep(5 * 60 * 1000);
 	}

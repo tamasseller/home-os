@@ -145,6 +145,7 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 	friend class UdpTransmitter::IpTransmitterBase::IpTxJob;
 
 	uint16_t dstPort, srcPort;
+	// TODO getLength()
 
 	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) {
 		auto self = static_cast<UdpTransmitter*>(item);
