@@ -8,6 +8,8 @@
 #ifndef ADDRESSETHERNET_H_
 #define ADDRESSETHERNET_H_
 
+#include <string.h>
+
 class AddressEthernet {
 	template<int>
 	struct ConstantContainer {

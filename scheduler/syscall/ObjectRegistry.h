@@ -81,10 +81,13 @@ class Scheduler<Args...>::ObjectRegistry<Object, true>
 		}
 
 	public:
-		static inline void check(Object* object) {
+		static inline bool isRegistered(Object* object) {
 			LimitedCTree* tree = Scheduler<Args...>::state.template rootFor<Object>();
-			bool ok = tree->contains<&ObjectRegistry::compare>(object);
-			Scheduler<Args...>::assert(ok, Scheduler<Args...>::ErrorStrings::invalidSyscallArgument);
+			return tree->contains<&ObjectRegistry::compare>(object);
+		}
+
+		static inline void check(Object* object) {
+			Scheduler<Args...>::assert(isRegistered(object), Scheduler<Args...>::ErrorStrings::invalidSyscallArgument);
 		}
 
 		static inline Object* lookup(uintptr_t objectPtr) {
@@ -118,6 +121,7 @@ public:
 	static inline bool remove(Object* object) {return false;}
 	static inline void registerObject(Object* object) {}
 	static inline void unregisterObject(Object* object) {}
+	static inline bool isRegistered(Object* object) {return false;}
 	static inline void check(Object* object) {}
 
 	static inline uintptr_t getRegisteredId(Object* object) {

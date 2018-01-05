@@ -25,7 +25,7 @@ namespace home {
 template<class... Args>
 struct Scheduler<Args...>::ErrorStrings {
 	static constexpr const char* unknownError = "WTF internal error";
-	static constexpr const char* unreachableReached = "Internal error, this method should never have been called.";
+	static constexpr const char* unreachableReached = "Internal error, this method should never have been called";
 	static constexpr const char* interruptOverload = "Tick overload, preemption event could not have been dispatched for a full tick cycle!";
 
 	static constexpr const char* objectAlreadyRegistered = "Object registered multiple times";
@@ -42,7 +42,7 @@ struct Scheduler<Args...>::ErrorStrings {
 
 	static constexpr const char* taskDelayTooBig = "Delay time too big!";
 
-	static constexpr const char* ioChannelDelete = "I/O channels can not be deleted with an active scheduler.";
+	static constexpr const char* ioChannelDelete = "I/O channels can not be deleted with an active scheduler";
 
 	static constexpr const char* ioJobDelete = "I/O jobs can not be deleted while running";
 

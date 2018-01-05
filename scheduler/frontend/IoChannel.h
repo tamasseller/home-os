@@ -99,7 +99,7 @@ public:
 	 * jobs in-flight, referencing it in various asynchronous contexts.
 	 */
 	~IoChannel() {
-		assert(!state.isRunning, ErrorStrings::ioChannelDelete);
+		assert(!state.isRunning || !Registry<IoChannel>::isRegistered(this), ErrorStrings::ioChannelDelete);
 	}
 
 	/**

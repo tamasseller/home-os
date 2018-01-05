@@ -1,0 +1,6 @@
+gdb \
+	-ex 'handle SIGUSR1 nostop noprint' \
+	-ex 'handle SIGUSR2 nostop noprint' \
+	-ex 'set print pretty' \
+	-ex 'set print static-members 0' \
+	 net-test

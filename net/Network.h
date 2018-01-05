@@ -65,6 +65,7 @@ struct NetworkOptions {
 
 	public:
 		class Interface;
+		struct Chunk;
 		class Packet;
 		class PacketStream;
 		class PacketAssembler;
@@ -75,7 +76,6 @@ struct NetworkOptions {
 		template<class> class Ethernet;
 		template<uint16_t, class, class = void> struct Interfaces;
 
-		struct Chunk;
 		class Block;
 		class PacketQueue;
 

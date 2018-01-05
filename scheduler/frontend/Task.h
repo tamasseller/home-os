@@ -88,7 +88,6 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 		inline Task(): Sleeper(&Task::wakeVirtual), Blockable(&Task::getTaskVirtual) {}
 
 	protected:
-
 		template<class Child, void (Child::*entry)(), class... StartArgs>
 		inline void start(void* stack, uintptr_t stackSize, StartArgs... startArgs) {
 			start(&Task::entryStub<Child, entry>, stack, stackSize, static_cast<Child*>(this), startArgs...);
