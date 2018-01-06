@@ -137,7 +137,7 @@ public:
 		            return;
 		}
 
-        this->set(ip, mac, timeout);
+        this->set(ip, mac, static_cast<uint16_t>(ageingCounter + timeout));
 	}
 
 	/**

@@ -17,8 +17,6 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	if(length < 8)
 		return nullptr;
 
-	size_t offset = 0;
-
 	if(!reader.skipAhead(6))
 		return nullptr;
 
@@ -95,6 +93,7 @@ class Network<S, Args...>::UdpReceiver:
 
 	AddressIp4 peerAddress;
     uint16_t peerPort;
+    uint16_t length;
 
     inline void reset() {
         peerAddress = AddressIp4::allZero;
@@ -112,7 +111,12 @@ class Network<S, Args...>::UdpReceiver:
 
         Os::assert(this->read16net(this->peerPort), NetErrorStrings::unknown);
 
-        Os::assert(this->skipAhead(6), NetErrorStrings::unknown);
+        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
+
+        Os::assert(this->read16net(this->length), NetErrorStrings::unknown);
+        this->length = static_cast<uint16_t>(this->length - 8);
+
+        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
     }
 
 public:
@@ -122,6 +126,10 @@ public:
 
     uint16_t getPeerPort() const {
         return peerPort;
+    }
+
+    uint16_t getLength() const {
+        return length;
     }
 
 	void init() {
@@ -145,7 +153,6 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 	friend class UdpTransmitter::IpTransmitterBase::IpTxJob;
 
 	uint16_t dstPort, srcPort;
-	// TODO getLength()
 
 	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) {
 		auto self = static_cast<UdpTransmitter*>(item);

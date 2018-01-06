@@ -55,6 +55,50 @@ TEST_GROUP(NetUdp)
         );
     }
 
+    static inline void expectLong() {
+    	Net::template getEthernetInterface<DummyIf>()->expectN(1,
+    		/*            dst                 |                src                | etherType */
+    		0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+    		/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+    		0x45, 0x00, 0x00, 0x7c, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, 0x12, 0x53,
+    		/* source IP address  | destination IP address */
+    		0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
+            /* srcport|  dstport  | udplength | checksum */
+            0x82, 0x3b, 0x04, 0xd2, 0x00, 0x68, 0xdb, 0xae,
+            /* payload */
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r'
+    	);
+    }
+
+    static inline void receiveLong() {
+    	Net::template getEthernetInterface<DummyIf>()->receive(
+    		/*            dst                 |                src                | etherType */
+			0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
+    		/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+    		0x45, 0x00, 0x00, 0x7c, 0x00, 0x00, 0x40, 0x00, 0x40, 0x11, 0x12, 0x53,
+    		/* source IP address  | destination IP address */
+    		0x0a, 0x0a, 0x0a, 0x01, 0x0a, 0x0a, 0x0a, 0x0a,
+            /* srcport|  dstport  | udplength | checksum */
+    		0x04, 0xd2, 0x82, 0x3b, 0x00, 0x68, 0xdb, 0xae,
+            /* payload */
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r',
+            'f', 'o', 'o', 'b', 'a', 'r', 'f', 'o', 'o', 'b', 'a', 'r'
+    	);
+    }
+
 	template<class Task>
 	static inline void work(Task& task)
 	{
@@ -140,6 +184,7 @@ TEST(NetUdp, ReceiveSimple) {
 
             if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
             if(r.getPeerPort() != 0x823b) return Task::bad;
+            if(r.getLength() != 6) return Task::bad;
 
             r.close();
 
@@ -170,6 +215,7 @@ TEST(NetUdp, ReceiveNoChecksum) {
 
             if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
             if(r.getPeerPort() != 0x823b) return Task::bad;
+            if(r.getLength() != 6) return Task::bad;
 
             r.close();
 
@@ -301,6 +347,7 @@ TEST(NetUdp, ReceiveMultiple) {
                 if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
                 if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
                 if(r.getPeerPort() != 0x823b) return Task::bad;
+                if(r.getLength() != 6) return Task::bad;
             }
 
             r.close();
@@ -308,6 +355,34 @@ TEST(NetUdp, ReceiveMultiple) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
             return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetUdp, SendLong) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            typename Net::UdpTransmitter tx;
+            tx.init(0x823b);
+
+            if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0x04d2, 6*16))
+                return Task::bad;
+
+            tx.wait();
+
+            for(int i=0; i<16; i++)
+				if(tx.fill("foobar", 6) != 6)
+					return Task::bad;
+
+            expectLong();
+
+            if(!tx.send())
+                return Task::bad;
+
+            tx.wait();
+            return Task::ok;
         }
     } task;
 
@@ -345,6 +420,53 @@ TEST(NetUdp, SendSimple) {
                 return Task::bad;
 
             tx.wait();
+            return Task::ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetUdp, Echo) {
+    struct Task: public TestTask<Task> {
+    	struct UdpEchoTask: public TestTask<UdpEchoTask> {
+    		Net::UdpReceiver rx;
+    		Net::UdpTransmitter tx;
+
+    		bool run() {
+    			rx.init();
+    	        rx.receive(0x823b);
+    	        tx.init(0x823b);
+
+    	        for(int i = 0; i < 10; i++) {
+    	            rx.wait();
+    	            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), 128);
+
+    	            while(!rx.atEop()) {
+    	                Net::Chunk c = rx.getChunk();
+    	                rx.advance((uint16_t)c.length());
+    					if(tx.fill(c.start, (uint16_t)c.length()) != c.length())
+    						break;
+    	            }
+
+    	            tx.send();
+    	        }
+
+    	        return ok;
+    		}
+    	} udpEchoTask;
+
+        bool run() {
+            typename Net::UdpTransmitter tx;
+
+            udpEchoTask.start();
+            Net::Os::sleep(1);
+
+			for(int i = 0; i < 10; i++) {
+				expectLong();
+				receiveLong();
+			}
+
             return Task::ok;
         }
     } task;

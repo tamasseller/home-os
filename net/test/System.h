@@ -25,7 +25,8 @@ using Os = home::Scheduler<
 using Net = Network<
 		Os,
 		NetworkOptions::BufferSize<64>,
-		NetworkOptions::TicksPerSecond<20>,
+		NetworkOptions::BufferCount<256>,
+		NetworkOptions::TicksPerSecond<1000>,
 		NetworkOptions::Interfaces<
 		    NetworkOptions::Set<
 		        NetworkOptions::EthernetInterface<LinuxTapDevice>

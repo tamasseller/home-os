@@ -27,7 +27,7 @@ class LinuxTapDevice {
     static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
 
     static constexpr const char *interfaceName = "tap0";
-    static constexpr auto nBlocks = (150 + blockMaxPayload - 1) / blockMaxPayload;
+    static constexpr auto nBlocks = (1500 + blockMaxPayload - 1) / blockMaxPayload;
 	char* rxTable[nBlocks];
 	int fd, rxWriteIdx, rxReadIdx;
 

@@ -53,6 +53,7 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		size_t remainingLength;
 		size_t totalLength;
 		bool valid;
+		bool offsetOdd;
 
 		bool isDone() {
 			return !remainingLength;
@@ -63,19 +64,22 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 			totalLength += length;
 
 			if(length < remainingLength) {
-				this->consume(start, length, remainingLength & 1);
+				this->consume(start, length, offsetOdd);
 				remainingLength -= length;
 			} else if(remainingLength) {
-				this->consume(start, remainingLength, remainingLength & 1);
+				this->consume(start, remainingLength, offsetOdd);
 				remainingLength = 0;
 				valid = this->result() == 0;
 			}
 
+			if(length & 1)
+				offsetOdd = !offsetOdd;
 		}
 
 		void observeFirstBlock(char* start, char* end) {
 			remainingLength = (start[0] & 0xf) << 2;
 			totalLength = 0;
+			offsetOdd = false;
 			observeInternalBlock(start, end);
 		}
 	};
@@ -186,6 +190,7 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 			auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
 			reader.InetChecksumDigester::reset();
 			reader.remainingLength = payloadLength;
+			reader.offsetOdd = false;
 			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
 			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
 			reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));

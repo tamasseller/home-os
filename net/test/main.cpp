@@ -25,13 +25,12 @@ class UdpEchoTask: Os::Task {
 
         while(true) {
             rx.wait();
-            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), 128);
+            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), rx.getLength());
 
             while(!rx.atEop()) {
                 Net::Chunk c = rx.getChunk();
+                tx.fill(c.start, (uint16_t)c.length());
                 rx.advance((uint16_t)c.length());
-				if(tx.fill(c.start, (uint16_t)c.length()) != c.length())
-					break;
             }
 
             tx.send();
