@@ -16,7 +16,7 @@ INCLUDE_DIRS += $(PET)
 
 CXXFLAGS += -std=c++17 
 CXXFLAGS += -g3 
-#CXXFLAGS += -Og
+CXXFLAGS += -O0
 CXXFLAGS += -fno-rtti
 CXXFLAGS += -fno-exceptions 
 CXXFLAGS += -pedantic 

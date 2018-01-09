@@ -20,6 +20,8 @@
 
 #include <stdio.h>  // XXX
 
+//#define PRINT_PACKETS 1
+
 template<class Net, uint16_t blockMaxPayload>
 class LinuxTapDevice {
 	friend Net;
@@ -27,7 +29,7 @@ class LinuxTapDevice {
     static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
 
     static constexpr const char *interfaceName = "tap0";
-    static constexpr auto nBlocks = (1500 + blockMaxPayload - 1) / blockMaxPayload;
+    static constexpr auto nBlocks = (3 * 1500 + blockMaxPayload - 1) / blockMaxPayload;
 	char* rxTable[nBlocks];
 	int fd, rxWriteIdx, rxReadIdx;
 
@@ -56,12 +58,13 @@ class LinuxTapDevice {
 
 		auto self = Net::template getEthernetInterface<LinuxTapDevice>();
 
-		if((self->rxWriteIdx - self->rxReadIdx) == 1) {
-			printf("Dropping packet due to buffer overflow.");
-			return;
-		}
-
 		while((nread = read(self->fd, buffer, buffsize)) > 0) {
+			if((self->rxWriteIdx - self->rxReadIdx) == 1) {
+				printf("Dropping packet due to buffer overflow.");
+				return;
+			}
+
+#ifdef PRINT_PACKETS
 			for(ssize_t i = 0; i < nread; i++){
 				if((i & 15) == 0) printf("RX ");
 				printf("%02X ", (unsigned int)(unsigned char)buffer[i]);
@@ -69,6 +72,7 @@ class LinuxTapDevice {
 				else if((i & 7) == 7) printf(" ");
 			}
 			printf("\n\n");
+#endif
 
 			const uint8_t *p = (const uint8_t*)buffer;
 			uint16_t length = (uint16_t)nread;
@@ -121,11 +125,16 @@ class LinuxTapDevice {
 	}
 
 	inline void enableTxIrq() {
+		sigset_t mask, old;
+		sigfillset(&mask);
+		sigprocmask(SIG_SETMASK, &mask, &old);
+
 	    auto x = Net::template getEthernetInterface<LinuxTapDevice>();
 	    while(auto* p = x->getCurrentTxPacket()) {
 	        typename Net::PacketStream packet;
 	        packet.init(*p);
 
+#ifdef PRINT_PACKETS
 			for(ssize_t i = 0; !packet.atEop(); i++) {
 				if((i & 15) == 0) printf("TX ");
 				uint8_t b;
@@ -136,6 +145,7 @@ class LinuxTapDevice {
 			}
 
 			printf("\n\n");
+#endif
 
 			int n = 0;
 			struct iovec iov[nBlocks];
@@ -147,12 +157,15 @@ class LinuxTapDevice {
 				iov[n].iov_len = chunk.length();
 				packet.advance(static_cast<uint16_t>(chunk.length()));
 				n++;
+				Net::Os::assert(n < nBlocks, "DAFUQ?");
 			}
 
 			Net::Os::assert(writev(fd, iov, n) >= 0, "Could not write tap device");
 
 	        x->packetTransmitted();
 	    }
+
+	    sigprocmask(SIG_SETMASK, &old, nullptr);
 	}
 
 	inline bool takeRxBuffer(char* data) {

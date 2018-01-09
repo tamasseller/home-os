@@ -14,11 +14,15 @@ template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkIcmpPacket(Reader& reader)
 {
+	InetChecksumDigester sum;
 	RxPacketHandler* ret;
 	uint16_t typeCode;
+	size_t offset = 0;
+
+	state.increment(&DiagnosticCounters::Icmp::inputReceived);
 
 	if(!reader.read16net(typeCode))
-		return nullptr;
+		goto formatError;
 
 	switch(typeCode) {
 		case 0x0000: // Echo reply.
@@ -28,11 +32,9 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 			ret = &state.icmpReplyJob;
 			break;
 		default:
-			return nullptr;
+			goto formatError;
 	}
 
-	InetChecksumDigester sum;
-	size_t offset = 0;
 	while(!reader.atEop()) {
 		Chunk chunk = reader.getChunk();
 		sum.consume(chunk.start, chunk.length(), offset & 1);
@@ -42,7 +44,15 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 
 	sum.patch(0, correctEndian(typeCode));
 
-	return (sum.result() == 0) ? ret : nullptr;
+	if(sum.result() != 0)
+		goto formatError;
+
+	return ret;
+
+formatError:
+
+	state.increment(&DiagnosticCounters::Icmp::inputFormatError);
+	return nullptr;
 }
 
 template<class S, class... Args>
@@ -74,11 +84,10 @@ inline void Network<S, Args...>::processIcmpPacket(typename Os::Event*, uintptr_
         /*
          * Skip initial fields of the IP header payload all the way to the source address.
          */
-        bool skipOk = reader.skipAhead(12);
-        Os::assert(skipOk, NetErrorStrings::unknown);
+        NET_ASSERT(reader.skipAhead(12));
 
         AddressIp4 src;
-        Os::assert(reader.read32net(src.addr), NetErrorStrings::unknown);
+        NET_ASSERT(reader.read32net(src.addr));
 
         /*
          * Move reader to the end, then dispose of the reply packet.
@@ -99,25 +108,29 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 	typedef typename IcmpEchoReplyJob::IpReplyJob Base;
 	friend Base;
 
+	inline void replySent(Packet& request) {
+		state.increment(&DiagnosticCounters::Icmp::outputSent);
+	}
+
 	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request) {
 		PacketStream reader;
 		reader.init(request);
 
     	uint8_t headerLength;
-    	reader.read8(headerLength);
+    	NET_ASSERT(reader.read8(headerLength));
     	headerLength = static_cast<uint8_t>((headerLength & 0xf) << 2);
 
-		reader.skipAhead(1);	// skip version+ihl and dsp+ecn
+    	NET_ASSERT(reader.skipAhead(1));	// skip version+ihl and dsp+ecn
 
 		uint16_t totalLength;
-		reader.read16net(totalLength);
+		NET_ASSERT(reader.read16net(totalLength));
 
-		reader.skipAhead(8);
+		NET_ASSERT(reader.skipAhead(8));
 
 		AddressIp4 requesterIp;
-		reader.read32net(requesterIp.addr);
+		NET_ASSERT(reader.read32net(requesterIp.addr));
 
-    	// TODO check ICMP sum. (type and code is known to be ok)
+		state.increment(&DiagnosticCounters ::Icmp::pingRequests);
 
 		return typename Base::InitialReplyInfo{requesterIp, static_cast<uint16_t>(totalLength - headerLength)};
 	}
@@ -142,17 +155,18 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 			checksum = static_cast<uint16_t>((temp & 0xffff) + (temp >> 16));
 
 			reply.write16net(0); // type and code
-			reply.write16net(checksum); // type and code
+			reply.write16net(checksum);
 
 			do {
 				Chunk chunk = reader.getChunk();
 
-				bool ok = reply.copyIn(chunk.start, static_cast<uint16_t>(chunk.length()));
-				Os::assert(ok, NetErrorStrings::unknown);
+				NET_ASSERT(reply.copyIn(chunk.start, static_cast<uint16_t>(chunk.length())));
 
 				reader.advance(static_cast<uint16_t>(chunk.length()));
 			} while(!reader.atEop());
 		}
+
+		state.increment(&DiagnosticCounters::Icmp::outputQueued);
 
 		return typename Base::FinalReplyInfo{0x01 /* ICMP */, 0xff};
 	}
@@ -162,6 +176,12 @@ template<class S, class... Args>
 class Network<S, Args...>::IcmpReceiver:
     public Os::template IoRequest<IpRxJob<IcmpReceiver, IcmpInputChannel>, &IpRxJob<IcmpReceiver, IcmpInputChannel>::onBlocking>
 {
+	friend typename IcmpReceiver::IoRequest::IpRxJob;
+
+    inline void preprocess() {
+    	state.increment(&DiagnosticCounters::Icmp::inputProcessed);
+    }
+
 public:
 	void init() {
 	    IcmpReceiver::IpRxJob::init();

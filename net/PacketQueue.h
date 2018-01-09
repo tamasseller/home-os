@@ -36,7 +36,7 @@ public:
 
     		while(!first->isEndOfPacket()) {
     			first = first->getNext();
-    			Os::assert(first, NetErrorStrings::unknown);
+    			NET_ASSERT(first);
     		}
 
     		if(Block* next = first->getNext()) {

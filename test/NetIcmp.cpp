@@ -130,6 +130,11 @@ TEST(NetIcmp, IcmpRequestSimple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().icmp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 1) return Task::bad;
         	return ok;
         }
     } task;
@@ -159,6 +164,14 @@ TEST(NetIcmp, IcmpRequestMartian) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().icmp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 1) return Task::bad;
+            if(Net::getCounterStats().ip.outputNoRoute != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -197,6 +210,15 @@ TEST(NetIcmp, IcmpRequestNoArp) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().icmp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 1) return Task::bad;
+            if(Net::getCounterStats().arp.requestSent != 1) return Task::bad;
+            if(Net::getCounterStats().ip.outputArpFailed != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -253,6 +275,13 @@ TEST(NetIcmp, IcmpRequestMultiple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().icmp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 3) return Task::bad;
+
         	return ok;
         }
     } task;
@@ -277,6 +306,12 @@ TEST(NetIcmp, IcmpReceptionInvalid) {
                 0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a
             );
 
+            if(Net::getCounterStats().icmp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 0) return Task::bad;
+
             /*
              * Invalid operation
              */
@@ -291,6 +326,12 @@ TEST(NetIcmp, IcmpReceptionInvalid) {
                 0xf0,     0x01,  0x0f, 0xfc, 0x00, 0x01, 0x00, 0x01
             );
 
+            if(Net::getCounterStats().icmp.inputReceived != 2) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 2) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 0) return Task::bad;
+
             /*
              * Invalid ICMP checksum
              */
@@ -302,12 +343,17 @@ TEST(NetIcmp, IcmpReceptionInvalid) {
                 /* source IP address  | destination IP address */
                 0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
                 /* type | code | checksum  |     id    |  seqnum   | */
-                0xf0,     0x01,  0xf0, 0x01, 0x00, 0x01, 0x00, 0x01
+                0x00,     0x00,  0xf0, 0x01, 0x00, 0x01, 0x00, 0x01
             );
 
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().icmp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 0) return Task::bad;
 
             return ok;
         }
@@ -355,6 +401,13 @@ TEST(NetIcmp, IcmpReceiveReplyWithListener) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().icmp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputProcessed != 1) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 0) return Task::bad;
+
         	return ok;
         }
     } task;
@@ -388,6 +441,14 @@ TEST(NetIcmp, IcmpReceiveMultipleRepliesWithListenerAtOnce) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().icmp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.inputProcessed != 3) return Task::bad;
+            if(Net::getCounterStats().icmp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().icmp.pingRequests != 0) return Task::bad;
+
         	return ok;
         }
     } task;

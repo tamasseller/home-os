@@ -19,33 +19,43 @@ template<class S, class... Args>
 template<class Driver>
 inline void Network<S, Args...>::Ethernet<Driver>::arpPacketReceived(Packet packet)
 {
+	uint16_t opCode, hType, pType;
+    uint8_t hLen, pLen;
 	PacketStream reader;
+
+    state.increment(&DiagnosticCounters::Arp::inputReceived);
+
 	reader.init(packet);
 	reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize());
-
-	uint16_t hType, pType;
-    uint8_t hLen, pLen;
 
 	if(!reader.read16net(hType) ||
 	   !reader.read16net(pType) ||
        !reader.read8(hLen) ||
-       !reader.read8(pLen)) {
-	    packet.template dispose<Pool::Quota::Rx>();
-	} else if(hType != 1 || hLen != 6 || pType != 0x800 || pLen != 4) {
-		packet.template dispose<Pool::Quota::Rx>();
-	} else {
-		uint16_t opCode;
+       !reader.read8(pLen))
+		goto formatError;
 
-		if(!reader.read16net(opCode)) {
-		    packet.template dispose<Pool::Quota::Rx>();
-		} else if(opCode == 0x01) {
-	    	this->arpRequestQueue.putPacketChain(packet);
-			static_cast<ArpReplyJob*>(this)->launch(&startReplySequence);
-		} else if(opCode == 0x0002) {
-			static_cast<ArpPacketProcessor*>(this)->process(packet);
-		} else
-			packet.template dispose<Pool::Quota::Rx>();
+	if(hType != 1 || hLen != 6 || pType != 0x800 || pLen != 4)
+		goto formatError;
+
+	if(!reader.read16net(opCode) || !reader.skipAhead(20))
+		goto formatError;
+
+	if(opCode == 0x01) {
+		state.increment(&DiagnosticCounters::Arp::requestReceived);
+		this->arpRequestQueue.putPacketChain(packet);
+		static_cast<ArpReplyJob*>(this)->launch(&startReplySequence);
+	} else if(opCode == 0x0002) {
+		state.increment(&DiagnosticCounters::Arp::replyReceived);
+		static_cast<ArpPacketProcessor*>(this)->process(packet);
+	} else {
+		goto formatError;
 	}
+
+	return;
+
+formatError:
+	state.increment(&DiagnosticCounters::Arp::inputFormatError);
+	packet.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>
@@ -67,15 +77,13 @@ inline void Network<S, Args...>::Ethernet<Driver>::processArpReplyPacket(Packet 
          * way to the sender hardware address, the initial fields are already processed at
          * this point and are known to describe an adequate reply message.
          */
-        bool skipOk = reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8));
-        Os::assert(skipOk, NetErrorStrings::unknown);
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8)));
 
         AddressEthernet replyMac;
-        bool macReadOk = reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6;
-        Os::assert(macReadOk, NetErrorStrings::unknown);
+        NET_ASSERT(reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6);
 
         AddressIp4 replyIp;
-        Os::assert(reader.read32net(replyIp.addr), NetErrorStrings::unknown);
+        NET_ASSERT(reader.read32net(replyIp.addr));
 
         /*
          * Notify the ARP table about the resolved address.
@@ -96,7 +104,10 @@ template<class S, class... Args>
 template<class Driver>
 inline bool Network<S, Args...>::Ethernet<Driver>::replySent(Launcher *launcher, IoJob* item, Result result)
 {
-	Os::assert(result == Result::Done, NetErrorStrings::unknown);
+	NET_ASSERT(result == Result::Done);
+
+	state.increment(&DiagnosticCounters::Arp::replySent);
+	state.increment(&DiagnosticCounters::Arp::outputSent);
 
 	auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
 	self->txReq.template dispose<Pool::Quota::Tx>();
@@ -113,8 +124,7 @@ template<class S, class... Args>
 template<class Driver>
 inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launcher, IoJob* item, Result result)
 {
-	bool ret = false;
-	Os::assert(result == Result::Done, NetErrorStrings::unknown);
+	NET_ASSERT(result == Result::Done);
 
 	auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
 	TxPacketBuilder builder;
@@ -132,40 +142,26 @@ inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launc
 		 * this point and are known to describe an adequate request. The packet is already
 		 * checked for having enough payload content to do this, so this must not fail.
 		 */
-        bool skipOk = reader.skipAhead(static_cast<uint16_t>(self->getHeaderSize() + 8));
-        Os::assert(skipOk, NetErrorStrings::unknown);
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(self->getHeaderSize() + 8)));
 
 		/*
 		 * Save the source address of the request for later use as the destination of the reply.
 		 */
 		AddressEthernet requesterMac;
-		if(reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) != 6) {
-            requestPacket.template dispose<Pool::Quota::Rx>();
-            continue;
-		}
+		NET_ASSERT(reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6);
 
 		/*
 		 * Read sender IP address.
 		 */
 		char requesterIp[4];
-		if(reader.copyOut(requesterIp, 4) != 4) {
-            requestPacket.template dispose<Pool::Quota::Rx>();
-            continue;
-        }
-
-		if(!reader.skipAhead(static_cast<uint16_t>(6))) {
-            requestPacket.template dispose<Pool::Quota::Rx>();
-            continue;
-        }
+		NET_ASSERT(reader.copyOut(requesterIp, 4) == 4);
+		NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(6)));
 
 		/*
 		 * Read sender IP address.
 		 */
 		AddressIp4 queriedIp;
-		if(!reader.read32net(queriedIp.addr)) {
-            requestPacket.template dispose<Pool::Quota::Rx>();
-            continue;
-		}
+		NET_ASSERT(reader.read32net(queriedIp.addr));
 
 		/*
 		 * Check if the requested
@@ -190,48 +186,41 @@ inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launc
 			0x00, 0x02	// opCode
 		};
 
-		bool boilerplateOk = builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate);
-		Os::assert(boilerplateOk, NetErrorStrings::unknown);
+		NET_ASSERT(builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate));
 
 		/*
 		 * Write source address again.
 		 */
-		bool srcWriteAgainOk = builder.copyIn(reinterpret_cast<const char*>(self->resolver.getAddress().bytes), 6) == 6;
-		Os::assert(srcWriteAgainOk, NetErrorStrings::unknown);
+		NET_ASSERT(builder.copyIn(reinterpret_cast<const char*>(self->resolver.getAddress().bytes), 6) == 6);
 
 		/*
 		 * Write source IP address.
 		 */
-		bool srcIpWriteOk = builder.write32net(queriedIp.addr);
-		Os::assert(srcIpWriteOk, NetErrorStrings::unknown);
+		NET_ASSERT(builder.write32net(queriedIp.addr));
 
 		/*
 		 * Write destination address again.
 		 */
-		bool dstWriteAgainOk = builder.copyIn(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6;
-		Os::assert(dstWriteAgainOk, NetErrorStrings::unknown);
+		NET_ASSERT(builder.copyIn(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6);
 
 		/*
 		 * Write destination IP address.
 		 */
-		bool dstIpWriteOk = builder.copyIn(requesterIp, 4) == 4;
-		Os::assert(dstIpWriteOk, NetErrorStrings::unknown);
+		NET_ASSERT(builder.copyIn(requesterIp, 4) == 4);
 
 		requestPacket.template dispose<Pool::Quota::Rx>();
-		ret = true;
-		break;
-	}
 
-	if(ret) {
 		builder.done();
 		self->txReq.init(builder);
+
+		state.increment(&DiagnosticCounters::Arp::outputQueued);
 		launcher->launch(self->getSender(), &Ethernet::replySent, &self->txReq);
         return true;
-	} else {
-		builder.done();
-		builder.template dispose<Pool::Quota::Tx>();
-        return false;
 	}
+
+	builder.done();
+	builder.template dispose<Pool::Quota::Tx>();
+	return false;
 }
 
 template<class S, class... Args>
@@ -251,7 +240,7 @@ inline bool Network<S, Args...>::Ethernet<Driver>::startReplySequence(Launcher *
 
 template<class S, class... Args>
 template<class Driver>
-struct Network<S, Args...>::Ethernet<Driver>::Resolver: ArpTable<Os, Driver::arpCacheEntries, arpAntiSpoof, typename Interface::AddressResolver> {
+struct Network<S, Args...>::Ethernet<Driver>::Resolver: ArpTable<Os, Driver::arpCacheEntries, typename Interface::AddressResolver> {
     template<class T> static void callPre(TxPacketBuilder& packet, decltype(T::preHeaderFill(packet))*) { return T::preHeaderFill(packet); }
     template<class T> static void callPre(...) {}
 
@@ -267,12 +256,9 @@ struct Network<S, Args...>::Ethernet<Driver>::Resolver: ArpTable<Os, Driver::arp
 	{
 		callPre<Driver>(packet, 0);
 
-		bool dstOk = packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) == 6;
-		Os::assert(dstOk, NetErrorStrings::unknown);
-		bool srcOk = packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) == 6;
-		Os::assert(srcOk, NetErrorStrings::unknown);
-		bool typeOk = packet.write16net(etherType);
-		Os::assert(typeOk, NetErrorStrings::unknown);
+		NET_ASSERT(packet.copyIn(reinterpret_cast<const char*>(dst.bytes), 6) == 6);
+		NET_ASSERT(packet.copyIn(reinterpret_cast<const char*>(Driver::ethernetAddress.bytes), 6) == 6);
+		NET_ASSERT(packet.write16net(etherType));
 	}
 };
 

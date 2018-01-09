@@ -167,7 +167,7 @@ public:
         if(!maskedOffset)
             return 0;
 
-        Os::assert(!isIndirect(), NetErrorStrings::unknown);
+        NET_ASSERT(!isIndirect());
 
         auto immediateOffset = maskedOffset >> offsetShift;
 
@@ -181,7 +181,7 @@ public:
 	 * Set the size of the contained data (implies in-line storage).
 	 */
 	inline void setSize(uint16_t size) {
-	    Os::assert(size < sizeMask, NetErrorStrings::unknown);
+	    NET_ASSERT(size < sizeMask);
 		setSizeInternal(size);
 	}
 
@@ -282,7 +282,7 @@ public:
      */
 	template<typename Pool::Quota quota>
     inline void dropInitialBytes(size_t n) {
-        Os::assert(!first->isIndirect(), NetErrorStrings::unknown);
+        NET_ASSERT(!first->isIndirect());
 
         while(n) {
             if(n < first->getSize()) {
@@ -296,7 +296,7 @@ public:
                 typename Pool::Deallocator deallocator(first);
 
                 while(current && (n >= current->getSize())) {
-                    Os::assert(!current->isIndirect(), NetErrorStrings::unknown);
+                    NET_ASSERT(!current->isIndirect());
 
                     Block* next = current->getNext();
 

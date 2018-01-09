@@ -126,6 +126,12 @@ TEST_GROUP(NetIpTransmitter) {
                         if(tx.send(254))
                             return Task::bad;
 
+                        if(Net::getCounterStats().ip.outputNoRoute != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputArpFailed != 0) return Task::bad;
+                        if(Net::getCounterStats().ip.outputRequest != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputQueued != 0) return Task::bad;
+                        if(Net::getCounterStats().ip.outputSent != 0) return Task::bad;
+
                         return Task::ok;
                     }
                 } task;
@@ -148,6 +154,15 @@ TEST_GROUP(NetIpTransmitter) {
 
                         if(tx.getError() != NetErrorStrings::unresolved)
                             return Task::bad;
+
+                        if(Net::getCounterStats().arp.outputQueued != 4) return Task::bad;
+                        if(Net::getCounterStats().arp.outputSent != 4) return Task::bad;
+                        if(Net::getCounterStats().arp.requestSent != 4) return Task::bad;
+                        if(Net::getCounterStats().ip.outputNoRoute != 0) return Task::bad;
+                        if(Net::getCounterStats().ip.outputArpFailed != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputRequest != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputQueued != 0) return Task::bad;
+                        if(Net::getCounterStats().ip.outputSent != 0) return Task::bad;
 
                         return Task::ok;
                     }
@@ -210,6 +225,8 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
+                        if(Net::getCounterStats().ip.outputRequest != 1) return Task::bad;
+
                         if(!tx.isOccupied())
                             return Task::bad;
 
@@ -242,10 +259,22 @@ TEST_GROUP(NetIpTransmitter) {
                         if(!tx.send(254))
                             return Task::bad;
 
+                        if(Net::getCounterStats().ip.outputQueued != 1) return Task::bad;
+
                         tx.wait();
+
+                        if(Net::getCounterStats().ip.outputSent != 1) return Task::bad;
 
                         if(Accessor::pool.statTxUsed()) return Task::bad;
                         if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+                        if(Net::getCounterStats().arp.inputReceived != 3) return Task::bad;
+                        if(Net::getCounterStats().arp.outputSent != 1) return Task::bad;
+                        if(Net::getCounterStats().arp.outputQueued != 1) return Task::bad;
+                        if(Net::getCounterStats().arp.requestSent != 1) return Task::bad;
+                        if(Net::getCounterStats().arp.replyReceived != 3) return Task::bad;
+                        if(Net::getCounterStats().ip.outputRequest != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputQueued != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputSent != 1) return Task::bad;
 
                         return Task::ok;
                     }
@@ -276,6 +305,14 @@ TEST_GROUP(NetIpTransmitter) {
                         tx.wait();
 
                         if(Accessor::pool.statTxUsed()) return Task::bad;
+                        if(Net::getCounterStats().arp.inputReceived != 0) return Task::bad;
+                        if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+                        if(Net::getCounterStats().arp.outputQueued != 0) return Task::bad;
+                        if(Net::getCounterStats().arp.requestSent != 0) return Task::bad;
+                        if(Net::getCounterStats().arp.replyReceived != 0) return Task::bad;
+                        if(Net::getCounterStats().ip.outputRequest != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputQueued != 1) return Task::bad;
+                        if(Net::getCounterStats().ip.outputSent != 1) return Task::bad;
 
                         return Task::ok;
                     }

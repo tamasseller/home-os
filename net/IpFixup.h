@@ -30,14 +30,9 @@ inline void Network<S, Args...>::fillInitialIpHeader(
 			0x00, 0x00		// checksum
 	};
 
-	bool preambleOk = packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble));
-	Os::assert(preambleOk, NetErrorStrings::unknown);
-
-	bool srcOk = packet.write32net(srcIp.addr);
-	Os::assert(srcOk, NetErrorStrings::unknown);
-
-	bool dstOk = packet.write32net(dstIp.addr);
-	Os::assert(dstOk, NetErrorStrings::unknown);
+	NET_ASSERT(packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble)));
+	NET_ASSERT(packet.write32net(srcIp.addr));
+	NET_ASSERT(packet.write32net(dstIp.addr));
 }
 
 template<class S, class... Args>
@@ -121,8 +116,7 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 			l2headerLength -= chunk.length();
 		}
 
-		bool ok = disassembler.advance();
-		Os::assert(ok, NetErrorStrings::unknown);
+		NET_ASSERT(disassembler.advance());
 	}
 
 	/*
@@ -130,8 +124,7 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 	 * and calculate the checksum over it.
 	 */
 	while(length < headerLength) {
-		bool ok = disassembler.advance();
-		Os::assert(ok, NetErrorStrings::unknown);
+		NET_ASSERT(disassembler.advance());
 
 		Chunk chunk = disassembler.getCurrentChunk();
 
@@ -182,7 +175,7 @@ inline uint16_t Network<S, Args...>::headerFixupStepOne(
 
 	headerChecksum.patch(0, correctEndian(static_cast<uint16_t>(length)));
 
-	Os::assert(length <= UINT16_MAX, NetErrorStrings::unknown);
+	NET_ASSERT(length <= UINT16_MAX);
 
 	return static_cast<uint16_t>(length);
 }
@@ -197,11 +190,10 @@ inline void Network<S, Args...>::headerFixupStepTwo(
 	static constexpr size_t lengthOffset = 2;
 	static constexpr size_t skipBetweenLengthAndChecksum = 6;
 
-	Os::assert(modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset)), NetErrorStrings::unknown);
-	Os::assert(modifier.write16net(static_cast<uint16_t>(length)), NetErrorStrings::unknown);
-
-	Os::assert(modifier.skipAhead(skipBetweenLengthAndChecksum), NetErrorStrings::unknown);
-	Os::assert(modifier.write16raw(headerChecksum), NetErrorStrings::unknown);
+	NET_ASSERT(modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset)));
+	NET_ASSERT(modifier.write16net(static_cast<uint16_t>(length)));
+	NET_ASSERT(modifier.skipAhead(skipBetweenLengthAndChecksum));
+	NET_ASSERT(modifier.write16raw(headerChecksum));
 }
 
 #endif /* IPFIXUP_H_ */

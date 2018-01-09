@@ -29,8 +29,8 @@ public:
 	};
 };
 
-template<class Os, size_t nEntries, bool allowRequestedOnly = false, class Base = typename Os::IoChannel>
-class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template SynchronousIoChannelBase<ArpTable<Os, nEntries, allowRequestedOnly, Base>, Base>
+template<class Os, size_t nEntries, class Base = typename Os::IoChannel>
+class ArpTable: SharedTable<Os, ArpEntry, nEntries>, public Os::template SynchronousIoChannelBase<ArpTable<Os, nEntries, Base>, Base>
 {
 	friend class ArpTable::SynchronousIoChannelBase;
 
@@ -131,11 +131,8 @@ public:
 	 */
 	inline void handleResolved(AddressIp4 ip, const AddressEthernet &mac, uint16_t timeout)
 	{
-		if(!flushRequests(newItems.iterator(), ip, mac)) {
-			if(!flushRequests(agedItems.iterator(), ip, mac))
-		        if(allowRequestedOnly)
-		            return;
-		}
+		if(!flushRequests(newItems.iterator(), ip, mac))
+			flushRequests(agedItems.iterator(), ip, mac);
 
         this->set(ip, mac, static_cast<uint16_t>(ageingCounter + timeout));
 	}

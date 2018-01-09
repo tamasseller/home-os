@@ -134,6 +134,14 @@ TEST(NetUdp, DropRawNoListenerAtAll) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().udp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 1) return Task::bad;
+            if(Net::getCounterStats().udp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().udp.outputSent != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -159,6 +167,15 @@ TEST(NetUdp, DropNoMatchingListener) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().udp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 1) return Task::bad;
+            if(Net::getCounterStats().udp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().udp.outputSent != 0) return Task::bad;
+
+
             return ok;
         }
     } task;
@@ -190,6 +207,14 @@ TEST(NetUdp, ReceiveSimple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().udp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 0) return Task::bad;
+            if(Net::getCounterStats().udp.outputQueued != 0) return Task::bad;
+            if(Net::getCounterStats().udp.outputSent != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -221,6 +246,12 @@ TEST(NetUdp, ReceiveNoChecksum) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().udp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -256,6 +287,11 @@ TEST(NetUdp, ReceiveBad) {
                 'f', 'o', 'o', 'b', 'a', 'r'
             );
 
+            if(Net::getCounterStats().udp.inputReceived != 2) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 0) return Task::bad;
+
             /*
              * Payload truncated
              */
@@ -272,6 +308,11 @@ TEST(NetUdp, ReceiveBad) {
                 'f', 'o', 'o'
             );
 
+            if(Net::getCounterStats().udp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 0) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 2) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 0) return Task::bad;
+
             /*
              * Header truncated (consistent IP payload size)
              */
@@ -286,8 +327,11 @@ TEST(NetUdp, ReceiveBad) {
                 0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0
             );
 
+            if(Net::getCounterStats().udp.inputReceived != 4) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 3) return Task::bad;
+
             /*
-             * Header truncated (in-consistent IP payload size)
+             * Header truncated (inconsistent IP payload size)
              */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 /*            dst                 |                src                | etherType */
@@ -300,8 +344,11 @@ TEST(NetUdp, ReceiveBad) {
                 0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0xf0
             );
 
+            if(Net::getCounterStats().udp.inputReceived != 5) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 4) return Task::bad;
+
             /*
-             * Header truncated (in-consistent IP payload size)
+             * Header truncated (inconsistent IP payload size)
              */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 /*            dst                 |                src                | etherType */
@@ -314,7 +361,15 @@ TEST(NetUdp, ReceiveBad) {
                 0x82, 0x3b, 0x04
             );
 
+            if(Net::getCounterStats().udp.inputReceived != 6) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 5) return Task::bad;
+
             if(r.wait(1)) return Task::bad;
+
+            if(Net::getCounterStats().udp.inputReceived != 6) return Task::bad;
+            if(Net::getCounterStats().udp.inputProcessed != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputFormatError != 5) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 0) return Task::bad;
 
             r.close();
 
@@ -438,9 +493,12 @@ TEST(NetUdp, Echo) {
     	        rx.receive(0x823b);
     	        tx.init(0x823b);
 
-    	        for(int i = 0; i < 10; i++) {
+    	        for(int i = 0; i < 20; i++) {
     	            rx.wait();
     	            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), 128);
+
+    	            if(tx.getError())
+    	            	return bad;
 
     	            while(!rx.atEop()) {
     	                Net::Chunk c = rx.getChunk();
@@ -450,7 +508,12 @@ TEST(NetUdp, Echo) {
     	            }
 
     	            tx.send();
+
+    	            if(tx.getError())
+    	            	return bad;
     	        }
+
+    	        tx.wait();
 
     	        return ok;
     		}
@@ -465,9 +528,20 @@ TEST(NetUdp, Echo) {
 			for(int i = 0; i < 10; i++) {
 				expectLong();
 				receiveLong();
+				Net::Os::sleep(1);
 			}
 
-            return Task::ok;
+			for(int i = 0; i < 10; i++) {
+				expectLong();
+				receiveLong();
+			}
+
+			Net::Os::sleep(1);
+
+			if(Net::getCounterStats().ip.outputRequest != Net::getCounterStats().ip.outputSent)
+				return Task::bad;
+
+            return udpEchoTask.error;
         }
     } task;
 

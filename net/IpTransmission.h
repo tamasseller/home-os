@@ -192,6 +192,7 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 			fillInitialIpHeader(packet, route->getSource(), self->dst);
 
 			self->device = dev;
+
 			return static_cast<Child*>(self)->onPreparationDone(launcher, item);
 		} else
 			return static_cast<Child*>(self)->onPreparationAborted(launcher, item, result);
@@ -215,12 +216,14 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 					 */
 					const uint16_t size = bytesToBlocks(arpReqSize + route->getDevice()->getHeaderSize());
 
+
 			    	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
 			    			launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
 				} else {
 					/*
 					 * Give up if number of retries exhausted.
 					 */
+					state.increment(&DiagnosticCounters::Ip::outputArpFailed);
 					return static_cast<Child*>(self)->onArpTimeout(launcher, item);
 				}
 			}
@@ -250,10 +253,11 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
         self->packet.stage3.template dispose<Pool::Quota::Tx>();
 
 		if(result == Result::Done) {
-			/*
-			 * Wait for the required address.
-			 */
 			self->arp.ip = self->getDestinationIpForL2();
+
+			state.increment(&DiagnosticCounters::Arp::outputSent);
+			state.increment(&DiagnosticCounters::Arp::requestSent);
+
 			launcher->launch(self->route->getDevice()->getResolver(), &IpTxJob::addressResolved, &self->arp);
 			return true;
 		} else {
@@ -263,7 +267,7 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	}
 
 	/**
-	 * Handler for completion of buffer allocation for the arp query packet.
+	 * Handler for completion of buffer allocation for the ARP query packet.
 	 */
 	static bool arpPacketAllocated(Launcher *launcher, IoJob* item, Result result)
 	{
@@ -290,6 +294,8 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 			Packet copy = self->packet.stage2;
 			self->packet.stage3.init(copy);
 
+			state.increment(&DiagnosticCounters::Arp::outputQueued);
+
 			launcher->launch(route->getDevice()->getSender(), &IpTxJob::arpPacketSent, &self->packet.stage3);
 		    return true;
 		} else {
@@ -304,6 +310,9 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	static bool sent(Launcher *launcher, IoJob* item, Result result)
 	{
 		auto self = static_cast<IpTxJob*>(item);
+
+		state.increment(&DiagnosticCounters::Ip::outputSent);
+
 		return static_cast<Child*>(self)->onSent(launcher, item, result);
 	}
 
@@ -319,6 +328,8 @@ public:
 	static bool startPreparation(Launcher *launcher, IoJob* item, AddressIp4 dst, size_t nInLine, size_t nIndirect, uint8_t arpRetry)
 	{
 		auto self = static_cast<IpTxJob*>(item);
+
+		state.increment(&DiagnosticCounters::Ip::outputRequest);
 
 		/*
 		 * Find the right network and save arguments.
@@ -366,8 +377,10 @@ public:
 
             return state.pool.template allocateDirectOrDeferred<Pool::Quota::Tx>(
                     launcher, &IpTxJob::arpPacketAllocated, &self->packet.stage1, size);
-		} else
+		} else {
+			state.increment(&DiagnosticCounters::Ip::outputNoRoute);
 		    return static_cast<Child*>(self)->onNoRoute(launcher, item);
+		}
 	}
 
 	template<class PayloadDigester = DummyDigester>
@@ -391,7 +404,7 @@ public:
 				ttl,
 				protocol);
 
-		Os::assert(length != (uint16_t)-1, NetErrorStrings::unknown);
+		NET_ASSERT(length != (uint16_t)-1);
 
 		PacketStream modifier;
 		modifier.init(self->packet.stage3);
@@ -410,9 +423,11 @@ public:
 			left -= run;
 		}
 
-		Os::assert(modifier.skipAhead(ipHeaderSize - 20), NetErrorStrings::unknown);
+		NET_ASSERT(modifier.skipAhead(ipHeaderSize - 20));
 
 		static_cast<Child*>(self)->postProcess(modifier, payloadChecksum, length - ipHeaderSize);
+
+		state.increment(&DiagnosticCounters::Ip::outputQueued);
 
 		launcher->launch(self->device->getSender(), &IpTxJob::sent, &self->packet.stage3);
 		return true;
@@ -434,6 +449,7 @@ class Network<S, Args...>::IpTransmitterBase: protected Os::template IoRequest<I
 
 	const char* error;
 
+protected:
 	inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
         if(result != Result::Done)
             error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
@@ -457,7 +473,6 @@ class Network<S, Args...>::IpTransmitterBase: protected Os::template IoRequest<I
         return false;
     }
 
-protected:
 	bool check() {
 		if(this->isOccupied())
 			this->wait();

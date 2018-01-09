@@ -71,6 +71,12 @@ TEST(NetIcmpArp, ArpRequestSimple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().arp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 1) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 1) return Task::bad;
+
         	return ok;
         }
     } task;
@@ -102,6 +108,12 @@ TEST(NetIcmpArp, ArpRequestTriple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().arp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 3) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 3) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 3) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 3) return Task::bad;
+
             return ok;
         }
     } task;
@@ -181,6 +193,13 @@ TEST(NetIcmpArp, ArpRequestWithJunk) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().arp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 1) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 1) return Task::bad;
+
             return ok;
         }
     } task;
@@ -206,6 +225,13 @@ TEST(NetIcmpArp, ArpRequestNotForUs) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().arp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             return ok;
         }
     } task;
@@ -231,6 +257,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 1) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
 			Net::template getEthernetInterface<DummyIf>()->receive(
 				/*            dst                 |                src                | etherType */
 				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -244,6 +277,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 2) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 2) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -254,6 +294,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().arp.inputReceived != 3) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 3) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
@@ -266,6 +313,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 4) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 4) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -277,6 +331,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 5) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 5) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -287,6 +348,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().arp.inputReceived != 6) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 6) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
@@ -301,6 +369,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 7) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 7) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -314,6 +389,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
+            if(Net::getCounterStats().arp.inputReceived != 8) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 8) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
+
             Net::template getEthernetInterface<DummyIf>()->receive(
                   /*            dst                 |                src                | etherType */
                   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x06,
@@ -326,6 +408,13 @@ TEST(NetIcmpArp, ArpRequestInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().arp.inputReceived != 9) return Task::bad;
+            if(Net::getCounterStats().arp.inputFormatError != 9) return Task::bad;
+            if(Net::getCounterStats().arp.outputQueued!= 0) return Task::bad;
+            if(Net::getCounterStats().arp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().arp.requestReceived != 0) return Task::bad;
+            if(Net::getCounterStats().arp.replySent != 0) return Task::bad;
 
             return ok;
         }

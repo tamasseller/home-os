@@ -71,7 +71,7 @@ private:
     static inline bool buffersAcquired(Launcher *launcher, IoJob* item, Result result)
     {
     	auto self = static_cast<Interface*>(item);
-    	Os::assert(result == Result::Done, NetErrorStrings::unknown);
+    	NET_ASSERT(result == Result::Done);
 
     	self->takeRxBuffers(static_cast<typename Pool::IoData*>(self)->allocator);
 

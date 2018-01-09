@@ -27,6 +27,7 @@ using Net = Network<
 		NetworkOptions::BufferSize<64>,
 		NetworkOptions::BufferCount<256>,
 		NetworkOptions::TicksPerSecond<1000>,
+		NetworkOptions::UseDiagnosticCounters<true>,
 		NetworkOptions::Interfaces<
 		    NetworkOptions::Set<
 		        NetworkOptions::EthernetInterface<LinuxTapDevice>

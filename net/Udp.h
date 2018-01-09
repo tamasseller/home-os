@@ -12,18 +12,18 @@ template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, uint16_t length)
 {
-	RxPacketHandler* ret = &state.udpPacketProcessor;
-
-	if(length < 8)
-		return nullptr;
-
-	if(!reader.skipAhead(6))
-		return nullptr;
-
 	uint16_t cheksumField;
 
+	state.increment(&DiagnosticCounters::Udp::inputReceived);
+
+	if(length < 8)
+		goto formatError;
+
+	if(!reader.skipAhead(6))
+		goto formatError;
+
 	if(!reader.read16net(cheksumField))
-		return nullptr;
+		goto formatError;
 
 	/*
 	 * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
@@ -32,16 +32,21 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
 	 */
 	if(cheksumField) {
-		Os::assert(!reader.skipAhead(0xffff), NetErrorStrings::unknown);
+		NET_ASSERT(!reader.skipAhead(0xffff));
 
 		reader.patch(0, correctEndian(static_cast<uint16_t>(length)));
 		reader.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
 
 		if(reader.result())
-			return nullptr;
+			goto formatError;
 	}
 
-	return ret;
+	return &state.udpPacketProcessor;
+
+formatError:
+
+	state.increment(&DiagnosticCounters::Udp::inputFormatError);
+	return nullptr;
 }
 
 template<class S, class... Args>
@@ -68,17 +73,19 @@ inline void Network<S, Args...>::processUdpPacket(typename Os::Event*, uintptr_t
 
         uint8_t ihl;
 
-        Os::assert(reader.read8(ihl), NetErrorStrings::unknown);
+        NET_ASSERT(reader.read8(ihl));
 
-        Os::assert(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)), NetErrorStrings::unknown);
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)));
 
         uint16_t port;
-        Os::assert(reader.read16net(port), NetErrorStrings::unknown);
+        NET_ASSERT(reader.read16net(port));
 
         bool hasMore = reader.cutCurrentAndMoveToNext();
 
-        if(!state.udpInputChannel.takePacket(start, DstPortTag(port)))
+        if(!state.udpInputChannel.takePacket(start, DstPortTag(port))) {
             start.template dispose<Pool::Quota::Rx>(); // TODO reply ICMP DUR PUR
+            state.increment(&DiagnosticCounters::Udp::inputNoPort);
+        }
 
         if(!hasMore)
             break;
@@ -102,21 +109,23 @@ class Network<S, Args...>::UdpReceiver:
 
     inline void preprocess() {
         uint8_t ihl;
-        Os::assert(this->read8(ihl), NetErrorStrings::unknown);
+        NET_ASSERT(this->read8(ihl));
 
-        Os::assert(this->skipAhead(11), NetErrorStrings::unknown);
-        Os::assert(this->read32net(this->peerAddress.addr), NetErrorStrings::unknown);
+        NET_ASSERT(this->skipAhead(11));
+        NET_ASSERT(this->read32net(this->peerAddress.addr));
 
-        Os::assert(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)), NetErrorStrings::unknown);
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
 
-        Os::assert(this->read16net(this->peerPort), NetErrorStrings::unknown);
+        NET_ASSERT(this->read16net(this->peerPort));
 
-        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
+        NET_ASSERT(this->skipAhead(2));
 
-        Os::assert(this->read16net(this->length), NetErrorStrings::unknown);
+        NET_ASSERT(this->read16net(this->length));
         this->length = static_cast<uint16_t>(this->length - 8);
 
-        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
+        NET_ASSERT(this->skipAhead(2));
+
+        state.increment(&DiagnosticCounters::Udp::inputProcessed);
     }
 
 public:
@@ -154,17 +163,22 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 
 	uint16_t dstPort, srcPort;
 
+	inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
+		state.increment(&DiagnosticCounters::Udp::outputSent);
+		return this->UdpTransmitter::IpTransmitterBase::onSent(launcher, item, result);
+	}
+
 	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) {
 		auto self = static_cast<UdpTransmitter*>(item);
-		Os::assert(self->accessPacket().write16net(self->srcPort), NetErrorStrings::unknown);
-		Os::assert(self->accessPacket().write16net(self->dstPort), NetErrorStrings::unknown);
-		Os::assert(self->accessPacket().write32raw(0), NetErrorStrings::unknown);
+		NET_ASSERT(self->accessPacket().write16net(self->srcPort));
+		NET_ASSERT(self->accessPacket().write16net(self->dstPort));
+		NET_ASSERT(self->accessPacket().write32raw(0));
 
 		return false;
 	}
 
 	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
-		Os::assert(stream.skipAhead(4), NetErrorStrings::unknown);
+		NET_ASSERT(stream.skipAhead(4));
 		stream.write16net(static_cast<uint16_t>(payload));
 
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
@@ -182,7 +196,9 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 		 * 		 generated  no checksum  (for debugging or for higher level
 		 * 		 protocols that don't care)."
 		 */
-		Os::assert(stream.write16raw(result ? result : static_cast<uint16_t>(~result)), NetErrorStrings::unknown);
+		NET_ASSERT(stream.write16raw(result ? result : static_cast<uint16_t>(~result)));
+
+		state.increment(&DiagnosticCounters::Udp::outputQueued);
 	}
 public:
 

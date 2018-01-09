@@ -208,7 +208,7 @@ class Scheduler<Args...>::IoRequest:
     	if(this->result != IoJob::Result::NotYet)
     		return this;
 
-    	if(onBlocking && !(this->*onBlocking)())
+    	if(onBlocking && !(static_cast<Job*>(this)->*onBlocking)())
     		return this;
 
         return this->isOccupied() ? nullptr : this;

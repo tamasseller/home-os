@@ -76,6 +76,7 @@ TEST(NetIpReception, DropRawNoListener) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReceived != 1) return Task::bad;
             return ok;
         }
     } task;
@@ -105,6 +106,7 @@ TEST(NetIpReception, ReceiveRawWithListener) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReceived != 1) return Task::bad;
             return ok;
         }
     } task;
@@ -137,6 +139,7 @@ TEST(NetIpReception, ReceiveRawRestart) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReceived != 3) return Task::bad;
             return ok;
         }
     } task;
@@ -171,6 +174,7 @@ TEST(NetIpReception, Misusage) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReceived != 1) return Task::bad;
             return ok;
         }
     } task;
@@ -240,6 +244,8 @@ TEST(NetIpReception, ReceiveRawMultiple) {
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReceived != 4) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 0) return Task::bad;
             return ok;
         }
     } task;
@@ -260,6 +266,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 1) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -269,6 +276,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 2) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -278,6 +286,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 3) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -288,6 +297,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 4) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -298,6 +308,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 5) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -305,39 +316,45 @@ TEST(NetIpReception, IpReceptionInvalid) {
                 0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x40, 0x00
             );
 
-            /*
-             * First fragment
-             */
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 6) return Task::bad;
+            if(Net::getCounterStats().ip.inputReassemblyRequired != 0) return Task::bad;
 
+            /*
+             * First fragment
+             */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
                 /* bullsh |  length   | frag. id  | flags+off */
                 0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x60, 0x00
             );
 
-            /*
-             * Internal fragment
-             */
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReassemblyRequired != 1) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 6) return Task::bad;
 
+            /*
+             * Internal fragment
+             */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
                 /* bullsh |  length   | frag. id  | flags+off */
                 0x45, 0x00, 0x00, 0x22, 0x00, 0x00, 0x60, 0x01
             );
 
-            /*
-             * Last fragment
-             */
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReassemblyRequired != 2) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 6) return Task::bad;
 
+            /*
+             * Last fragment
+             */
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
                 /* bullsh |  length   | frag. id  | flags+off */
@@ -347,6 +364,8 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputReassemblyRequired != 3) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 6) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0x08, 0x00,
@@ -357,6 +376,8 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 7) return Task::bad;
+            if(Net::getCounterStats().ip.inputReassemblyRequired != 3) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 /*            dst                 |                src                | etherType */
@@ -368,6 +389,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 8) return Task::bad;
 
             Net::template getEthernetInterface<DummyIf>()->receive(
                 /*            dst                 |                src                | etherType */
@@ -381,6 +403,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 9) return Task::bad;
 
             /*
              * Truncated content.
@@ -399,6 +422,7 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 10) return Task::bad;
 
             /*
              * Truncated header (should be 24 bytes)
@@ -411,6 +435,11 @@ TEST(NetIpReception, IpReceptionInvalid) {
                 /* source IP address  | destination IP address */
                 0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a
             );
+
+            Net::Os::sleep(1);
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 11) return Task::bad;
 
             /*
              * Bad checksum
@@ -428,9 +457,12 @@ TEST(NetIpReception, IpReceptionInvalid) {
                 'f', 'o', 'o', 'b', 'a', 'r'
             );
 
+
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputForwardingRequired != 0) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 12) return Task::bad;
 
             /*
              * Not for us.
@@ -451,6 +483,8 @@ TEST(NetIpReception, IpReceptionInvalid) {
             Net::Os::sleep(1);
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+            if(Net::getCounterStats().ip.inputForwardingRequired != 1) return Task::bad;
+            if(Net::getCounterStats().ip.inputFormatError != 12) return Task::bad;
 
             return ok;
         }

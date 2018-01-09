@@ -48,7 +48,8 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 }
 
 template<class S, class... Args>
-inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev) {
+inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
+{
 	struct ChecksumValidatorObserver: InetChecksumDigester {
 		size_t remainingLength;
 		size_t totalLength;
@@ -84,6 +85,15 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 		}
 	};
 
+	static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
+
+	RxPacketHandler* handler = &state.rawPacketProcessor;
+	AddressIp4 srcIp, dstIp;
+	uint16_t ipLength, id, fragmentOffsetAndFlags;
+	uint8_t protocol;
+
+	state.increment(&DiagnosticCounters::Ip::inputReceived);
+
 	/*
 	 * Dispose of L2 header.
 	 */
@@ -93,78 +103,51 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	reader.init(packet);
 
 	uint8_t versionAndHeaderLength;
-	if(!reader.read8(versionAndHeaderLength) || ((versionAndHeaderLength & 0xf0) != 0x40)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read8(versionAndHeaderLength) || ((versionAndHeaderLength & 0xf0) != 0x40))
+		goto formatError;
 
-	if(!reader.skipAhead(1)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.skipAhead(1))
+		goto formatError;
 
-	uint16_t ipLength;
-	if(!reader.read16net(ipLength)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read16net(ipLength))
+		goto formatError;
 
-	uint16_t id;
-	if(!reader.read16net(id)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read16net(id))
+		goto formatError;
 
-	uint16_t fragmentOffsetAndFlags;
-	if(!reader.read16net(fragmentOffsetAndFlags)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read16net(fragmentOffsetAndFlags))
+		goto formatError;
 
-	static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
 	if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
 		/*
 		 * IP defragmentation could be done here.
 		 */
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
+		state.increment(&DiagnosticCounters::Ip::inputReassemblyRequired);
+		goto error;
 	}
 
 	/*
 	 * Skip TTL.
 	 */
-	if(!reader.skipAhead(1)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.skipAhead(1))
+		goto formatError;
 
-	uint8_t protocol;
-	if(!reader.read8(protocol)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read8(protocol))
+		goto formatError;
 
-	if(!reader.skipAhead(2)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.skipAhead(2))
+		goto formatError;
 
-	AddressIp4 srcIp, dstIp;
-	if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr)) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr))
+		goto formatError;
 
-	if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength))) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength)))
+		goto formatError;
 
-	Os::assert(reader.isDone(), NetErrorStrings::unknown);
-	if(!reader.valid) {
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+	NET_ASSERT(reader.isDone());
+
+	if(!reader.valid)
+		goto formatError;
 
 	/*
 	 * Check if the packet is for us.
@@ -172,14 +155,14 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	if(Route* route = state.routingTable.findRouteWithSource(dev, dstIp)) {
 		state.routingTable.releaseRoute(route);
 	} else {
-		/*
-		 * If this host not the final destination then, routing could be done here.
-		 */
-		packet.template dispose<Pool::Quota::Rx>();
-		return;
-	}
+		// TODO allow broadcast.
 
-	RxPacketHandler* handler = &state.rawPacketProcessor;
+		/*
+		 * If this host is not the final destination then, routing could be done here.
+		 */
+		state.increment(&DiagnosticCounters::Ip::inputForwardingRequired);
+		goto error;
+	}
 
 	switch(protocol) {
 	case 1:
@@ -198,26 +181,31 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 			auto chunk = reader.getChunk();
 			reader.consume(chunk.start, chunk.length());
 
-			if(protocol == 6)
+			if(protocol == 6) {
 				handler = checkTcpPacket(reader, payloadLength);
-			else
+			} else {
 				handler = checkUdpPacket(reader, payloadLength);
+			}
 
 			break;
 		}
 	}
 
     if(handler) {
-        Os::assert(!reader.skipAhead(0xffff), NetErrorStrings::unknown);
+        NET_ASSERT(!reader.skipAhead(0xffff));
 
-        if(reader.totalLength != ipLength) {
-            packet.template dispose<Pool::Quota::Rx>();
-            return;
-        }
+        if(reader.totalLength != ipLength)
+        	goto formatError;
 
         handler->handlePacket(packet);
-    } else
-        packet.template dispose<Pool::Quota::Rx>();
+        return;
+    }
+
+formatError:
+	state.increment(&DiagnosticCounters::Ip::inputFormatError);
+
+error:
+	packet.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>
@@ -238,18 +226,38 @@ private:
         static_cast<Child*>(this)->reset();
     }
 
-    inline void fetchPacket() {
-        if(packet.isValid() && this->atEop()) {
-            packet.template dispose<Pool::Quota::Rx>();
-            invalidateAllStates();
+    inline bool fetchPacket()
+    {
+        if(packet.isValid()) {
+        	/*
+        	 * If we have a valid packet that is not consumed return true
+        	 * right away to indicate that there is data to be processed.
+        	 */
+        	if(!this->atEop())
+        		return true;
+
+        	/*
+        	 * Drop the packet if it have been consumed.
+        	 */
+        	packet.template dispose<Pool::Quota::Rx>();
+			invalidateAllStates();
         }
 
-        if(!packet.isValid()) {
-            if(data.packets.takePacketFromQueue(packet)) {
-                static_cast<PacketStream*>(this)->init(packet);
-                static_cast<Child*>(this)->preprocess();
-            }
+    	/*
+    	 * If there is no packet (because either there was none or it have
+    	 * been dropped above) and a new one can be obtained then fetch it
+    	 * and return true to indicate that there is data to be processed.
+    	 */
+        if(!packet.isValid() && data.packets.takePacketFromQueue(packet)) {
+			static_cast<PacketStream*>(this)->init(packet);
+			static_cast<Child*>(this)->preprocess();
+			return true;
         }
+
+        /*
+         * If this point is reached then there is no data to be read.
+         */
+        return false;
     }
 
     static bool received(Launcher *launcher, IoJob* item, Result result)
@@ -275,11 +283,7 @@ public:
     // Internal!
     bool onBlocking()
     {
-        if(isEmpty())
-            return true;
-
-        fetchPacket();
-        return false;
+        return !fetchPacket();
     }
 
 
@@ -287,15 +291,11 @@ public:
         invalidateAllStates();
     }
 
-    bool isEmpty() {
-        return !packet.isValid() && data.packets.isEmpty();
-    }
-
     static bool startReception(Launcher *launcher, IoJob* item, Channel* channel)
     {
         auto self = static_cast<IpRxJob*>(item);
 
-        Os::assert(!self->packet.isValid(), NetErrorStrings::unknown);
+        NET_ASSERT(!self->packet.isValid());
 
         launcher->launch(channel, &IpRxJob::received, &self->data);
         return true;
@@ -317,15 +317,12 @@ class Network<S, Args...>::IpReceiver: public Os::template IoRequest<IpRxJob<IpR
 
     inline void preprocess() {
         uint8_t ihl;
-        Os::assert(this->read8(ihl), NetErrorStrings::unknown);
-
-        Os::assert(this->skipAhead(8), NetErrorStrings::unknown);
-        Os::assert(this->read8(this->protocol), NetErrorStrings::unknown);
-
-        Os::assert(this->skipAhead(2), NetErrorStrings::unknown);
-        Os::assert(this->read32net(this->peerAddress.addr), NetErrorStrings::unknown);
-
-        Os::assert(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)), NetErrorStrings::unknown);
+        NET_ASSERT(this->read8(ihl));
+        NET_ASSERT(this->skipAhead(8));
+        NET_ASSERT(this->read8(this->protocol));
+        NET_ASSERT(this->skipAhead(2));
+        NET_ASSERT(this->read32net(this->peerAddress.addr));
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
     }
 
 public:

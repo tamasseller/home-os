@@ -8,8 +8,6 @@
 #ifndef NETWORK_H_
 #define NETWORK_H_
 
-#include "meta/Configuration.h"
-
 #include "Routing.h"
 #include "ArpTable.h"
 #include "AddressIp4.h"
@@ -17,7 +15,11 @@
 #include "SharedTable.h"
 #include "AddressEthernet.h"
 #include "NetErrorStrings.h"
+#include "DiagnosticCounters.h"
 #include "InetChecksumDigester.h"
+
+#include "meta/Sfinae.h"
+#include "meta/Configuration.h"
 
 struct NetworkOptions {
 	PET_CONFIG_VALUE(RoutingTableEntries, size_t);
@@ -29,7 +31,7 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(RxBufferLimit, size_t);
 	PET_CONFIG_VALUE(TicksPerSecond, size_t);
 	PET_CONFIG_VALUE(MachineLittleEndian, bool);
-	PET_CONFIG_VALUE(ArpAntiSpoof, bool);
+	PET_CONFIG_VALUE(UseDiagnosticCounters, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
 	template<template<class, uint16_t> class Driver> struct EthernetInterface {
@@ -48,7 +50,7 @@ struct NetworkOptions {
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
 		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
-		PET_EXTRACT_VALUE(arpAntiSpoof, ArpAntiSpoof, false, Options);
+		PET_EXTRACT_VALUE(useDiagnosticCounters, UseDiagnosticCounters, false, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
 		PET_EXTRACT_VALUE(arpTimeout, ArpCacheTimeout, 60, Options);
@@ -92,7 +94,10 @@ struct NetworkOptions {
 		template<class> class ObservedPacketStream;
 		class PacketTransmissionRequest;
 
+	public:
 		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
+
+	private:
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
 		template<typename Pool::Quota> class PacketBuilder;
 		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
@@ -113,7 +118,7 @@ struct NetworkOptions {
 		class RawPacketProcessor;
 		class UdpPacketProcessor;
 
-		static struct State {
+		static struct State: DiagnosticCounterStorage<useDiagnosticCounters> {
 			struct Ager: Os::Timeout {
 				inline void age();
 				static inline void doAgeing(typename Os::Sleeper*);
@@ -187,6 +192,25 @@ struct NetworkOptions {
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);
 
+		struct BufferStats {
+			size_t nBuffersUsed, nTxUsed, nRxUsed;
+		};
+
+		static inline BufferStats getBufferStats() {
+			BufferStats ret;
+
+			ret.nBuffersUsed = state.pool.statUsed();
+			ret.nTxUsed = state.pool.statTxUsed();
+			ret.nRxUsed = state.pool.statRxUsed();
+
+			return ret;
+		}
+
+		template<bool enabled = useDiagnosticCounters>
+		static inline typename EnableIf<enabled, DiagnosticCounters>::Type getCounterStats() {
+			return state;
+		}
+
 		static inline void init(Buffers &buffers) {
 		    state.~State();
 		    new(&state) State();
@@ -233,6 +257,10 @@ template<class S, class... Args>
 struct Network<S, Args...>::RxPacketHandler {
 	virtual void handlePacket(Packet packet) = 0;
 };
+
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+#define NET_ASSERT(x)	Os::assert((x), "Internal error at " __FILE__ "@" STR(__LINE__))
 
 #include "Arp.h"
 #include "Udp.h"

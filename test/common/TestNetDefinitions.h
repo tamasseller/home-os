@@ -174,8 +174,11 @@ using Ifs = NetworkOptions::Interfaces<
     >
 >;
 
-using Net64 = Network<OsRr, Ifs, NetworkOptions::BufferSize<64>, NetworkOptions::TicksPerSecond<20>>;
-using Net43 = Network<OsRr, Ifs, NetworkOptions::BufferSize<43>, NetworkOptions::TicksPerSecond<20>>;
+using Net64 = Network<OsRr, Ifs, NetworkOptions::BufferSize<64>,
+		NetworkOptions::TicksPerSecond<20>, NetworkOptions::UseDiagnosticCounters<true>>;
+
+using Net43 = Network<OsRr, Ifs, NetworkOptions::BufferSize<43>,
+		NetworkOptions::TicksPerSecond<20>, NetworkOptions::UseDiagnosticCounters<true>>;
 
 template<class Net>
 struct NetBuffers {

@@ -46,6 +46,7 @@ private:
     }
 
     inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
+    	static_cast<Child*>(this)->replySent(request);
     	this->disposePacket();
     	return restartIfNeeded(launcher, item);
     }
@@ -71,7 +72,7 @@ private:
      */
 
     inline bool onPreparationAborted(Launcher *launcher, IoJob* item, Result result) {
-        Os::assert(false, NetErrorStrings::unknown);
+        NET_ASSERT(false);
         return false;
     }
 
