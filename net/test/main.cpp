@@ -27,7 +27,8 @@ class UdpEchoTask: Os::Task {
         while(true) {
             rx.wait();
 
-            tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), rx.getLength());
+           	tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), rx.getLength());
+           	Os::assert(!tx.getError(), tx.getError());
 
             while(!rx.atEop()) {
                 Net::Chunk c = rx.getChunk();
@@ -65,9 +66,9 @@ class MainTask: Os::Task
 			auto bufferStats = Net::getBufferStats();
 			auto stats = Net::getCounterStats();
 
-			ss << std::endl << "Buffers used: " << bufferStats.nBuffersUsed << std::endl;
-			ss << std::endl << "\tRX:\t" << bufferStats.nRxUsed << std::endl;
-			ss << std::endl << "\tTX:\t" << bufferStats.nTxUsed << std::endl;
+			ss << std::endl << "Buffers used:\t" << bufferStats.nBuffersUsed << std::endl;
+			ss << "\tRX:\t" << bufferStats.nRxUsed << std::endl;
+			ss << "\tTX:\t" << bufferStats.nTxUsed << std::endl;
 
 			ss << std::endl << "ARP stats: " << std::endl;
 

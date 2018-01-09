@@ -29,14 +29,15 @@ class LinuxTapDevice {
     static constexpr auto ethernetAddress = AddressEthernet::make(0xee, 0xee, 0xee, 0xee, 0xee, 0);
 
     static constexpr const char *interfaceName = "tap0";
-    static constexpr auto nBlocks = (3 * 1500 + blockMaxPayload - 1) / blockMaxPayload;
-	char* rxTable[nBlocks];
+    static constexpr auto nBlocks = (1500 + blockMaxPayload - 1) / blockMaxPayload;
+	char* rxTable[nBlocks + 1];
 	int fd, rxWriteIdx, rxReadIdx;
 
 	inline char* receiveSome(const uint8_t *&p, uint16_t &length, uint16_t &run)
 	{
 		char* ret = rxTable[rxReadIdx];
-		rxReadIdx = (rxReadIdx + 1) % nBlocks;
+		rxTable[rxReadIdx] = nullptr;
+		rxReadIdx = (rxReadIdx + 1) % (nBlocks + 1);
 
 		run = (length < blockMaxPayload) ? length : blockMaxPayload;
 
@@ -59,10 +60,8 @@ class LinuxTapDevice {
 		auto self = Net::template getEthernetInterface<LinuxTapDevice>();
 
 		while((nread = read(self->fd, buffer, buffsize)) > 0) {
-			if((self->rxWriteIdx - self->rxReadIdx) == 1) {
-				printf("Dropping packet due to buffer overflow.");
+			if(!((self->rxWriteIdx - self->rxReadIdx + (nBlocks + 1)) % (nBlocks + 1)))
 				return;
-			}
 
 #ifdef PRINT_PACKETS
 			for(ssize_t i = 0; i < nread; i++){
@@ -82,6 +81,13 @@ class LinuxTapDevice {
 			uint16_t nBlocksConsumed = 1;
 
 			while(length) {
+				if(!((self->rxWriteIdx - self->rxReadIdx + (nBlocks + 1)) % (nBlocks + 1))) {
+					assembler.done();
+					assembler.template dispose<Net::Pool::Quota::Rx>();
+					self->requestRxBuffers(nBlocksConsumed);
+					return;
+				}
+
 				char* chunk = self->receiveSome(p, length, run);
 				assembler.addBlockByFinalInlineData(chunk, run);
 				nBlocksConsumed++;
@@ -175,7 +181,7 @@ class LinuxTapDevice {
 		sigprocmask(SIG_BLOCK, &intmask, NULL);
 
 		rxTable[rxWriteIdx] = data;
-		rxWriteIdx = (rxWriteIdx + 1) % nBlocks;
+		rxWriteIdx = (rxWriteIdx + 1) % (nBlocks + 1);
 
 		sigprocmask(SIG_UNBLOCK, &intmask, NULL);
 		return true;
