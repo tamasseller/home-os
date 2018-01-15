@@ -29,6 +29,22 @@ public:
 	inline DstPortTag(): n(0) {}
 };
 
+template<class S, class... Args>
+class Network<S, Args...>:: ConnectionTag {
+	AddressIp4 peerAddress;
+	uint16_t peerPort, localPort;
+public:
+	bool operator ==(const ConnectionTag& other) {
+		return 	(peerAddress == other.peerAddress) &&
+				(peerPort == other.peerPort) &&
+				(localPort == other.localPort);
+	}
+
+	inline ConnectionTag(AddressIp4 peerAddress, uint16_t peerPort, uint16_t localPort):
+			peerAddress(peerAddress), peerPort(peerPort), localPort(localPort) {}
+
+	inline ConnectionTag(): peerAddress(AddressIp4::allZero), peerPort(peerPort), localPort(localPort) {}
+};
 
 template<class S, class... Args>
 template<class Tag>
@@ -64,18 +80,30 @@ private:
 		return true;
 	}
 
+protected:
+	inline IoData* findListener(Tag t) {
+		for(auto it = items.iterator(); it.current(); it.step())
+			if(it.current()->accessTag() == t)
+				return it.current();
+
+		return nullptr;
+	}
+
 public:
 	inline bool takePacket(Packet p, Tag t = Tag())
 	{
-		for(auto it = items.iterator(); it.current(); it.step()) {
-			if(it.current()->accessTag() == t) {
-				it.current()->packets.putPacketChain(p);
-				this->jobDone(it.current());
-				return true;
-			}
+		if(IoData* listener = findListener(t)) {
+			listener->packets.putPacketChain(p);
+			this->jobDone(listener);
+			return true;
 		}
 
 		return false;
+	}
+
+	inline bool hasListener(Tag t = Tag())
+	{
+		return findListener(t) != nullptr;
 	}
 };
 

@@ -40,14 +40,6 @@ inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t
 }
 
 template<class S, class... Args>
-template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, uint16_t)
-{
-	RxPacketHandler* ret = nullptr;
-	return ret;
-}
-
-template<class S, class... Args>
 inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 {
 	struct ChecksumValidatorObserver: InetChecksumDigester {
@@ -165,11 +157,11 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 	}
 
 	switch(protocol) {
-	case 1:
+	case IpProtocolNumbers::icmp:
 		handler = checkIcmpPacket(reader);
 		break;
-	case 6:
-	case 17: {
+	case IpProtocolNumbers::tcp:
+	case IpProtocolNumbers::udp: {
 			auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
 			reader.InetChecksumDigester::reset();
 			reader.remainingLength = payloadLength;

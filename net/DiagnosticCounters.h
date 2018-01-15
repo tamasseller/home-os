@@ -62,12 +62,23 @@ struct DiagnosticCounters {
 		size_t inputNoPort = 0;				//< Number of packets dropped due lack of a listener.
 	} udp;
 
+	/**
+	 * Counters related to various UDP transmission and reception events.
+	 */
+	struct Tcp: Common<Tcp> {
+		size_t inputProcessed = 0;			//< Number of packets that the user started processing.
+		size_t ackPackets = 0;				//< Number of packets sent for acknowledging received data.
+		size_t rstPackets = 0;				//< Number of packets sent for indicating connection error.
+		size_t inputNoPort = 0;				//< Number of packets dropped due lack of a listener.
+	} tcp;
+
 	template<class T>
 	inline DiagnosticCounters(const T& storage):
 		arp(storage),
 		ip(storage),
 		icmp(storage),
-		udp(storage) {}
+		udp(storage),
+		tcp(storage) {}
 
 	inline DiagnosticCounters() {}
 };
@@ -80,7 +91,8 @@ struct DiagnosticCounterStorage<true>:
 	DiagnosticCounters::Arp,
 	DiagnosticCounters::Ip,
 	DiagnosticCounters::Icmp,
-	DiagnosticCounters::Udp
+	DiagnosticCounters::Udp,
+	DiagnosticCounters::Tcp
 {
 	template<class T>
 	inline void increment(size_t T::* field) {

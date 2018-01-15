@@ -168,7 +168,7 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 
 		state.increment(&DiagnosticCounters::Icmp::outputQueued);
 
-		return typename Base::FinalReplyInfo{0x01 /* ICMP */, 0xff};
+		return typename Base::FinalReplyInfo{IpProtocolNumbers::icmp, 0xff};
 	}
 };
 

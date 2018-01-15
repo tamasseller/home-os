@@ -11,8 +11,8 @@
 #include "Network.h"
 
 template<class S, class... Args>
-template<class Child>
-class Network<S, Args...>::IpReplyJob: IpTxJob<IpReplyJob<Child>>, public RxPacketHandler
+template<class Child, class PayloadDigester>
+class Network<S, Args...>::IpReplyJob: IpTxJob<Child>, public RxPacketHandler
 {
 	friend class IpReplyJob::IpTxJob;
 
@@ -56,7 +56,7 @@ private:
     	FinalReplyInfo info = static_cast<Child*>(this)->generateReply(request, this->accessPacket());
 
 		request.template dispose<Pool::Quota::Rx>();
-		return IpReplyJob::IpTxJob::startTransmission(launcher, item, info.protocol, info.ttl);
+		return IpReplyJob::IpTxJob::template startTransmission<PayloadDigester>(launcher, item, info.protocol, info.ttl);
 	}
 
     inline bool onNoRoute(Launcher *launcher, IoJob* item) {
@@ -88,7 +88,6 @@ private:
 
 		return IpReplyJob::IpTxJob::startPreparation(launcher, item, info.dst, info.length, 0, 0);
     }
-
 
 public:
     virtual void handlePacket(Packet packet) {

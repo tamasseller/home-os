@@ -15,6 +15,7 @@
 #include "SharedTable.h"
 #include "AddressEthernet.h"
 #include "NetErrorStrings.h"
+#include "IpProtocolNumbers.h"
 #include "DiagnosticCounters.h"
 #include "InetChecksumDigester.h"
 
@@ -83,11 +84,14 @@ struct NetworkOptions {
 
 		class NullTag;
 		class DstPortTag;
+		class ConnectionTag;
 
 		template<class> class PacketInputChannel;
 		typedef PacketInputChannel<NullTag> IcmpInputChannel;
 		typedef PacketInputChannel<NullTag> RawInputChannel;
 		typedef PacketInputChannel<DstPortTag> UdpInputChannel;
+		typedef PacketInputChannel<DstPortTag> TcpListenerChannel;
+		class TcpInputChannel;
 
 		template<class> class PacketWriterBase;
 		class NullObserver;
@@ -108,15 +112,18 @@ struct NetworkOptions {
 		class RxPacketHandler;
 		template<class> class IpTxJob;
 		template<class, class> class IpRxJob;
-		template<class> class IpReplyJob;
+		template<class, class = DummyDigester> class IpReplyJob;
 		class IcmpEchoReplyJob;
 		class ArpReplyJob;
+		class TcpAckJob;
+		class TcpRstJob;
 
 		class PacketProcessor;
 		class ArpPacketProcessor;
 		class IcmpPacketProcessor;
 		class RawPacketProcessor;
 		class UdpPacketProcessor;
+		class TcpPacketProcessor;
 
 		static struct State: DiagnosticCounterStorage<useDiagnosticCounters> {
 			struct Ager: Os::Timeout {
@@ -136,6 +143,12 @@ struct NetworkOptions {
 
 			UdpInputChannel udpInputChannel;
 			UdpPacketProcessor udpPacketProcessor;
+
+			TcpAckJob tcpAckJob;
+			TcpRstJob tcpRstJob;
+			TcpListenerChannel tcpListenerChannel;
+			TcpInputChannel tcpInputChannel;
+			TcpPacketProcessor tcpPacketProcessor;
 
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
@@ -160,6 +173,10 @@ struct NetworkOptions {
 				uint16_t length,
 				uint16_t headerChecksum);
 
+		static inline void tcpTxPostProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payloadLength);
+
+		template<typename Pool::Quota> static inline Packet dropIpHeader(Packet packet);
+
 		inline static constexpr uint16_t bytesToBlocks(size_t);
 
 		using IoJob = typename Os::IoJob;
@@ -173,6 +190,7 @@ struct NetworkOptions {
 		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
 		static inline void processRawPacket(typename Os::Event*, uintptr_t);
 		static inline void processUdpPacket(typename Os::Event*, uintptr_t);
+		static inline void processTcpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 		template<class> class IpTransmitterBase;
@@ -214,9 +232,11 @@ struct NetworkOptions {
 		static inline void init(Buffers &buffers) {
 		    state.~State();
 		    new(&state) State();
-		    state.icmpInputChannel.init();
 		    state.rawInputChannel.init();
+		    state.icmpInputChannel.init();
 		    state.udpInputChannel.init();
+		    state.tcpInputChannel.init();
+		    state.tcpListenerChannel.init();
 			state.pool.init(buffers);
 			state.interfaces.init();
 			state.ager.start(secTicks);
@@ -263,6 +283,7 @@ struct Network<S, Args...>::RxPacketHandler {
 #define NET_ASSERT(x)	Os::assert((x), "Internal error at " __FILE__ "@" STR(__LINE__))
 
 #include "Arp.h"
+#include "Tcp.h"
 #include "Udp.h"
 #include "Icmp.h"
 #include "Packet.h"

@@ -21,6 +21,7 @@ struct NetErrorStrings {
 	/*
 	 * TCP
 	 */
+	static constexpr const char* socketConcurrency = "TCP socket used concurrently";
 	static constexpr const char* alreadyConnected = "The socket is already connected";
 	static constexpr const char* connectionReset = "Connection reset by peer";
 

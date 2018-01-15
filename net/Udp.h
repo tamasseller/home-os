@@ -35,7 +35,7 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 		NET_ASSERT(!reader.skipAhead(0xffff));
 
 		reader.patch(0, correctEndian(static_cast<uint16_t>(length)));
-		reader.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
+		reader.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
 
 		if(reader.result())
 			goto formatError;
@@ -181,7 +181,7 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 		NET_ASSERT(stream.skipAhead(4));
 		stream.write16net(static_cast<uint16_t>(payload));
 
-		checksum.patch(0, correctEndian(static_cast<uint16_t>(0x11)));
+		checksum.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
 		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
 
@@ -196,7 +196,7 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 		 * 		 generated  no checksum  (for debugging or for higher level
 		 * 		 protocols that don't care)."
 		 */
-		NET_ASSERT(stream.write16raw(result ? result : static_cast<uint16_t>(~result)));
+		NET_ASSERT(stream.write16raw(result ? result : 0xffff));
 
 		state.increment(&DiagnosticCounters::Udp::outputQueued);
 	}
@@ -236,7 +236,7 @@ public:
 
 		bool later = this->launch(
 				&UdpTransmitter::IpTransmitterBase::IpTxJob::template startTransmission<InetChecksumDigester>,
-				'\x11', ttl);
+				IpProtocolNumbers::udp, ttl);
         return later || this->getError() == nullptr;
 	}
 
@@ -247,7 +247,7 @@ public:
 
         bool later = this->launchTimeout(
         		&UdpTransmitter::IpTransmitterBase::IpTxJob::template startTransmission<InetChecksumDigester>, timeout,
-        		'\x11', ttl);
+        		IpProtocolNumbers::udp, ttl);
         return later || this->getError() == nullptr;
     }
 };

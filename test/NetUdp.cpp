@@ -25,7 +25,7 @@ TEST_GROUP(NetUdp)
         return true;
     }
 
-        static inline void receiveSimple() {
+	static inline void receiveSimple() {
         Net::template getEthernetInterface<DummyIf>()->receive(
             /*            dst                 |                src                | etherType */
             0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
