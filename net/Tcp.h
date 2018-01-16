@@ -60,6 +60,7 @@ template<class S, class... Args>
 inline void Network<S, Args...>::processTcpPacket(typename Os::Event*, uintptr_t arg)
 {
 	static constexpr uint16_t synMask = 0x0002;
+	static constexpr uint16_t rstMask = 0x0004;
 	static constexpr uint16_t ackMask = 0x0010;
 
     Packet chain;
@@ -93,10 +94,14 @@ inline void Network<S, Args...>::processTcpPacket(typename Os::Event*, uintptr_t
         bool hasMore = reader.cutCurrentAndMoveToNext();
 
         if(!state.tcpInputChannel.takePacket(start, ConnectionTag(peerAddress, peerPort, localPort))) {
-        	bool isInitial = (offsetAndFlags & synMask) && !(offsetAndFlags & ackMask);
-        	if(!isInitial || !state.tcpListenerChannel.takePacket(start, DstPortTag(localPort))) {
-            	state.increment(&DiagnosticCounters::Tcp::inputNoPort);
-            	state.tcpRstJob.handlePacket(start);
+        	if((offsetAndFlags & rstMask)) {
+        		start.template dispose<Pool::Quota::Rx>();
+        	} else {
+				bool isInitial = (offsetAndFlags & synMask) && !(offsetAndFlags & ackMask);
+				if(!isInitial || !state.tcpListenerChannel.takePacket(start, DstPortTag(localPort))) {
+					state.increment(&DiagnosticCounters::Tcp::inputNoPort);
+					state.tcpRstJob.handlePacket(start);
+				}
         	}
         }
 
@@ -152,7 +157,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 		return typename Base::InitialReplyInfo{peerAddress, static_cast<uint16_t>(20)};
 	}
 
-	inline typename Base::FinalReplyInfo generateReply(Packet& request, TxPacketBuilder& reply)
+	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply)
 	{
     	uint32_t seqNum;
         uint16_t peerPort, localPort;
@@ -162,7 +167,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 		reader.init(request);
 
         NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40);
+        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
         NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) - 1)));
 
         NET_ASSERT(reader.read16net(peerPort));
@@ -187,7 +192,12 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 template<class S, class... Args>
 class Network<S, Args...>::TcpAckJob: public IpTxJob<TcpAckJob> {
 	// TODO reply job style, but with sockets instead of packets as its input.
-	// TODO should send an empty acknowledge packet with the current data.
+
+	/* TODO:
+	 *		1. send an empty acknowledge packet with the current ack number
+	 *		2. put packet into the acked list
+	 */
+
 };
 
 template<class S, class... Args>
@@ -199,43 +209,57 @@ class Network<S, Args...>::TcpInputChannel:
 	typedef typename Os::template SynchronousIoChannelBase<TcpInputChannel> WindowChannel;
 	friend WindowChannel;
 
+	uint32_t tcpTime;
+
+	struct TcpTimer {
+		class TcpTimer* next;
+		uint32_t deadline;
+	};
+
+	struct RetransmissionTimer: TcpTimer{};
+
 public:
-	class WindowWaiterData;
+	class SocketData;
 
-	class SocketData: public InputChannel::IoData {
+	class WindowWaiterData: public Os::IoJob::Data {
 		friend class TcpInputChannel;
-		class WindowWaiterData* windowWaiter;
+		uint16_t requestedWindowSize;
 
-		uint32_t lastAckNumber;
-		uint32_t expectedSequenceNumber;
-		uint16_t lastPeerWindowSize;
+		inline SocketData* getSocketData();
+	};
+
+	class SocketData: public InputChannel::IoData, WindowWaiterData {
+		friend class TcpInputChannel;
+		friend class TcpListener;
+
+		AddressIp4 peerAddress;
+		uint16_t peerPort;
+
+		uint16_t rxLastWindowSize;
+		uint32_t rxNextSequenceNumber;
+		uint32_t rxLastAckNumber;
+
+		uint16_t txPeerWindowLeft;
+		uint16_t txOwnWindowLeft;
+		uint32_t txLastSequenceNumber;
+		uint32_t txNextAckNumber;
+
+		// TODO lists: unacked, acked, sent
+		// TODO timers: retransmission, zero window probe
 
 		enum State: uint8_t {
 			SynSent, SynReceived, Established
 		} state;
 	};
 
-	class WindowWaiterData: public Os::IoJob::Data {
-		friend class TcpInputChannel;
-		WindowWaiterData* next;
-
-	public:
-		SocketData* socket;
-		uint16_t requestedWindowSize;
-	};
-
 private:
 	inline bool addItem(typename Os::IoJob::Data* data){
-		auto windowWaiterData = static_cast<WindowWaiterData*>(data);
-		Os::assert(!windowWaiterData->socket->windowWaiter, NetErrorStrings::socketConcurrency);
-		windowWaiterData->socket->windowWaiter = windowWaiterData;
+		// TODO check state
 		return true;
 	}
 
 	inline bool removeCanceled(typename Os::IoJob::Data* data) {
-		auto windowWaiterData = static_cast<WindowWaiterData*>(data);
-		Os::assert(windowWaiterData->socket->windowWaiter == windowWaiterData, NetErrorStrings::socketConcurrency);
-		windowWaiterData->socket->windowWaiter = windowWaiterData;
+		// TODO check state
 		return true;
 	}
 
@@ -252,9 +276,6 @@ public:
 		getInputChannel()->init();
 	}
 
-   	// TODO normal, per-socket checking and ACK reply and state update (should call into
-	// some other class that knows about the per-socket info).
-	//
 	// If sequence number is correct:
 	//   - update lastAcked, and window, drop from unacked as needed, reset retransmission timer.
 	//   - if data length is not zero:
@@ -279,6 +300,99 @@ public:
 
 		return false;
 	}
+};
+
+template<class S, class... Args>
+inline typename Network<S, Args...>::TcpInputChannel::SocketData*
+Network<S, Args...>::TcpInputChannel::WindowWaiterData::getSocketData() {
+	return static_cast<SocketData*>(this);
+}
+
+
+template<class S, class... Args>
+class Network<S, Args...>::TcpListener:
+    protected Os::template IoRequest<IpRxJob<TcpListener, TcpListenerChannel>, &IpRxJob<TcpListener, TcpListenerChannel>::onBlocking>
+{
+	friend class TcpListener::IpRxJob;
+
+	AddressIp4 peerAddress;
+    uint32_t initialSequenceNumber;
+    uint16_t peerPort;
+
+    inline void reset() {
+        peerAddress = AddressIp4::allZero;
+    	peerPort = 0;
+    }
+
+    inline void preprocess() {
+        uint8_t ihl;
+        NET_ASSERT(this->read8(ihl));
+        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
+
+        NET_ASSERT(this->skipAhead(11));
+        NET_ASSERT(this->read32net(this->peerAddress.addr));
+
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
+
+        NET_ASSERT(this->read16net(peerPort));
+        NET_ASSERT(this->skipAhead(2));
+        NET_ASSERT(this->read32net(initialSequenceNumber));
+
+        state.increment(&DiagnosticCounters::Tcp::inputProcessed);
+    }
+
+public:
+    using TcpListener::IoRequest::wait;
+
+    AddressIp4 getPeerAddress() const {
+        return peerAddress;
+    }
+
+    uint16_t getPeerPort() const {
+        return peerPort;
+    }
+
+	void init() {
+	    TcpListener::IpRxJob::init();
+	    TcpListener::IoRequest::init();
+	}
+
+	void deny() {
+		state.increment(&DiagnosticCounters::Tcp::inputConnectionDenied);
+		state.tcpRstJob.handlePacket(this->packet);
+		this->invalidateAllStates();
+	}
+
+	bool accept(TcpSocket& socket) {
+		state.increment(&DiagnosticCounters::Tcp::inputConnectionAccepted);
+		// TODO check state;
+		socket.data.state = TcpInputChannel::SocketData::State::SynReceived;
+		socket.data.rxLastWindowSize = 1;
+		socket.data.txPeerWindowLeft = 1;
+		socket.data.rxNextSequenceNumber = initialSequenceNumber + 1;
+		socket.data.txLastSequenceNumber = 0; // TODO generate randomly
+
+		// TODO add syn packet as unacked
+		// TODO queue for sending ack
+
+		return true;
+	}
+
+	bool listen(uint16_t port) {
+		this->data.accessTag() = DstPortTag(port);
+		return this->launch(&TcpListener::IpRxJob::startReception, &state.tcpListenerChannel);
+	}
+
+	void close() {
+		this->cancel();
+		this->wait();
+	}
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::TcpSocket {
+	friend TcpListener;
+	typename TcpInputChannel::SocketData data;
 };
 
 #endif /* TCP_H_ */

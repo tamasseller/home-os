@@ -22,7 +22,7 @@ class Network<S, Args...>::Ethernet:
     friend class Network<S, Args...>;
     friend Driver;
 
-    using TxPacketBuilder = Network<S, Args...>::TxPacketBuilder;
+    using PacketBuilder = Network<S, Args...>::PacketBuilder;
     struct Resolver;
 
     Resolver resolver;

@@ -17,7 +17,7 @@ TEST_GROUP(NetPacket) {
 
 	template<class Child>
 	struct TaskBase: TestTask<Child> {
-		Accessor::TxPacketBuilder builder;
+		Accessor::PacketBuilder builder;
 
 		void init(size_t n) {
 			builder.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(n));
@@ -79,7 +79,7 @@ TEST_GROUP(NetPacket) {
 		}
 	};
 
-	typedef Accessor::TxPacketBuilder::PacketWriterBase Writer;
+	typedef Accessor::PacketBuilder::PacketWriterBase Writer;
 	typedef Accessor::PacketStream::ObservedPacketStream Reader;
 
 	template<const char* padding, class Data, bool (Writer::* write)(Data), bool(Reader::* read)(Data&)>
@@ -286,7 +286,7 @@ TEST(NetPacket, WordOverlapNet) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&Accessor::TxPacketBuilder::write32net,
+			&Accessor::PacketBuilder::write32net,
 			&Accessor::PacketStream::read32net
 	> task;
 	work(task);
@@ -296,7 +296,7 @@ TEST(NetPacket, HalfWordOverlapNet) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&Accessor::TxPacketBuilder::write16net,
+			&Accessor::PacketBuilder::write16net,
 			&Accessor::PacketStream::read16net
 	> task;
 	work(task);
@@ -306,7 +306,7 @@ TEST(NetPacket, WordOverlapRawt) {
 	OverlapTask<
 			c55,
 			uint32_t,
-			&Accessor::TxPacketBuilder::write32raw,
+			&Accessor::PacketBuilder::write32raw,
 			&Accessor::PacketStream::read32raw
 	> task;
 	work(task);
@@ -316,7 +316,7 @@ TEST(NetPacket, HalfWordOverlapRaw) {
 	OverlapTask<
 			c57,
 			uint16_t,
-			&Accessor::TxPacketBuilder::write16raw,
+			&Accessor::PacketBuilder::write16raw,
 			&Accessor::PacketStream::read16raw
 	> task;
 	work(task);

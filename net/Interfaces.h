@@ -21,7 +21,7 @@ public:
 	struct AddressResolver: Os::IoChannel {
 		virtual const AddressEthernet& getAddress() = 0;
 		virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
-		virtual void fillHeader(TxPacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
+		virtual void fillHeader(PacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 	};
 
     inline Interface(uint16_t headerSize, AddressResolver* resolver): resolver(resolver), headerSize(headerSize) {}

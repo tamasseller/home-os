@@ -66,16 +66,6 @@ struct NetworkOptions {
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 		static_assert(bufferCount < 32768, "Too many blocks requested");
 
-	public:
-		class Interface;
-		struct Chunk;
-		class Packet;
-		class PacketStream;
-		class PacketAssembler;
-		class PacketDisassembler;
-		typedef Scheduler Os;
-
-	private:
 		template<class> class Ethernet;
 		template<uint16_t, class, class = void> struct Interfaces;
 
@@ -99,18 +89,24 @@ struct NetworkOptions {
 		class PacketTransmissionRequest;
 
 	public:
+		class Interface;
+		struct Chunk;
+		class Packet;
+		class PacketStream;
+		class PacketAssembler;
+		class PacketDisassembler;
+		typedef Scheduler Os;
 		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
 
 	private:
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
-		template<typename Pool::Quota> class PacketBuilder;
-		using TxPacketBuilder = PacketBuilder<Pool::Quota::Tx>;
-		using RxPacketBuilder = PacketBuilder<Pool::Quota::Rx>;
+		class PacketBuilder;
 
 		class DummyDigester;
 
 		class RxPacketHandler;
 		template<class> class IpTxJob;
+		template<class> class IpTransmitterBase;
 		template<class, class> class IpRxJob;
 		template<class, class = DummyDigester> class IpReplyJob;
 		class IcmpEchoReplyJob;
@@ -155,7 +151,7 @@ struct NetworkOptions {
 			Pool pool;
 		} state;
 
-		static void fillInitialIpHeader(TxPacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
+		static void fillInitialIpHeader(PacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
 
 		template<bool patch, class HeaderDigester, class PayloadDigester>
 		static inline uint16_t headerFixupStepOne(
@@ -193,8 +189,6 @@ struct NetworkOptions {
 		static inline void processTcpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
-		template<class> class IpTransmitterBase;
-
 	public:
 		static constexpr auto blockMaxPayload = Block::dataSize;
 		typedef typename Pool::Storage Buffers;
@@ -207,47 +201,25 @@ struct NetworkOptions {
 		class IcmpReceiver;
 		class UdpReceiver;
 
+		class TcpListener;
+		class TcpSocket;
+
+		struct BufferStats;
+
 		static inline constexpr uint32_t correctEndian(uint32_t);
 		static inline constexpr uint16_t correctEndian(uint16_t);
 
-		struct BufferStats {
-			size_t nBuffersUsed, nTxUsed, nRxUsed;
-		};
+		static inline void init(Buffers &buffers);
 
-		static inline BufferStats getBufferStats() {
-			BufferStats ret;
-
-			ret.nBuffersUsed = state.pool.statUsed();
-			ret.nTxUsed = state.pool.statTxUsed();
-			ret.nRxUsed = state.pool.statRxUsed();
-
-			return ret;
-		}
-
-		template<bool enabled = useDiagnosticCounters>
-		static inline typename EnableIf<enabled, DiagnosticCounters>::Type getCounterStats() {
-			return state;
-		}
-
-		static inline void init(Buffers &buffers) {
-		    state.~State();
-		    new(&state) State();
-		    state.rawInputChannel.init();
-		    state.icmpInputChannel.init();
-		    state.udpInputChannel.init();
-		    state.tcpInputChannel.init();
-		    state.tcpListenerChannel.init();
-			state.pool.init(buffers);
-			state.interfaces.init();
-			state.ager.start(secTicks);
-		}
-
-		static inline bool addRoute(const Route& route, bool setUp = false) {
-		    return state.routingTable.add(route, setUp);
-		}
+		static inline bool addRoute(const Route& route, bool setUp = false);
 
 		template<template<class, uint16_t> class Driver>
 		constexpr static inline auto* getEthernetInterface();
+
+		static inline BufferStats getBufferStats();
+
+		template<bool enabled = useDiagnosticCounters>
+		static inline typename EnableIf<enabled, DiagnosticCounters>::Type getCounterStats();
 	};
 };
 
@@ -257,31 +229,11 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 template<class S, class... Args>
 typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
 
-template<class S, class... Args>
-inline void Network<S, Args...>::State::Ager::age() {
-	state.interfaces.ageContent();
-	this->extend(secTicks);
-}
-
-template<class S, class... Args>
-inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sleeper) {
-	static_cast<Ager*>(sleeper)->age();
-}
-
-template<class S, class... Args>
-inline constexpr uint16_t Network<S, Args...>::bytesToBlocks(size_t bytes) {
-	return static_cast<uint16_t>((bytes + blockMaxPayload - 1) / blockMaxPayload);
-}
-
-template<class S, class... Args>
-struct Network<S, Args...>::RxPacketHandler {
-	virtual void handlePacket(Packet packet) = 0;
-};
-
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define NET_ASSERT(x)	Os::assert((x), "Internal error at " __FILE__ "@" STR(__LINE__))
 
+#include "Misc.h"
 #include "Arp.h"
 #include "Tcp.h"
 #include "Udp.h"

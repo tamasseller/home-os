@@ -159,7 +159,7 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 		 * Packet information used during the second stage: the assembled packet, filled
 		 * with the headers at the end of stage 1 and during stage 2, the packet is also
 		 * patched at the start of stage 3 with the size and possibly the checksum. */
-        TxPacketBuilder stage2;
+        PacketBuilder stage2;
 
 		/**
 		 * Packet data used during the third, final stage: The final queueable packet,
@@ -433,7 +433,7 @@ public:
 		return true;
 	}
 
-	inline TxPacketBuilder& accessPacket() {
+	inline PacketBuilder& accessPacket() {
 		return packet.stage2;
 	}
 

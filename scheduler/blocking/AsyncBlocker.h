@@ -43,10 +43,9 @@ public:
 		state.eventList.issue(this);
 	}
 
-    inline void notifyFromTask() {
+    inline void notifyFromTask() { // TODO get rid of
         syscall<SYSCALL(doRelease<ActualBlocker>)>(Registry<ActualBlocker>::getRegisteredId(static_cast<ActualBlocker*>(this)), (uintptr_t)1);
     }
-
 };
 
 }

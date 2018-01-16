@@ -43,7 +43,7 @@ public:
 	inline ConnectionTag(AddressIp4 peerAddress, uint16_t peerPort, uint16_t localPort):
 			peerAddress(peerAddress), peerPort(peerPort), localPort(localPort) {}
 
-	inline ConnectionTag(): peerAddress(AddressIp4::allZero), peerPort(peerPort), localPort(localPort) {}
+	inline ConnectionTag(): peerAddress(AddressIp4::allZero), peerPort(0), localPort(0) {}
 };
 
 template<class S, class... Args>

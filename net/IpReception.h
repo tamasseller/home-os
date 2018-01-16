@@ -203,21 +203,21 @@ error:
 template<class S, class... Args>
 template<class Child, class Channel>
 class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
+protected:
     Packet packet;
 
-protected:
     typename Channel::IoData data;
 
     inline void preprocess() {}
     inline void reset() {}
 
-private:
     inline void invalidateAllStates() {
         packet.init(nullptr);
         static_cast<PacketStream*>(this)->invalidate();
         static_cast<Child*>(this)->reset();
     }
 
+private:
     inline bool fetchPacket()
     {
         if(packet.isValid()) {

@@ -364,7 +364,11 @@ TEST(NetUdp, ReceiveBad) {
             if(Net::getCounterStats().udp.inputReceived != 6) return Task::bad;
             if(Net::getCounterStats().udp.inputFormatError != 5) return Task::bad;
 
-            if(r.wait(1)) return Task::bad;
+            if(!r.wait(1)) return Task::bad;
+            if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
+            if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
+            if(r.getPeerPort() != 0x823b) return Task::bad;
+            if(r.getLength() != 6) return Task::bad;
 
             if(Net::getCounterStats().udp.inputReceived != 6) return Task::bad;
             if(Net::getCounterStats().udp.inputProcessed != 1) return Task::bad;
@@ -484,9 +488,11 @@ TEST(NetUdp, SendSimple) {
 
 TEST(NetUdp, Echo) {
     struct Task: public TestTask<Task> {
+
     	struct UdpEchoTask: public TestTask<UdpEchoTask> {
     		Net::UdpReceiver rx;
     		Net::UdpTransmitter tx;
+    		Net::Os::BinarySemaphore sem;
 
     		bool run() {
     			rx.init();
@@ -515,6 +521,8 @@ TEST(NetUdp, Echo) {
 
     	        tx.wait();
 
+    	        this->error = ok;
+    	        sem.notifyFromTask();
     	        return ok;
     		}
     	} udpEchoTask;
@@ -522,6 +530,7 @@ TEST(NetUdp, Echo) {
         bool run() {
             typename Net::UdpTransmitter tx;
 
+            udpEchoTask.sem.init(false);
             udpEchoTask.start();
             Net::Os::sleep(1);
 
@@ -536,7 +545,7 @@ TEST(NetUdp, Echo) {
 				receiveLong();
 			}
 
-			Net::Os::sleep(1);
+			udpEchoTask.sem.wait();
 
 			if(Net::getCounterStats().ip.outputRequest != Net::getCounterStats().ip.outputSent)
 				return Task::bad;

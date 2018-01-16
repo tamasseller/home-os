@@ -127,7 +127,7 @@ inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launc
 	NET_ASSERT(result == Result::Done);
 
 	auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
-	TxPacketBuilder builder;
+	PacketBuilder builder;
 
 	builder.init(self->poolParams.allocator);
 
@@ -241,7 +241,7 @@ inline bool Network<S, Args...>::Ethernet<Driver>::startReplySequence(Launcher *
 template<class S, class... Args>
 template<class Driver>
 struct Network<S, Args...>::Ethernet<Driver>::Resolver: ArpTable<Os, Driver::arpCacheEntries, typename Interface::AddressResolver> {
-    template<class T> static void callPre(TxPacketBuilder& packet, decltype(T::preHeaderFill(packet))*) { return T::preHeaderFill(packet); }
+    template<class T> static void callPre(PacketBuilder& packet, decltype(T::preHeaderFill(packet))*) { return T::preHeaderFill(packet); }
     template<class T> static void callPre(...) {}
 
 	virtual const AddressEthernet& getAddress() override final {
@@ -252,7 +252,7 @@ struct Network<S, Args...>::Ethernet<Driver>::Resolver: ArpTable<Os, Driver::arp
 		return this->lookUp(ip, mac);
 	}
 
-	virtual void fillHeader(TxPacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
+	virtual void fillHeader(PacketBuilder& packet, const AddressEthernet& dst, uint16_t etherType) override final
 	{
 		callPre<Driver>(packet, 0);
 

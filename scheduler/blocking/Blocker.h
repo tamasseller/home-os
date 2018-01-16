@@ -299,10 +299,10 @@ uintptr_t Scheduler<Args...>::doTimedBlock(uintptr_t blockerPtr, uintptr_t timeo
 }
 
 /**
- * Block the current task on blocker with timeout.
+ * Release an ownable blocker (ie. mutex) and block current task as needed.
  *
  * This is a common method that could be used as a system call for any
- * type of real blocker, including: mutexes, semaphores, and _WaitableSets_.
+ * type of blockers, including: mutexes, semaphores, and _WaitableSets_.
  *
  * @NOTE This method uses de-virtualized calls for performance reasons.
  */

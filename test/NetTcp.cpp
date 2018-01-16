@@ -61,6 +61,23 @@ TEST_GROUP(NetTcp)
     	);
     }
 
+    static inline void expectSynAck() {
+    	Net::template getEthernetInterface<DummyIf>()->expectN(1,
+			/*            dst                 |                src                | etherType */
+			0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+			0x45, 0x00, 0x00, 0x28, 0x00, 0x00, 0x40, 0x00, 0xff, 0x06, 0x53, 0xb1,
+			/* source IP address  | destination IP address */
+			0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
+			/* srcport|  dstport  |    Sequence number    */
+			0x56, 0x78, 0x12, 0x34, 0x00, 0x00, 0x00, 0x00,
+			/*     Ack number     | off+flags | wnd size */
+			0x00, 0x00, 0x00, 0x01, 0x05, 0x12, 0x00, 0x00,
+			/* checksum / urgent bs */
+			0x6a, 0x07, 0x00, 0x00
+    	);
+    }
+
 	template<class Task>
 	static inline void work(Task& task)
 	{
@@ -102,6 +119,7 @@ TEST(NetTcp, DropRawNoListenerAtAll) {
             if(Net::getCounterStats().tcp.inputProcessed != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputNoPort != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionDenied != 0) return Task::bad;
             if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
             if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
 
@@ -111,22 +129,21 @@ TEST(NetTcp, DropRawNoListenerAtAll) {
 
     work(task);
 }
-/*
+
 TEST(NetTcp, DropNoMatchingListener) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::TcpReceiver r;
+            Net::TcpListener r;
 
             r.init();
-            r.receive(0xf001);
+            r.listen(0xf001);
 
+            expectRst();
             receiveSyn();
 
             if(r.wait(1)) return Task::bad;
-
-            r.close();
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
@@ -135,9 +152,11 @@ TEST(NetTcp, DropNoMatchingListener) {
             if(Net::getCounterStats().tcp.inputProcessed != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputNoPort != 1) return Task::bad;
-            if(Net::getCounterStats().tcp.outputQueued != 0) return Task::bad;
-            if(Net::getCounterStats().tcp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionDenied != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
 
+            r.close();
 
             return ok;
         }
@@ -146,27 +165,25 @@ TEST(NetTcp, DropNoMatchingListener) {
     work(task);
 }
 
-TEST(NetTcp, ReceiveSyn) {
+TEST(NetTcp, DenyConnection) {
     struct Task: public TestTask<Task> {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::TcpReceiver r;
+            Net::TcpListener r;
 
             r.init();
-            r.receive(1234);
+            r.listen(0x5678);
 
             receiveSyn();
 
-            r.wait();
-
-            if(!checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
-
+            if(!r.wait(1)) return Task::bad;
+            if(r.getPeerPort() != 0x1234) return Task::bad;
             if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
-            if(r.getPeerPort() != 0x823b) return Task::bad;
-            if(r.getLength() != 6) return Task::bad;
 
-            r.close();
+            expectRst();
+
+            r.deny();
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
@@ -175,8 +192,11 @@ TEST(NetTcp, ReceiveSyn) {
             if(Net::getCounterStats().tcp.inputProcessed != 1) return Task::bad;
             if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputNoPort != 0) return Task::bad;
-            if(Net::getCounterStats().tcp.outputQueued != 0) return Task::bad;
-            if(Net::getCounterStats().tcp.outputSent != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionDenied != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
+
+            r.close();
 
             return ok;
         }
@@ -184,4 +204,45 @@ TEST(NetTcp, ReceiveSyn) {
 
     work(task);
 }
-*/
+
+TEST(NetTcp, AcceptConnection) {
+    struct Task: public TestTask<Task> {
+        bool run() {
+            auto initialRxUsage = Accessor::pool.statRxUsed();
+
+            Net::TcpListener r;
+
+            r.init();
+            r.listen(0x5678);
+
+            receiveSyn();
+
+            if(!r.wait(1)) return Task::bad;
+            if(r.getPeerPort() != 0x1234) return Task::bad;
+            if(r.getPeerAddress() != AddressIp4::make(10, 10, 10, 1)) return Task::bad;
+
+            expectSynAck();
+
+            Net::TcpSocket s;
+
+            if(!r.accept(s)) return Task::bad;
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
+
+            if(Net::getCounterStats().tcp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.inputProcessed != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.inputNoPort != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionDenied != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
+
+            r.close();
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}

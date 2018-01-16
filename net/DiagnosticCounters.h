@@ -8,7 +8,7 @@
 #ifndef DIGNOSTICCOUNTERS_H_
 #define DIGNOSTICCOUNTERS_H_
 
-struct DiagnosticCounters {
+struct DiagnosticCounters {	// TODO make counters atomic.
 	/**
 	 * Protocol agnostic fields.
 	 */
@@ -67,9 +67,11 @@ struct DiagnosticCounters {
 	 */
 	struct Tcp: Common<Tcp> {
 		size_t inputProcessed = 0;			//< Number of packets that the user started processing.
+		size_t inputConnectionDenied = 0;		//< Number of packets sent for indicating connection error.
+		size_t inputConnectionAccepted = 0;		//< Number of packets sent for indicating connection error.
+		size_t inputNoPort = 0;				//< Number of packets dropped due lack of a listener.
 		size_t ackPackets = 0;				//< Number of packets sent for acknowledging received data.
 		size_t rstPackets = 0;				//< Number of packets sent for indicating connection error.
-		size_t inputNoPort = 0;				//< Number of packets dropped due lack of a listener.
 	} tcp;
 
 	template<class T>

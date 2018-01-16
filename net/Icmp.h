@@ -135,7 +135,7 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 		return typename Base::InitialReplyInfo{requesterIp, static_cast<uint16_t>(totalLength - headerLength)};
 	}
 
-	inline typename Base::FinalReplyInfo generateReply(Packet& request, TxPacketBuilder& reply) {
+	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply) {
 		PacketStream reader;
 		reader.init(request);
 

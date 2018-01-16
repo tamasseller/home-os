@@ -61,7 +61,7 @@ class Scheduler<Args...>::IoRequestCommon:
 	}
 
 	virtual uintptr_t acquire(Task* task) {
-		return 0;
+		return blockedReturnValue;
 	}
 
 	/*
