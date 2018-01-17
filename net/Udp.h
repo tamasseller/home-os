@@ -12,6 +12,12 @@ template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, uint16_t length)
 {
+    static struct UdpPacketHandler: RxPacketHandler {
+        virtual void handlePacket(Packet packet) {
+            processUdpPacket(packet);
+        }
+    } udpPacketHandler;
+
 	uint16_t cheksumField;
 
 	state.increment(&DiagnosticCounters::Udp::inputReceived);
@@ -41,24 +47,13 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 			goto formatError;
 	}
 
-	return &state.udpPacketProcessor;
+	return &udpPacketHandler;
 
 formatError:
 
 	state.increment(&DiagnosticCounters::Udp::inputFormatError);
 	return nullptr;
 }
-
-template<class S, class... Args>
-struct Network<S, Args...>::UdpPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline UdpPacketProcessor():
-    		PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processUdpPacket>()) {}
-
-private:
-    virtual void handlePacket(Packet packet) {
-        this->process(packet);
-    }
-};
 
 template<class S, class... Args>
 inline void Network<S, Args...>::processUdpPacket(Packet start)

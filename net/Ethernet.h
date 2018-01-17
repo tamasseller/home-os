@@ -15,7 +15,7 @@ template<class Driver>
 class Network<S, Args...>::Ethernet:
 	public Os::template IoChannelBase<Ethernet<Driver>, Interface>,
 	public ArpReplyJob,
-	private ArpPacketProcessor,
+	private PacketProcessor,
 	public Driver
 {
     friend class Ethernet::IoChannelBase;
@@ -137,7 +137,7 @@ class Network<S, Args...>::Ethernet:
 public:
     inline Ethernet():
     	Ethernet::IoChannelBase((uint16_t)14, &resolver),
-    	ArpPacketProcessor(ArpPacketProcessor::template make<Ethernet, &Ethernet::processArpReplyPacket>()) {}
+    	PacketProcessor(PacketProcessor::template make<Ethernet, &Ethernet::processArpReplyPacket>()) {}
 
     decltype(resolver) *getArpCache() {
         return &resolver;

@@ -106,6 +106,7 @@ struct NetworkOptions {
 		class DummyDigester;
 
 		class RxPacketHandler;
+
 		template<class> class IpTxJob;
 		template<class> class IpTransmitterBase;
 		template<class, class> class IpRxJob;
@@ -116,11 +117,6 @@ struct NetworkOptions {
 		class TcpRstJob;
 
 		class PacketProcessor;
-		class ArpPacketProcessor;
-		class IcmpPacketProcessor;
-		class RawPacketProcessor;
-		class UdpPacketProcessor;
-		class TcpPacketProcessor;
 
 		static struct State: DiagnosticCounterStorage<useDiagnosticCounters> {
 			struct Ager: Os::Timeout {
@@ -131,25 +127,25 @@ struct NetworkOptions {
 
             inline void* operator new(size_t, void* x) { return x; }
 
+            PacketProcessor rxProcessor;
+
+            RawInputChannel rawInputChannel;
+
             IcmpEchoReplyJob icmpReplyJob;
-			IcmpPacketProcessor icmpPacketProcessor;
 			IcmpInputChannel icmpInputChannel;
 
-			RawInputChannel rawInputChannel;
-			RawPacketProcessor rawPacketProcessor;
-
 			UdpInputChannel udpInputChannel;
-			UdpPacketProcessor udpPacketProcessor;
 
 			TcpAckJob tcpAckJob;
 			TcpRstJob tcpRstJob;
 			TcpListenerChannel tcpListenerChannel;
 			TcpInputChannel tcpInputChannel;
-			TcpPacketProcessor tcpPacketProcessor;
 
 			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
 			RoutingTable routingTable;
 			Pool pool;
+
+			inline State();
 		} state;
 
 		static void fillInitialIpHeader(PacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
@@ -184,10 +180,11 @@ struct NetworkOptions {
 		template<class Reader> static inline RxPacketHandler* checkIcmpPacket(Reader&);
 		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&, uint16_t);
 		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&, uint16_t);
+		static inline void processReceivedPacket(Packet start);
 		static inline void processIcmpPacket(Packet start);
 		static inline void processRawPacket(Packet start);
 		static inline void processUdpPacket(Packet start);
-		static inline void processTcpPacket(typename Os::Event*, uintptr_t);
+		static inline void processTcpPacket(Packet start);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:

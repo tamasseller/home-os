@@ -9,17 +9,6 @@
 #define IPRECEPTION_H_
 
 template<class S, class... Args>
-struct Network<S, Args...>::RawPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline RawPacketProcessor():
-    		PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processRawPacket>()) {}
-
-private:
-    virtual void handlePacket(Packet packet) {
-        this->process(packet);
-    }
-};
-
-template<class S, class... Args>
 inline void Network<S, Args...>::processRawPacket(Packet start)
 {
 	if(!state.rawInputChannel.takePacket(start))
@@ -29,163 +18,207 @@ inline void Network<S, Args...>::processRawPacket(Packet start)
 template<class S, class... Args>
 inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 {
-	struct ChecksumValidatorObserver: InetChecksumDigester {
-		size_t remainingLength;
-		size_t totalLength;
-		bool valid;
-		bool offsetOdd;
+    /*
+     * Dispose of L2 header.
+     */
 
-		bool isDone() {
-			return !remainingLength;
-		}
+    packet.template dropInitialBytes<Pool::Quota::Rx>(dev->getHeaderSize()); // TODO check success
 
-		void observeInternalBlock(char* start, char* end) {
-			size_t length = end - start;
-			totalLength += length;
 
-			if(length < remainingLength) {
-				this->consume(start, length, offsetOdd);
-				remainingLength -= length;
-			} else if(remainingLength) {
-				this->consume(start, remainingLength, offsetOdd);
-				remainingLength = 0;
-				valid = this->result() == 0;
-			}
+    state.increment(&DiagnosticCounters::Ip::inputReceived);
 
-			if(length & 1)
-				offsetOdd = !offsetOdd;
-		}
+    PacketStream reader;
+    reader.init(packet);
 
-		void observeFirstBlock(char* start, char* end) {
-			remainingLength = (start[0] & 0xf) << 2;
-			totalLength = 0;
-			offsetOdd = false;
-			observeInternalBlock(start, end);
-		}
-	};
+    uint8_t versionAndHeaderLength;
+    if(!reader.read8(versionAndHeaderLength))
+        goto formatError;
+    if((versionAndHeaderLength & 0xf0) == 0x40) {
+        if(!reader.skipAhead(15))
+            goto formatError;
 
-	static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
+        AddressIp4 dstIp;
+        if(!reader.read32net(dstIp.addr))
+            goto formatError;
 
-	RxPacketHandler* handler = &state.rawPacketProcessor;
-	AddressIp4 srcIp, dstIp;
-	uint16_t ipLength, id, fragmentOffsetAndFlags;
-	uint8_t protocol;
+        /*
+         * Check if the packet is for us.
+         */
+        if(Route* route = state.routingTable.findRouteWithSource(dev, dstIp)) {
+            state.routingTable.releaseRoute(route);
+        } else {
+            // TODO allow broadcast.
 
-	state.increment(&DiagnosticCounters::Ip::inputReceived);
+            /*
+             * If this host is not the final destination then, routing could be done here.
+             */
+            state.increment(&DiagnosticCounters::Ip::inputForwardingRequired);
+            goto error;
+        }
 
-	/*
-	 * Dispose of L2 header.
-	 */
-	packet.template dropInitialBytes<Pool::Quota::Rx>(dev->getHeaderSize());
+        state.rxProcessor.process(packet);
+    } else {
+        // IPv4 only for now.
+        goto formatError;
+    }
 
-	ObservedPacketStream<ChecksumValidatorObserver> reader;
-	reader.init(packet);
+    return;
 
-	uint8_t versionAndHeaderLength;
-	if(!reader.read8(versionAndHeaderLength) || ((versionAndHeaderLength & 0xf0) != 0x40))
-		goto formatError;
+    formatError:
+        state.increment(&DiagnosticCounters::Ip::inputFormatError);
 
-	if(!reader.skipAhead(1))
-		goto formatError;
+    error:
+        packet.template dispose<Pool::Quota::Rx>();
+}
 
-	if(!reader.read16net(ipLength))
-		goto formatError;
+template<class S, class... Args>
+inline void Network<S, Args...>::processReceivedPacket(Packet packet)
+{
+    struct ChecksumValidatorObserver: InetChecksumDigester {
+        size_t remainingLength;
+        size_t totalLength;
+        bool valid;
+        bool offsetOdd;
 
-	if(!reader.read16net(id))
-		goto formatError;
+        bool isDone() {
+            return !remainingLength;
+        }
 
-	if(!reader.read16net(fragmentOffsetAndFlags))
-		goto formatError;
+        void observeInternalBlock(char* start, char* end) {
+            size_t length = end - start;
+            totalLength += length;
 
-	if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
-		/*
-		 * IP defragmentation could be done here.
-		 */
-		state.increment(&DiagnosticCounters::Ip::inputReassemblyRequired);
-		goto error;
-	}
+            if(length < remainingLength) {
+                this->consume(start, length, offsetOdd);
+                remainingLength -= length;
+            } else if(remainingLength) {
+                this->consume(start, remainingLength, offsetOdd);
+                remainingLength = 0;
+                valid = this->result() == 0;
+            }
 
-	/*
-	 * Skip TTL.
-	 */
-	if(!reader.skipAhead(1))
-		goto formatError;
+            if(length & 1)
+                offsetOdd = !offsetOdd;
+        }
 
-	if(!reader.read8(protocol))
-		goto formatError;
+        void observeFirstBlock(char* start, char* end) {
+            remainingLength = (start[0] & 0xf) << 2;
+            totalLength = 0;
+            offsetOdd = false;
+            observeInternalBlock(start, end);
+        }
+    };
 
-	if(!reader.skipAhead(2))
-		goto formatError;
+    static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
 
-	if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr))
-		goto formatError;
+    static struct RawPacketHandler: RxPacketHandler {
+        virtual void handlePacket(Packet packet) {
+            processRawPacket(packet);
+        }
+    } rawPacketHandler;
 
-	if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength)))
-		goto formatError;
+    RxPacketHandler* handler = &rawPacketHandler;
+    AddressIp4 srcIp, dstIp;
+    uint16_t ipLength, id, fragmentOffsetAndFlags;
+    uint8_t protocol;
 
-	NET_ASSERT(reader.isDone());
+    ObservedPacketStream<ChecksumValidatorObserver> reader;
+    reader.init(packet);
 
-	if(!reader.valid)
-		goto formatError;
+    uint8_t versionAndHeaderLength;
+    if(!reader.read8(versionAndHeaderLength))
+        goto formatError;
 
-	/*
-	 * Check if the packet is for us.
-	 */
-	if(Route* route = state.routingTable.findRouteWithSource(dev, dstIp)) {
-		state.routingTable.releaseRoute(route);
-	} else {
-		// TODO allow broadcast.
+    NET_ASSERT((versionAndHeaderLength & 0xf0) == 0x40); // IPv4 only for now.
 
-		/*
-		 * If this host is not the final destination then, routing could be done here.
-		 */
-		state.increment(&DiagnosticCounters::Ip::inputForwardingRequired);
-		goto error;
-	}
+    if(!reader.skipAhead(1))
+        goto formatError;
 
-	switch(protocol) {
-	case IpProtocolNumbers::icmp:
-		handler = checkIcmpPacket(reader);
-		break;
-	case IpProtocolNumbers::tcp:
-	case IpProtocolNumbers::udp: {
-			auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
-			reader.InetChecksumDigester::reset();
-			reader.remainingLength = payloadLength;
-			reader.offsetOdd = false;
-			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
-			reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
-			reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
-			reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
-			auto chunk = reader.getChunk();
-			reader.consume(chunk.start, chunk.length());
+    if(!reader.read16net(ipLength))
+        goto formatError;
 
-			if(protocol == 6) {
-				handler = checkTcpPacket(reader, payloadLength);
-			} else {
-				handler = checkUdpPacket(reader, payloadLength);
-			}
+    if(!reader.read16net(id))
+        goto formatError;
 
-			break;
-		}
-	}
+    if(!reader.read16net(fragmentOffsetAndFlags))
+        goto formatError;
+
+    if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
+        /*
+         * IP defragmentation could be done here.
+         */
+        state.increment(&DiagnosticCounters::Ip::inputReassemblyRequired);
+        goto error;
+    }
+
+    /*
+     * Skip TTL.
+     */
+    if(!reader.skipAhead(1))
+        goto formatError;
+
+    if(!reader.read8(protocol))
+        goto formatError;
+
+    if(!reader.skipAhead(2))
+        goto formatError;
+
+    if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr))
+        goto formatError;
+
+    if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength)))
+        goto formatError;
+
+    NET_ASSERT(reader.isDone());
+
+    if(!reader.valid)
+        goto formatError;
+
+
+    switch(protocol) {
+    case IpProtocolNumbers::icmp:
+        handler = checkIcmpPacket(reader);
+        break;
+    case IpProtocolNumbers::tcp:
+    case IpProtocolNumbers::udp: {
+            auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
+            reader.InetChecksumDigester::reset();
+            reader.remainingLength = payloadLength;
+            reader.offsetOdd = false;
+            reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
+            reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
+            reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
+            reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
+            auto chunk = reader.getChunk();
+            reader.consume(chunk.start, chunk.length());
+
+            if(protocol == 6) {
+                handler = checkTcpPacket(reader, payloadLength);
+            } else {
+                handler = checkUdpPacket(reader, payloadLength);
+            }
+
+            break;
+        }
+    }
 
     if(handler) {
         NET_ASSERT(!reader.skipAhead(0xffff));
 
         if(reader.totalLength != ipLength)
-        	goto formatError;
+            goto formatError;
 
         handler->handlePacket(packet);
         return;
     }
 
 formatError:
-	state.increment(&DiagnosticCounters::Ip::inputFormatError);
+    state.increment(&DiagnosticCounters::Ip::inputFormatError);
 
 error:
-	packet.template dispose<Pool::Quota::Rx>();
+    packet.template dispose<Pool::Quota::Rx>();
 }
+
 
 template<class S, class... Args>
 template<class Child, class Channel>

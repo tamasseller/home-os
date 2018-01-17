@@ -11,6 +11,10 @@
 #include "Network.h"
 
 template<class S, class... Args>
+inline Network<S, Args...>::State::State():
+    rxProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processReceivedPacket>()) {}
+
+template<class S, class... Args>
 struct Network<S, Args...>::BufferStats {
 	size_t nBuffersUsed, nTxUsed, nRxUsed;
 };

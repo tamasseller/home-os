@@ -12,6 +12,12 @@ template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, uint16_t length)
 {
+    static struct TcpPacketHandler: RxPacketHandler {
+        virtual void handlePacket(Packet packet) {
+            Network<S, Args...>::processTcpPacket(packet);
+        }
+    } tcpPacketHandler;
+
 	static constexpr uint16_t ackMask = 0x01;
 	static constexpr uint16_t synMask = 0x01;
 
@@ -38,7 +44,7 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	if(reader.result())
 		goto formatError;
 
-	return &state.tcpPacketProcessor;
+	return &tcpPacketHandler;
 
 formatError:
 
@@ -47,24 +53,11 @@ formatError:
 }
 
 template<class S, class... Args>
-struct Network<S, Args...>::TcpPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline TcpPacketProcessor(): PacketProcessor(&Network<S, Args...>::processTcpPacket) {}
-
-private:
-    virtual void handlePacket(Packet packet) {
-        this->process(packet);
-    }
-};
-
-template<class S, class... Args>
-inline void Network<S, Args...>::processTcpPacket(typename Os::Event*, uintptr_t arg)
+inline void Network<S, Args...>::processTcpPacket(Packet chain)
 {
 	static constexpr uint16_t synMask = 0x0002;
 	static constexpr uint16_t rstMask = 0x0004;
 	static constexpr uint16_t ackMask = 0x0010;
-
-    Packet chain;
-    chain.init(reinterpret_cast<Block*>(arg));
 
     PacketStream reader;
     reader.init(chain);

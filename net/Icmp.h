@@ -14,6 +14,12 @@ template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkIcmpPacket(Reader& reader)
 {
+    static struct IcmpPacketHandler: RxPacketHandler {
+        virtual void handlePacket(Packet packet) {
+            processIcmpPacket(packet);
+        }
+    } icmpPacketHandler;
+
 	InetChecksumDigester sum;
 	RxPacketHandler* ret;
 	uint16_t typeCode;
@@ -26,7 +32,7 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 
 	switch(typeCode) {
 		case 0x0000: // Echo reply.
-			ret = &state.icmpPacketProcessor;
+			ret = &icmpPacketHandler;
 			break;
 		case 0x0800: // Echo request.
 			ret = &state.icmpReplyJob;
@@ -54,17 +60,6 @@ formatError:
 	state.increment(&DiagnosticCounters::Icmp::inputFormatError);
 	return nullptr;
 }
-
-template<class S, class... Args>
-struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline IcmpPacketProcessor():
-            PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processIcmpPacket>()) {}
-
-private:
-    virtual void handlePacket(Packet packet) {
-        this->process(packet);
-    }
-};
 
 template<class S, class... Args>
 inline void Network<S, Args...>::processIcmpPacket(Packet start)

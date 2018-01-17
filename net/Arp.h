@@ -11,11 +11,6 @@
 #include "Ethernet.h"
 
 template<class S, class... Args>
-struct Network<S, Args...>::ArpPacketProcessor: PacketProcessor {
-    inline ArpPacketProcessor(typename PacketProcessor::Callback callback): PacketProcessor(callback) {}
-};
-
-template<class S, class... Args>
 template<class Driver>
 inline void Network<S, Args...>::Ethernet<Driver>::arpPacketReceived(Packet packet)
 {
@@ -46,7 +41,7 @@ inline void Network<S, Args...>::Ethernet<Driver>::arpPacketReceived(Packet pack
 		static_cast<ArpReplyJob*>(this)->launch(&startReplySequence);
 	} else if(opCode == 0x0002) {
 		state.increment(&DiagnosticCounters::Arp::replyReceived);
-		static_cast<ArpPacketProcessor*>(this)->process(packet);
+		static_cast<PacketProcessor*>(this)->process(packet);
 	} else {
 		goto formatError;
 	}
