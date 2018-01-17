@@ -58,7 +58,7 @@ formatError:
 template<class S, class... Args>
 struct Network<S, Args...>::IcmpPacketProcessor: PacketProcessor, RxPacketHandler {
     inline IcmpPacketProcessor():
-            PacketProcessor(&Network<S, Args...>::processIcmpPacket) {}
+            PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processIcmpPacket>()) {}
 
 private:
     virtual void handlePacket(Packet packet) {
@@ -67,39 +67,21 @@ private:
 };
 
 template<class S, class... Args>
-inline void Network<S, Args...>::processIcmpPacket(typename Os::Event*, uintptr_t arg)
+inline void Network<S, Args...>::processIcmpPacket(Packet start)
 {
-	Packet chain;
-	chain.init(reinterpret_cast<Block*>(arg));
-
     PacketStream reader;
-    reader.init(chain);
+    reader.init(start);
 
-    while(true) {
-        /*
-         * Save the handle to the first block.
-         */
-        Packet start = reader.asPacket();
+	/*
+	 * Skip initial fields of the IP header payload all the way to the source address.
+	 */
+	NET_ASSERT(reader.skipAhead(12));
 
-        /*
-         * Skip initial fields of the IP header payload all the way to the source address.
-         */
-        NET_ASSERT(reader.skipAhead(12));
+	AddressIp4 src;
+	NET_ASSERT(reader.read32net(src.addr));
 
-        AddressIp4 src;
-        NET_ASSERT(reader.read32net(src.addr));
-
-        /*
-         * Move reader to the end, then dispose of the reply packet.
-         */
-        bool hasMore = reader.cutCurrentAndMoveToNext();
-
-        if(!state.icmpInputChannel.takePacket(start))
-        	start.template dispose<Pool::Quota::Rx>();
-
-        if(!hasMore)
-            break;
-    }
+	if(!state.icmpInputChannel.takePacket(start))
+		start.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>

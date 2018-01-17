@@ -51,7 +51,8 @@ formatError:
 
 template<class S, class... Args>
 struct Network<S, Args...>::UdpPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline UdpPacketProcessor(): PacketProcessor(&Network<S, Args...>::processUdpPacket) {}
+    inline UdpPacketProcessor():
+    		PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processUdpPacket>()) {}
 
 private:
     virtual void handlePacket(Packet packet) {
@@ -60,36 +61,24 @@ private:
 };
 
 template<class S, class... Args>
-inline void Network<S, Args...>::processUdpPacket(typename Os::Event*, uintptr_t arg)
+inline void Network<S, Args...>::processUdpPacket(Packet start)
 {
-    Packet chain;
-    chain.init(reinterpret_cast<Block*>(arg));
+    PacketStream reader;
+    reader.init(start);
 
-    PacketStream reader; // TODO optimize with PacketDisassembler
-    reader.init(chain);
+	uint8_t ihl;
 
-    while(true) {
-        Packet start = reader.asPacket();
+	NET_ASSERT(reader.read8(ihl));
 
-        uint8_t ihl;
+	NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)));
 
-        NET_ASSERT(reader.read8(ihl));
+	uint16_t port;
+	NET_ASSERT(reader.read16net(port));
 
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)));
-
-        uint16_t port;
-        NET_ASSERT(reader.read16net(port));
-
-        bool hasMore = reader.cutCurrentAndMoveToNext();
-
-        if(!state.udpInputChannel.takePacket(start, DstPortTag(port))) {
-            start.template dispose<Pool::Quota::Rx>(); // TODO reply ICMP DUR PUR
-            state.increment(&DiagnosticCounters::Udp::inputNoPort);
-        }
-
-        if(!hasMore)
-            break;
-    }
+	if(!state.udpInputChannel.takePacket(start, DstPortTag(port))) {
+		start.template dispose<Pool::Quota::Rx>(); // TODO reply ICMP DUR PUR
+		state.increment(&DiagnosticCounters::Udp::inputNoPort);
+	}
 }
 
 template<class S, class... Args>

@@ -70,7 +70,9 @@ struct NetworkOptions {
 		template<uint16_t, class, class = void> struct Interfaces;
 
 		class Block;
+		class PacketChain;
 		class PacketQueue;
+		class PacketBuilder;
 
 		class NullTag;
 		class DstPortTag;
@@ -100,7 +102,6 @@ struct NetworkOptions {
 
 	private:
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
-		class PacketBuilder;
 
 		class DummyDigester;
 
@@ -183,9 +184,9 @@ struct NetworkOptions {
 		template<class Reader> static inline RxPacketHandler* checkIcmpPacket(Reader&);
 		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&, uint16_t);
 		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&, uint16_t);
-		static inline void processIcmpPacket(typename Os::Event*, uintptr_t);
-		static inline void processRawPacket(typename Os::Event*, uintptr_t);
-		static inline void processUdpPacket(typename Os::Event*, uintptr_t);
+		static inline void processIcmpPacket(Packet start);
+		static inline void processRawPacket(Packet start);
+		static inline void processUdpPacket(Packet start);
 		static inline void processTcpPacket(typename Os::Event*, uintptr_t);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 

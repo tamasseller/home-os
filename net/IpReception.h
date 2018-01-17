@@ -10,7 +10,8 @@
 
 template<class S, class... Args>
 struct Network<S, Args...>::RawPacketProcessor: PacketProcessor, RxPacketHandler {
-    inline RawPacketProcessor(): PacketProcessor(&Network<S, Args...>::processRawPacket) {}
+    inline RawPacketProcessor():
+    		PacketProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processRawPacket>()) {}
 
 private:
     virtual void handlePacket(Packet packet) {
@@ -19,24 +20,10 @@ private:
 };
 
 template<class S, class... Args>
-inline void Network<S, Args...>::processRawPacket(typename Os::Event*, uintptr_t arg)
+inline void Network<S, Args...>::processRawPacket(Packet start)
 {
-    Packet chain;
-    chain.init(reinterpret_cast<Block*>(arg));
-
-    PacketStream reader; // TODO optimize with PacketDisassembler
-    reader.init(chain);
-
-    while(true) {
-        Packet start = reader.asPacket();
-        bool hasMore = reader.cutCurrentAndMoveToNext();
-
-        if(!state.rawInputChannel.takePacket(start))
-            start.template dispose<Pool::Quota::Rx>();
-
-        if(!hasMore)
-            break;
-    }
+	if(!state.rawInputChannel.takePacket(start))
+		start.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>

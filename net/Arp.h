@@ -60,44 +60,33 @@ formatError:
 
 template<class S, class... Args>
 template<class Driver>
-inline void Network<S, Args...>::Ethernet<Driver>::processArpReplyPacket(Packet chain)
+inline void Network<S, Args...>::Ethernet<Driver>::processArpReplyPacket(Packet start)
 {
     PacketStream reader;
-    reader.init(chain);
+    reader.init(start);
 
-    while(true) {
-        /*
-         * Save the handle to the first block for later disposal.
-         */
+	/*
+	 * Skip destination ethernet header and initial fields of the ARP payload all the
+	 * way to the sender hardware address, the initial fields are already processed at
+	 * this point and are known to describe an adequate reply message.
+	 */
+	NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8)));
 
-        Packet start = reader.asPacket();
+	AddressEthernet replyMac;
+	NET_ASSERT(reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6);
 
-        /*
-         * Skip destination ethernet header and initial fields of the ARP payload all the
-         * way to the sender hardware address, the initial fields are already processed at
-         * this point and are known to describe an adequate reply message.
-         */
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(this->getHeaderSize() + 8)));
+	AddressIp4 replyIp;
+	NET_ASSERT(reader.read32net(replyIp.addr));
 
-        AddressEthernet replyMac;
-        NET_ASSERT(reader.copyOut(reinterpret_cast<char*>(replyMac.bytes), 6) == 6);
+	/*
+	 * Notify the ARP table about the resolved address.
+	 */
+	resolver.handleResolved(replyIp, replyMac, arpTimeout);
 
-        AddressIp4 replyIp;
-        NET_ASSERT(reader.read32net(replyIp.addr));
-
-        /*
-         * Notify the ARP table about the resolved address.
-         */
-        resolver.handleResolved(replyIp, replyMac, arpTimeout);
-
-        /*
-         * Move reader to the end, then dispose of the reply packet.
-         */
-        bool hasMore = reader.cutCurrentAndMoveToNext();
-        start.template dispose<Pool::Quota::Rx>();
-        if(!hasMore)
-            break;
-    }
+	/*
+	 * Move reader to the end, then dispose of the reply packet.
+	 */
+	start.template dispose<Pool::Quota::Rx>();
 }
 
 template<class S, class... Args>

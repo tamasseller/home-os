@@ -14,12 +14,31 @@ template<class S, class... Args>
 class Network<S, Args...>::PacketProcessor: Os::Event {
 	using PacketReader = Network<S, Args...>::PacketStream;
 
+	template<class C>
+	static inline void process(uintptr_t arg, C&& c) {
+		PacketChain chain(reinterpret_cast<Block*>(arg));
+		chain.flip();
+
+		do {
+			c(chain.pop());
+		} while(!chain.isEmpty());
+	}
+
 	template<class T, void (T::*worker)(Packet)>
 	struct Wrapper {
 		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
-			Packet chain;
-			chain.init(reinterpret_cast<Block*>(arg));
-			(static_cast<T*>(static_cast<PacketProcessor*>(event))->*worker)(chain);
+			process(arg, [event](Packet packet){
+				(static_cast<T*>(static_cast<PacketProcessor*>(event))->*worker)(packet);
+			});
+		}
+	};
+
+	template<void (*worker)(Packet)>
+	struct StaticWrapper {
+		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
+			process(arg, [event](Packet packet){
+				(*worker)(packet);
+			});
 		}
 	};
 
@@ -30,6 +49,12 @@ protected:
 	static constexpr Callback make() {
 		return &Wrapper<T, worker>::trampoline;
 	}
+
+	template<void (*worker)(Packet)>
+	static constexpr Callback makeStatic() {
+		return &StaticWrapper<worker>::trampoline;
+	}
+
 
 public:
 	inline PacketProcessor(Callback callback): Os::Event(callback) {}

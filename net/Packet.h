@@ -234,12 +234,25 @@ public:
 	static inline Block* fromInlineData(char* data) {
 		return reinterpret_cast<Block*>(data - dataOffset());
 	}
+
+	inline Block* findEndOfPacket()
+	{
+		Block* block = this;
+
+		while(!block->isEndOfPacket()) {
+			block = block->getNext();
+			NET_ASSERT(block != nullptr);
+		}
+
+		return block;
+	}
+
 };
 
 template<class S, class... Args>
 class Network<S, Args...>::Packet
 {
-	friend Network<S, Args...>::PacketQueue;
+	friend Network<S, Args...>::PacketChain;
 	friend Network<S, Args...>::PacketProcessor;
 	friend Network<S, Args...>::PacketDisassembler;
 	Block* first;
@@ -313,6 +326,62 @@ public:
             }
         }
     }
+};
+
+template<class S, class... Args>
+class Network<S, Args...>::PacketChain {
+	Block* first;
+
+public:
+	inline PacketChain(): first(nullptr) {}
+	inline PacketChain(Block* first): first(first) {}
+
+	inline Packet pop()
+	{
+		NET_ASSERT(first);
+		Packet ret;
+		ret.init(first);
+
+		Block *last = first->findEndOfPacket();
+		first = last->findEndOfPacket()->getNext();
+		last->terminate();
+
+		return ret;
+	}
+
+	inline void push(Packet packet) {
+		if(first)
+			packet.first->findEndOfPacket()->setNext(first);
+		else
+			packet.first->findEndOfPacket()->terminate();
+
+		first = packet.first;
+	}
+
+	inline void reset() {
+		first = nullptr;
+	}
+
+	inline bool isEmpty() {
+		return first == nullptr;
+	}
+
+	inline void flip() {
+		Block *last = first->findEndOfPacket();
+		Block *current = last->getNext();
+		last->terminate();
+
+		Block* prev = first;
+		while(current) {
+			Block *last = current->findEndOfPacket();
+			Block* oldNext = last->getNext();
+			last->setNext(prev);
+			prev = current;
+			current = oldNext;
+		}
+
+		first = prev;
+	}
 };
 
 template<class S, class... Args>

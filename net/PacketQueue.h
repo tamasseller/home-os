@@ -11,50 +11,30 @@
 template<class S, class... Args>
 class Network<S, Args...>::PacketQueue
 {
-    typename Os::template Atomic<Block*> head;
+    PacketChain input, output;
 
 public:
     inline void putPacketChain(Packet packet) {
-		Block* first = packet.first, *last = first;
+    	input.push(packet);
+    }
 
-		while(Block* next = last->getNext())
-			last = next;
-
-    	this->head([](Block* old, Block*& result, Block* first, Block* last){
-    		if(!old)
-    			last->terminate();
-			else
-    			last->setNext(old);
-			result = first;
-			return true;
-		}, first, last);
+    inline bool isEmpty() {
+    	return output.isEmpty() && input.isEmpty();
     }
 
     inline bool takePacketFromQueue(Packet &ret) {
-    	if(Block* first = this->head.reset()) {
-    		ret.init(first);
+    	if(output.isEmpty()) {
+    		if(input.isEmpty())
+    			return false;
 
-    		while(!first->isEndOfPacket()) {
-    			first = first->getNext();
-    			NET_ASSERT(first);
-    		}
-
-    		if(Block* next = first->getNext()) {
-    			Packet remaining;
-    			remaining.init(next);
-    			this->putPacketChain(remaining);
-    		}
-
-    		first->terminate();
-    		return true;
+    		input.flip();
+    		output = input;
+    		input.reset();
     	}
 
-    	return false;
+    	ret = output.pop();
+    	return true;
 	}
-
-    inline bool isEmpty() {
-    	return !head;
-    }
 };
 
 
