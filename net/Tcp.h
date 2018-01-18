@@ -8,18 +8,24 @@
 #ifndef TCP_H_
 #define TCP_H_
 
+namespace TcpConstants {
+	static constexpr uint16_t finMask = 0x0001;
+	static constexpr uint16_t synMask = 0x0002;
+	static constexpr uint16_t rstMask = 0x0004;
+	static constexpr uint16_t ackMask = 0x0010;
+}
+
+
 template<class S, class... Args>
 template<class Reader>
 inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkTcpPacket(Reader& reader, uint16_t length)
 {
+	using namespace TcpConstants;
     static struct TcpPacketHandler: RxPacketHandler {
         virtual void handlePacket(Packet packet) {
             Network<S, Args...>::processTcpPacket(packet);
         }
     } tcpPacketHandler;
-
-	static constexpr uint16_t ackMask = 0x01;
-	static constexpr uint16_t synMask = 0x01;
 
 	uint16_t offsetAndFlags, payloadLength;
 	uint8_t offset;
@@ -32,7 +38,7 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	if(!reader.skipAhead(12) || !reader.read16net(offsetAndFlags))
 		goto formatError;
 
-	offset = static_cast<uint8_t>((offsetAndFlags >> 6) & ~0x3);
+	offset = static_cast<uint8_t>((offsetAndFlags >> 10) & ~0x3);
 
 	if(length < offset)
 		goto formatError;
@@ -55,10 +61,7 @@ formatError:
 template<class S, class... Args>
 inline void Network<S, Args...>::processTcpPacket(Packet chain)
 {
-	static constexpr uint16_t synMask = 0x0002;
-	static constexpr uint16_t rstMask = 0x0004;
-	static constexpr uint16_t ackMask = 0x0010;
-
+	using namespace TcpConstants;
     PacketStream reader;
     reader.init(chain);
 
@@ -152,31 +155,42 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 
 	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply)
 	{
-    	uint32_t seqNum;
-        uint16_t peerPort, localPort;
+		using namespace TcpConstants;
+    	uint32_t seqNum, ackNum;
+        uint16_t peerPort, localPort, payloadLength, flags;
         uint8_t ihl;
 
 		PacketStream reader;
 		reader.init(request);
 
         NET_ASSERT(reader.read8(ihl));
+        NET_ASSERT(reader.skipAhead(1));
+
+        NET_ASSERT(reader.read16net(payloadLength));
+        payloadLength = static_cast<uint16_t>(payloadLength - ((ihl & 0x0f) << 2));
+
         NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) - 1)));
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>((((ihl - 1) & 0x0f) << 2))));
 
         NET_ASSERT(reader.read16net(peerPort));
         NET_ASSERT(reader.read16net(localPort));
         NET_ASSERT(reader.read32net(seqNum));
+        NET_ASSERT(reader.read32net(ackNum));
+        NET_ASSERT(reader.read16net(flags));
+        payloadLength = static_cast<uint16_t>(payloadLength - ((flags >> 10) & ~0x3));
 
-	    static constexpr const char boilerplate[] = {
-	    		/* off+flag / wnd siz |  checksum | urgent bs */
-	    		0x05, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-	    };
+        if(flags & synMask) payloadLength++;
+        if(flags & finMask) payloadLength++;
 
 		NET_ASSERT(reply.write16net(localPort));
 		NET_ASSERT(reply.write16net(peerPort));
-		NET_ASSERT(reply.write32net(0x00));
-		NET_ASSERT(reply.write32net(seqNum + 1));
-	    reply.copyIn(boilerplate, sizeof(boilerplate));
+
+		NET_ASSERT(reply.write32net((flags & ackMask) ? ackNum : 0));
+		NET_ASSERT(reply.write32net(seqNum + payloadLength));
+
+		NET_ASSERT(reply.write16net(0x5014));	// Flags
+		NET_ASSERT(reply.write16net(0));		// Window size
+		NET_ASSERT(reply.write32net(0));		// Checksum and urgent pointer.
 
 		return typename Base::FinalReplyInfo{IpProtocolNumbers::tcp, 0xff};
 	}
@@ -228,16 +242,15 @@ public:
 		AddressIp4 peerAddress;
 		uint16_t peerPort;
 
-		uint16_t rxLastWindowSize;
-		uint32_t rxNextSequenceNumber;
-		uint32_t rxLastAckNumber;
+		uint16_t rxWindowSize;			// Current receiver window size (RCV.WND in RFC793).
+		uint16_t rxLastPeerWindowSize;	// Last received window size (SND.WND in RFC793).
+		uint32_t rxNextSequenceNumber;  // The sequence number expected for the next packet (RCV.UNA in RFC793).
+		uint32_t rxLastAckNumber;		// The last received acknowledgement number (SND.UNA in RFC793).
+		uint32_t txNextSequenceNumber;	// The sequence number to be used for the next segment (SND.NXT in RFC793).
 
-		uint16_t txPeerWindowLeft;
-		uint16_t txOwnWindowLeft;
-		uint32_t txLastSequenceNumber;
-		uint32_t txNextAckNumber;
+		PacketChain rxPackets;			// Received packets (payload only).
+		PacketChain txPackets;			// Unacknowledged segments.
 
-		// TODO lists: unacked, acked, sent
 		// TODO timers: retransmission, zero window probe
 
 		enum State: uint8_t {
