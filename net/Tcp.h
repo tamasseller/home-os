@@ -13,6 +13,68 @@ namespace TcpConstants {
 	static constexpr uint16_t synMask = 0x0002;
 	static constexpr uint16_t rstMask = 0x0004;
 	static constexpr uint16_t ackMask = 0x0010;
+
+	/**
+	 *  States of the TCP state machine (as defined in RFC793 3.2)
+	 *
+	 *  The LISTEN state is not needed as passive opens are
+	 *  implemented using separate mechanism from the actual communication sockets.
+	 *
+	 *  The TIME WAIT state is not implemented (due to resource allocation considerations).
+	 */
+	enum State: uint8_t {
+		/**
+		 * RFC793 3.2: represents no connection state at all.
+		 */
+		Closed,
+
+		/**
+		 *  RFC793 3.2: represents waiting for a matching connection request after
+		 *  having sent a connection request.
+		 */
+		SynSent,
+
+		/**
+		 *  RFC793 3.2: represents waiting for a confirming connection request acknowledgment
+		 *  after having both received and sent a connection request.
+		 */
+		SynReceived,
+
+		/**
+		 * RFC793 3.2: represents an open connection, data received can be delivered to
+		 * the user.  The normal state for the data transfer phase of the connection.
+		 */
+		Established,
+
+		/**
+		 * RFC793 3.2: represents waiting for a connection termination request from the remote
+		 * TCP, or an acknowledgment of the connection termination request previously sent.
+		 */
+		FinWait1,
+
+		/**
+		 * RFC793 3.2: represents waiting for a connection termination request from the remote TCP.
+		 */
+		FinWait2,
+
+		/**
+		 * RFC793 3.2: represents waiting for a connection termination request from the local user.
+		 */
+		CloseWait,
+
+		/**
+		 * RFC793 3.2: represents waiting for a connection termination request acknowledgment from
+		 * the remote TCP.
+		 */
+		Closing,
+
+		/**
+		 * RFC793 3.2: represents waiting for an acknowledgment of the connection termination
+		 * request previously sent to the remote TCP (which includes an acknowledgment of its
+		 * connection termination request).
+		 */
+		LastAck
+	};
 }
 
 
@@ -118,95 +180,6 @@ inline void Network<S, Args...>::tcpTxPostProcess(PacketStream& stream, InetChec
 	state.increment(&DiagnosticCounters::Tcp::outputQueued);
 }
 
-
-template<class S, class... Args>
-class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumDigester>
-{
-	typedef typename TcpRstJob::IpReplyJob Base;
-	friend typename Base::IpTxJob;
-	friend Base;
-
-	inline void replySent(Packet& request) {
-		state.increment(&DiagnosticCounters::Tcp::outputSent);
-	}
-
-	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
-		tcpTxPostProcess(stream, checksum, payload);
-	}
-
-	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request)
-	{
-        AddressIp4 peerAddress;
-        uint8_t ihl;
-
-		PacketStream reader;
-		reader.init(request);
-
-        NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40);
-
-        NET_ASSERT(reader.skipAhead(11));
-        NET_ASSERT(reader.read32net(peerAddress.addr));
-
-		state.increment(&DiagnosticCounters::Tcp::rstPackets);
-
-		return typename Base::InitialReplyInfo{peerAddress, static_cast<uint16_t>(20)};
-	}
-
-	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply)
-	{
-		using namespace TcpConstants;
-    	uint32_t seqNum, ackNum;
-        uint16_t peerPort, localPort, payloadLength, flags;
-        uint8_t ihl;
-
-		PacketStream reader;
-		reader.init(request);
-
-        NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT(reader.skipAhead(1));
-
-        NET_ASSERT(reader.read16net(payloadLength));
-        payloadLength = static_cast<uint16_t>(payloadLength - ((ihl & 0x0f) << 2));
-
-        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>((((ihl - 1) & 0x0f) << 2))));
-
-        NET_ASSERT(reader.read16net(peerPort));
-        NET_ASSERT(reader.read16net(localPort));
-        NET_ASSERT(reader.read32net(seqNum));
-        NET_ASSERT(reader.read32net(ackNum));
-        NET_ASSERT(reader.read16net(flags));
-        payloadLength = static_cast<uint16_t>(payloadLength - ((flags >> 10) & ~0x3));
-
-        if(flags & synMask) payloadLength++;
-        if(flags & finMask) payloadLength++;
-
-		NET_ASSERT(reply.write16net(localPort));
-		NET_ASSERT(reply.write16net(peerPort));
-
-		NET_ASSERT(reply.write32net((flags & ackMask) ? ackNum : 0));
-		NET_ASSERT(reply.write32net(seqNum + payloadLength));
-
-		NET_ASSERT(reply.write16net(0x5014));	// Flags
-		NET_ASSERT(reply.write16net(0));		// Window size
-		NET_ASSERT(reply.write32net(0));		// Checksum and urgent pointer.
-
-		return typename Base::FinalReplyInfo{IpProtocolNumbers::tcp, 0xff};
-	}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::TcpAckJob: public IpTxJob<TcpAckJob> {
-	// TODO reply job style, but with sockets instead of packets as its input.
-
-	/* TODO:
-	 *		1. send an empty acknowledge packet with the current ack number
-	 *		2. put packet into the acked list
-	 */
-
-};
-
 template<class S, class... Args>
 class Network<S, Args...>::TcpInputChannel:
 	PacketInputChannel<ConnectionTag>,
@@ -236,34 +209,86 @@ public:
 	};
 
 	class SocketData: public InputChannel::IoData, WindowWaiterData {
+		using State = TcpConstants::State;
 		friend class TcpInputChannel;
 		friend class TcpListener;
 
+		/// Acknowledged packets (payload only).
+		PacketChain receivedData;
+
+		/// Unacknowledged data for which a retransmission may be needed.
+		PacketChain unackedPackets;
+
+		/// Network layer address of the peer.
 		AddressIp4 peerAddress;
+
+		/// TCP port number of the peer.
 		uint16_t peerPort;
 
-		uint16_t rxWindowSize;			// Current receiver window size (RCV.WND in RFC793).
-		uint16_t rxLastPeerWindowSize;	// Last received window size (SND.WND in RFC793).
-		uint32_t rxNextSequenceNumber;  // The sequence number expected for the next packet (RCV.UNA in RFC793).
-		uint32_t rxLastAckNumber;		// The last received acknowledgement number (SND.UNA in RFC793).
-		uint32_t txNextSequenceNumber;	// The sequence number to be used for the next segment (SND.NXT in RFC793).
+		/*
+		 *	RFC793 Figure 4 (Send Sequence Space):
+		 *
+		 *            1         2          3          4
+		 *       ----------|----------|----------|----------
+		 *              SND.UNA    SND.NXT    SND.UNA
+		 *                                   +SND.WND
+		 *
+		 *  1 - old sequence numbers which have been acknowledged
+		 *  2 - sequence numbers of unacknowledged data
+		 *  3 - sequence numbers allowed for new data transmission
+		 *  4 - future sequence numbers which are not yet allowed
+		 */
 
-		PacketChain rxPackets;			// Received packets (payload only).
-		PacketChain txPackets;			// Unacknowledged segments.
+		/// RFC793 SND.WND - The last accepted window update.
+		uint16_t peerWindowSize;
+
+		/// RFC793 SND.UNA - The last accepted ACK number.
+		uint32_t lastReceivedAckNumber;
+
+		/// RFC793 SND.NXT - The next sequence number to be used for TX.
+		uint32_t nextSequenceNumber;
+
+		/// RFC793 SND.WL1 - The sequence number of last accepted window update segment.
+		uint32_t lastWindowUpdateSeqNum;
+
+		/// RFC793 SND.WL2 - The acknowledgment number of last accepted window update segment.
+		uint32_t lastWindowUpdateAckNum;
+
+		/*
+		 *  RFC793 Figure 5 (Receive Sequence Space):
+		 *
+		 *                  1          2          3
+		 *             ----------|----------|----------
+		 *                    RCV.NXT    RCV.NXT
+		 *                              +RCV.WND
+		 *  1 - old sequence numbers which have been acknowledged
+		 *  2 - sequence numbers allowed for new reception
+		 *  3 - future sequence numbers which are not yet allowed
+		 */
+
+		/// RFC793 RCV.NXT - The sequence number expected for the next acceptable packet.
+		uint32_t expectedSequenceNumber;
+
+		/// RFC793 RCV.WND - receive window
+		uint16_t receiveWindow;
+
+		State state;
 
 		// TODO timers: retransmission, zero window probe
-
-		enum State: uint8_t {
-			SynSent, SynReceived, Established
-		} state;
 	};
 
 private:
+	/**
+	 * IoChannel implementation used for the WindowWaiter side.
+	 */
 	inline bool addItem(typename Os::IoJob::Data* data){
 		// TODO check state
 		return true;
 	}
 
+	/**
+	 * IoChannel implementation used for the WindowWaiter side.
+	 */
 	inline bool removeCanceled(typename Os::IoJob::Data* data) {
 		// TODO check state
 		return true;
@@ -299,7 +324,7 @@ public:
 	inline bool takePacket(Packet p, ConnectionTag tag)
 	{
 		if(typename InputChannel::IoData* listener = this->findListener(tag)) {
-			listener->packets.putPacketChain(p);
+			listener->packets.put(p);
 			this->InputChannel::jobDone(listener);
 			return true;
 		}
@@ -313,87 +338,6 @@ inline typename Network<S, Args...>::TcpInputChannel::SocketData*
 Network<S, Args...>::TcpInputChannel::WindowWaiterData::getSocketData() {
 	return static_cast<SocketData*>(this);
 }
-
-
-template<class S, class... Args>
-class Network<S, Args...>::TcpListener:
-    protected Os::template IoRequest<IpRxJob<TcpListener, TcpListenerChannel>, &IpRxJob<TcpListener, TcpListenerChannel>::onBlocking>
-{
-	friend class TcpListener::IpRxJob;
-
-	AddressIp4 peerAddress;
-    uint32_t initialSequenceNumber;
-    uint16_t peerPort;
-
-    inline void reset() {
-        peerAddress = AddressIp4::allZero;
-    	peerPort = 0;
-    }
-
-    inline void preprocess() {
-        uint8_t ihl;
-        NET_ASSERT(this->read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
-
-        NET_ASSERT(this->skipAhead(11));
-        NET_ASSERT(this->read32net(this->peerAddress.addr));
-
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
-
-        NET_ASSERT(this->read16net(peerPort));
-        NET_ASSERT(this->skipAhead(2));
-        NET_ASSERT(this->read32net(initialSequenceNumber));
-
-        state.increment(&DiagnosticCounters::Tcp::inputProcessed);
-    }
-
-public:
-    using TcpListener::IoRequest::wait;
-
-    AddressIp4 getPeerAddress() const {
-        return peerAddress;
-    }
-
-    uint16_t getPeerPort() const {
-        return peerPort;
-    }
-
-	void init() {
-	    TcpListener::IpRxJob::init();
-	    TcpListener::IoRequest::init();
-	}
-
-	void deny() {
-		state.increment(&DiagnosticCounters::Tcp::inputConnectionDenied);
-		state.tcpRstJob.handlePacket(this->packet);
-		this->invalidateAllStates();
-	}
-
-	bool accept(TcpSocket& socket) {
-		state.increment(&DiagnosticCounters::Tcp::inputConnectionAccepted);
-		// TODO check state;
-		socket.data.state = TcpInputChannel::SocketData::State::SynReceived;
-		socket.data.rxLastWindowSize = 1;
-		socket.data.txPeerWindowLeft = 1;
-		socket.data.rxNextSequenceNumber = initialSequenceNumber + 1;
-		socket.data.txLastSequenceNumber = 0; // TODO generate randomly
-
-		// TODO add syn packet as unacked
-		// TODO queue for sending ack
-
-		return true;
-	}
-
-	bool listen(uint16_t port) {
-		this->data.accessTag() = DstPortTag(port);
-		return this->launch(&TcpListener::IpRxJob::startReception, &state.tcpListenerChannel);
-	}
-
-	void close() {
-		this->cancel();
-		this->wait();
-	}
-};
 
 template<class S, class... Args>
 class Network<S, Args...>::TcpSocket {

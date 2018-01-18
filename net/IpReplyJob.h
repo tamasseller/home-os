@@ -27,7 +27,7 @@ protected:
 	};
 
 private:
-    PacketQueue requestQueue;
+    PacketChain requestQueue;
     Packet request;
 
     inline bool restartIfNeeded(Launcher *launcher, IoJob* item)
@@ -82,7 +82,7 @@ private:
     static bool startReplySequence(Launcher *launcher, IoJob* item) {
     	auto self = static_cast<IpReplyJob*>(item);
 
-    	self->requestQueue.takePacketFromQueue(self->request);
+    	self->requestQueue.take(self->request);
 
     	InitialReplyInfo info = static_cast<Child*>(self)->getReplyInfo(self->request);
 
@@ -91,7 +91,7 @@ private:
 
 public:
     virtual void handlePacket(Packet packet) {
-    	this->requestQueue.putPacketChain(packet);
+    	this->requestQueue.put(packet);
 		this->launch(&IpReplyJob::startReplySequence);
     }
 };

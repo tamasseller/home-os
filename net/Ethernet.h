@@ -28,7 +28,7 @@ class Network<S, Args...>::Ethernet:
     Resolver resolver;
     PacketTransmissionRequest *currentPacket, *nextPacket;
     pet::LinkedList<PacketTransmissionRequest> items;
-    PacketQueue arpRequestQueue;
+    PacketChain arpRequestQueue;
     union {
     	typename Pool::IoData poolParams;
     	PacketTransmissionRequest txReq;

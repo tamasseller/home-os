@@ -37,7 +37,7 @@ inline void Network<S, Args...>::Ethernet<Driver>::arpPacketReceived(Packet pack
 
 	if(opCode == 0x01) {
 		state.increment(&DiagnosticCounters::Arp::requestReceived);
-		this->arpRequestQueue.putPacketChain(packet);
+		this->arpRequestQueue.put(packet);
 		static_cast<ArpReplyJob*>(this)->launch(&startReplySequence);
 	} else if(opCode == 0x0002) {
 		state.increment(&DiagnosticCounters::Arp::replyReceived);
@@ -116,7 +116,7 @@ inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launc
 	builder.init(self->poolParams.allocator);
 
 	Packet requestPacket;
-	while(self->arpRequestQueue.takePacketFromQueue(requestPacket)) {
+	while(self->arpRequestQueue.take(requestPacket)) {
 		PacketStream reader;
 		reader.init(requestPacket);
 

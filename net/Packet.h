@@ -330,44 +330,55 @@ public:
 
 template<class S, class... Args>
 class Network<S, Args...>::PacketChain {
-	Block* first;
+	Block *head, *tail;
 
 public:
-	inline PacketChain(): first(nullptr) {}
-	inline PacketChain(Block* first): first(first) {}
+	inline PacketChain(): head(nullptr), tail(nullptr) {}
 
-	inline Packet pop()
+	inline bool take(Packet &ret)
 	{
-		NET_ASSERT(first);
-		Packet ret;
-		ret.init(first);
+		if(!head)
+			return false;
 
-		Block *last = first->findEndOfPacket();
-		first = last->findEndOfPacket()->getNext();
+		ret.init(head);
+
+		Block *last = head->findEndOfPacket();
+		head = last->findEndOfPacket()->getNext();
 		last->terminate();
 
-		return ret;
+		if(!head)
+			tail = nullptr;
+
+		return true;
 	}
 
-	inline void push(Packet packet) {
-		if(first)
-			packet.first->findEndOfPacket()->setNext(first);
-		else
-			packet.first->findEndOfPacket()->terminate();
+	inline void put(Packet packet)
+	{
+		Block *last = packet.first->findEndOfPacket();
+		last->terminate();
 
-		first = packet.first;
+		if(head)
+			tail->setNext(packet.first);
+		else
+			head = packet.first;
+
+		tail = last;
 	}
 
 	inline void reset() {
-		first = nullptr;
+		head = nullptr;
 	}
 
 	inline bool isEmpty() {
-		return first == nullptr;
+		return head == nullptr;
 	}
 
-	inline void flip() {
+	inline static PacketChain flip(Block* first) {
+		PacketChain ret;
+
 		Block *last = first->findEndOfPacket();
+		ret.tail = last;
+
 		Block *current = last->getNext();
 		last->terminate();
 
@@ -380,7 +391,8 @@ public:
 			current = oldNext;
 		}
 
-		first = prev;
+		ret.head = prev;
+		return ret;
 	}
 };
 

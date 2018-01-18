@@ -16,12 +16,13 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 
 	template<class C>
 	static inline void process(uintptr_t arg, C&& c) {
-		PacketChain chain(reinterpret_cast<Block*>(arg));
-		chain.flip();
+		PacketChain chain = PacketChain::flip(reinterpret_cast<Block*>(arg)); // TODO convert to field
 
-		do {
-			c(chain.pop());
-		} while(!chain.isEmpty());
+
+		for(Packet p; chain.take(p);) {
+			// TODO refactor while loop into event reissueing loop (to keep handler runtime low)
+			c(p);
+		}
 	}
 
 	template<class T, void (T::*worker)(Packet)>

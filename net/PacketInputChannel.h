@@ -63,7 +63,7 @@ public:
 			return *this;
 		}
 
-		PacketQueue packets;
+		PacketChain packets;
 	};
 
 private:
@@ -93,7 +93,7 @@ public:
 	inline bool takePacket(Packet p, Tag t = Tag())
 	{
 		if(IoData* listener = findListener(t)) {
-			listener->packets.putPacketChain(p);
+			listener->packets.put(p);
 			this->jobDone(listener);
 			return true;
 		}

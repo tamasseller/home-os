@@ -71,7 +71,6 @@ struct NetworkOptions {
 
 		class Block;
 		class PacketChain;
-		class PacketQueue;
 		class PacketBuilder;
 
 		class NullTag;
@@ -242,8 +241,9 @@ typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::st
 #include "Interfaces.h"
 #include "IpReplyJob.h"
 #include "IpReception.h"
-#include "PacketQueue.h"
+#include "TcpListener.h"
 #include "PacketStream.h"
+#include "TcpReplyJobs.h"
 #include "PacketBuilder.h"
 #include "IpTransmission.h"
 #include "PacketProcessor.h"

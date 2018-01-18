@@ -224,7 +224,7 @@ template<class S, class... Args>
 template<class Child, class Channel>
 class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
 protected:
-    Packet packet;
+    Packet packet; // TODO check if can be peeked from data.packets instead.
 
     typename Channel::IoData data;
 
@@ -260,7 +260,7 @@ private:
     	 * been dropped above) and a new one can be obtained then fetch it
     	 * and return true to indicate that there is data to be processed.
     	 */
-        if(!packet.isValid() && data.packets.takePacketFromQueue(packet)) {
+        if(!packet.isValid() && data.packets.take(packet)) {
 			static_cast<PacketStream*>(this)->init(packet);
 			static_cast<Child*>(this)->preprocess();
 			return true;
@@ -283,7 +283,7 @@ private:
             if(self->packet.isValid())
                 self->packet.template dispose<Pool::Quota::Rx>();
 
-            while(self->data.packets.takePacketFromQueue(self->packet))
+            while(self->data.packets.take(self->packet)) // TODO optimize chain deallocation at once.
                 self->packet.template dispose<Pool::Quota::Rx>();
 
             self->invalidateAllStates();
