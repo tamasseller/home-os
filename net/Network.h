@@ -8,16 +8,16 @@
 #ifndef NETWORK_H_
 #define NETWORK_H_
 
-#include "Routing.h"
-#include "ArpTable.h"
-#include "AddressIp4.h"
-#include "BufferPool.h"
-#include "SharedTable.h"
-#include "AddressEthernet.h"
-#include "NetErrorStrings.h"
-#include "IpProtocolNumbers.h"
-#include "DiagnosticCounters.h"
-#include "InetChecksumDigester.h"
+#include "core/Routing.h"
+#include "core/ArpTable.h"
+#include "core/AddressIp4.h"
+#include "core/BufferPool.h"
+#include "core/SharedTable.h"
+#include "core/AddressEthernet.h"
+#include "core/NetErrorStrings.h"
+#include "core/IpProtocolNumbers.h"
+#include "core/DiagnosticCounters.h"
+#include "core/InetChecksumDigester.h"
 
 #include "meta/Sfinae.h"
 #include "meta/Configuration.h"
@@ -85,17 +85,19 @@ struct NetworkOptions {
 		class TcpInputChannel;
 
 		template<class> class PacketWriterBase;
-		class NullObserver;
-		template<class> class ObservedPacketStream;
+		template <class> class NullObserver;
+		template <class> class ChecksumValidatorObserver;
+		template<template <class> class> class PacketStreamBase;
+	    class ValidatorPacketStream;
 		class PacketTransmissionRequest;
 
 	public:
 		class Interface;
 		struct Chunk;
+		class Fixup;
 		class Packet;
 		class PacketStream;
 		class PacketAssembler;
-		class PacketDisassembler;
 		typedef Scheduler Os;
 		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
 
@@ -104,7 +106,7 @@ struct NetworkOptions {
 
 		class DummyDigester;
 
-		class RxPacketHandler;
+		class RxPacketHandler; // TODO eliminate
 
 		template<class> class IpTxJob;
 		template<class> class IpTransmitterBase;
@@ -147,25 +149,6 @@ struct NetworkOptions {
 			inline State();
 		} state;
 
-		static void fillInitialIpHeader(PacketBuilder &packet, AddressIp4 srcIp, AddressIp4 dstIp);
-
-		template<bool patch, class HeaderDigester, class PayloadDigester>
-		static inline uint16_t headerFixupStepOne(
-				Packet packet,
-				size_t l2headerLength,
-				size_t ipHeaderLength,
-				HeaderDigester &headerChecksum,
-				PayloadDigester &payloadChecksum,
-				uint8_t ttl,
-				uint8_t protocol);
-
-		static inline void headerFixupStepTwo(
-				PacketStream &modifier,
-				size_t l2HeaderSize,
-				uint16_t length,
-				uint16_t headerChecksum);
-
-		static inline void tcpTxPostProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payloadLength);
 
 		template<typename Pool::Quota> static inline Packet dropIpHeader(Packet packet);
 
@@ -235,18 +218,26 @@ typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::st
 #include "Tcp.h"
 #include "Udp.h"
 #include "Icmp.h"
-#include "Packet.h"
+#include "Fixup.h"
 #include "Endian.h"
 #include "Ethernet.h"
 #include "Interfaces.h"
 #include "IpReplyJob.h"
 #include "IpReception.h"
 #include "TcpListener.h"
-#include "PacketStream.h"
 #include "TcpReplyJobs.h"
-#include "PacketBuilder.h"
 #include "IpTransmission.h"
 #include "PacketProcessor.h"
 #include "PacketInputChannel.h"
+
+#include "buffer/Block.h"
+#include "buffer/Packet.h"
+#include "buffer/PacketChain.h"
+#include "buffer/PacketStream.h"
+#include "buffer/PacketBuilder.h"
+#include "buffer/PacketAssembler.h"
+#include "buffer/PacketStreamBase.h"
+#include "buffer/ValidatorPacketStream.h"
+#include "buffer/PacketTransmissionRequest.h"
 
 #endif /* NETWORK_H_ */

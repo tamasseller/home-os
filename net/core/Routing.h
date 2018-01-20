@@ -21,6 +21,8 @@ class Route {
 	uint8_t metric;
 	bool up = false;
 
+	// TODO scope and ttl handling.
+
 public:
 	/// Create a **direct** route (directly reachable, no intermediate router).
 	inline Route(Interface* dev, AddressIp4 addr, uint8_t mask, uint8_t metric = 0):

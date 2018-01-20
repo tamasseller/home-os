@@ -38,12 +38,10 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
 	 */
 	if(cheksumField) {
-		NET_ASSERT(!reader.skipAhead(0xffff));
+		reader.patch(correctEndian(static_cast<uint16_t>(length)));
+		reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
 
-		reader.patch(0, correctEndian(static_cast<uint16_t>(length)));
-		reader.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
-
-		if(reader.result())
+		if(!reader.finishAndCheck())
 			goto formatError;
 	}
 
@@ -58,8 +56,7 @@ formatError:
 template<class S, class... Args>
 inline void Network<S, Args...>::processUdpPacket(Packet start)
 {
-    PacketStream reader;
-    reader.init(start);
+    PacketStream reader(start);
 
 	uint8_t ihl;
 
@@ -165,9 +162,9 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 		NET_ASSERT(stream.skipAhead(4));
 		stream.write16net(static_cast<uint16_t>(payload));
 
-		checksum.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
-		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
-		checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
+		checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
+		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
+		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
 
 		uint16_t result = checksum.result();
 

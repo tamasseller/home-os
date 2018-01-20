@@ -11,6 +11,13 @@
 #include "Network.h"
 
 template<class S, class... Args>
+struct Network<S, Args...>::DummyDigester {
+	inline void consume(const char* data, size_t length, bool oddOffset = false) {}
+	inline void patch(uint16_t) {}
+};
+
+
+template<class S, class... Args>
 inline Network<S, Args...>::State::State():
     rxProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processReceivedPacket>()) {}
 

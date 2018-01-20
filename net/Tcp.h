@@ -105,11 +105,10 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	if(length < offset)
 		goto formatError;
 
-	NET_ASSERT(!reader.skipAhead(0xffff));
-	reader.patch(0, correctEndian(static_cast<uint16_t>(length)));
-	reader.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
+	reader.patch(correctEndian(static_cast<uint16_t>(length)));
+	reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
 
-	if(reader.result())
+	if(!reader.finishAndCheck())
 		goto formatError;
 
 	return &tcpPacketHandler;
@@ -121,63 +120,42 @@ formatError:
 }
 
 template<class S, class... Args>
-inline void Network<S, Args...>::processTcpPacket(Packet chain)
+inline void Network<S, Args...>::processTcpPacket(Packet packet)
 {
 	using namespace TcpConstants;
-    PacketStream reader;
-    reader.init(chain);
+    PacketStream reader(packet);
 
-    while(true) {
-        Packet start = reader.asPacket();
+	uint8_t ihl;
+	uint16_t peerPort, localPort;
+	AddressIp4 peerAddress;
+	NET_ASSERT(reader.read8(ihl));
+	NET_ASSERT((ihl & 0xf0) == 0x40);
 
-        uint8_t ihl;
-        uint16_t peerPort, localPort;
-        AddressIp4 peerAddress;
-        NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40);
+	NET_ASSERT(reader.skipAhead(11));
+	NET_ASSERT(reader.read32net(peerAddress.addr));
 
-        NET_ASSERT(reader.skipAhead(11));
-        NET_ASSERT(reader.read32net(peerAddress.addr));
+	NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
 
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
+	NET_ASSERT(reader.read16net(peerPort));
+	NET_ASSERT(reader.read16net(localPort));
 
-        NET_ASSERT(reader.read16net(peerPort));
-        NET_ASSERT(reader.read16net(localPort));
+	NET_ASSERT(reader.skipAhead(8));
 
-        NET_ASSERT(reader.skipAhead(8));
+	uint16_t offsetAndFlags;
+	NET_ASSERT(reader.read16net(offsetAndFlags));
 
-    	uint16_t offsetAndFlags;
-        NET_ASSERT(reader.read16net(offsetAndFlags));
+	if(!state.tcpInputChannel.takePacket(packet, ConnectionTag(peerAddress, peerPort, localPort))) {
+		if((offsetAndFlags & rstMask)) {
+			packet.template dispose<Pool::Quota::Rx>();
+		} else {
+			bool isInitial = (offsetAndFlags & synMask) && !(offsetAndFlags & ackMask);
+			if(!isInitial || !state.tcpListenerChannel.takePacket(packet, DstPortTag(localPort))) {
+				state.increment(&DiagnosticCounters::Tcp::inputNoPort);
+				state.tcpRstJob.handlePacket(packet);
+			}
+		}
+	}
 
-        bool hasMore = reader.cutCurrentAndMoveToNext();
-
-        if(!state.tcpInputChannel.takePacket(start, ConnectionTag(peerAddress, peerPort, localPort))) {
-        	if((offsetAndFlags & rstMask)) {
-        		start.template dispose<Pool::Quota::Rx>();
-        	} else {
-				bool isInitial = (offsetAndFlags & synMask) && !(offsetAndFlags & ackMask);
-				if(!isInitial || !state.tcpListenerChannel.takePacket(start, DstPortTag(localPort))) {
-					state.increment(&DiagnosticCounters::Tcp::inputNoPort);
-					state.tcpRstJob.handlePacket(start);
-				}
-        	}
-        }
-
-        if(!hasMore)
-            break;
-    }
-}
-
-template<class S, class... Args>
-inline void Network<S, Args...>::tcpTxPostProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload)
-{
-	checksum.patch(0, correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
-	checksum.patch(0, correctEndian(static_cast<uint16_t>(payload)));
-
-	NET_ASSERT(stream.skipAhead(16));
-	NET_ASSERT(stream.write16raw(checksum.result()));
-
-	state.increment(&DiagnosticCounters::Tcp::outputQueued);
 }
 
 template<class S, class... Args>

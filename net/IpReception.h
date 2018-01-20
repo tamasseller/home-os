@@ -24,11 +24,9 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 
     packet.template dropInitialBytes<Pool::Quota::Rx>(dev->getHeaderSize()); // TODO check success
 
-
     state.increment(&DiagnosticCounters::Ip::inputReceived);
 
-    PacketStream reader;
-    reader.init(packet);
+    PacketStream reader(packet);
 
     uint8_t versionAndHeaderLength;
     if(!reader.read8(versionAndHeaderLength))
@@ -74,41 +72,6 @@ inline void Network<S, Args...>::ipPacketReceived(Packet packet, Interface* dev)
 template<class S, class... Args>
 inline void Network<S, Args...>::processReceivedPacket(Packet packet)
 {
-    struct ChecksumValidatorObserver: InetChecksumDigester {
-        size_t remainingLength;
-        size_t totalLength;
-        bool valid;
-        bool offsetOdd;
-
-        bool isDone() {
-            return !remainingLength;
-        }
-
-        void observeInternalBlock(char* start, char* end) {
-            size_t length = end - start;
-            totalLength += length;
-
-            if(length < remainingLength) {
-                this->consume(start, length, offsetOdd);
-                remainingLength -= length;
-            } else if(remainingLength) {
-                this->consume(start, remainingLength, offsetOdd);
-                remainingLength = 0;
-                valid = this->result() == 0;
-            }
-
-            if(length & 1)
-                offsetOdd = !offsetOdd;
-        }
-
-        void observeFirstBlock(char* start, char* end) {
-            remainingLength = (start[0] & 0xf) << 2;
-            totalLength = 0;
-            offsetOdd = false;
-            observeInternalBlock(start, end);
-        }
-    };
-
     static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
 
     static struct RawPacketHandler: RxPacketHandler {
@@ -122,8 +85,7 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     uint16_t ipLength, id, fragmentOffsetAndFlags;
     uint8_t protocol;
 
-    ObservedPacketStream<ChecksumValidatorObserver> reader;
-    reader.init(packet);
+    ValidatorPacketStream reader(packet);
 
     uint8_t versionAndHeaderLength;
     if(!reader.read8(versionAndHeaderLength))
@@ -166,14 +128,8 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr))
         goto formatError;
 
-    if(!reader.skipAhead(static_cast<uint16_t>(reader.remainingLength)))
+    if(!reader.finishAndCheck())
         goto formatError;
-
-    NET_ASSERT(reader.isDone());
-
-    if(!reader.valid)
-        goto formatError;
-
 
     switch(protocol) {
     case IpProtocolNumbers::icmp:
@@ -182,15 +138,11 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     case IpProtocolNumbers::tcp:
     case IpProtocolNumbers::udp: {
             auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
-            reader.InetChecksumDigester::reset();
-            reader.remainingLength = payloadLength;
-            reader.offsetOdd = false;
-            reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
-            reader.patch(0, correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
-            reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
-            reader.patch(0, correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
-            auto chunk = reader.getChunk();
-            reader.consume(chunk.start, chunk.length());
+            reader.restart(payloadLength);
+            reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
+            reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
+            reader.patch(correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
+            reader.patch(correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
 
             if(protocol == 6) {
                 handler = checkTcpPacket(reader, payloadLength);
@@ -203,9 +155,7 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     }
 
     if(handler) {
-        NET_ASSERT(!reader.skipAhead(0xffff));
-
-        if(reader.totalLength != ipLength)
+        if(!reader.checkTotalLength(ipLength))
             goto formatError;
 
         handler->handlePacket(packet);

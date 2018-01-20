@@ -8,8 +8,7 @@
 #ifndef IPTRANSMISSION_H_
 #define IPTRANSMISSION_H_
 
-#include "InetChecksumDigester.h"
-#include "IpFixup.h"
+#include "Network.h"
 
 /**
  * Multi-operation composite I/O job object for sending a simple "raw"
@@ -189,7 +188,7 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 
 			resolver->fillHeader(packet, self->arp.mac, etherTypeIp);
 
-			fillInitialIpHeader(packet, route->getSource(), self->dst);
+			Fixup::fillInitialIpHeader(packet, route->getSource(), self->dst);
 
 			self->device = dev;
 
@@ -395,7 +394,7 @@ public:
 		InetChecksumDigester headerChecksum;
 		PayloadDigester payloadChecksum;
 
-		uint16_t length = headerFixupStepOne<true>(
+		uint16_t length = Fixup::headerFixupStepOne(
 				self->packet.stage3,
 				self->device->getHeaderSize(),
 				ipHeaderSize,
@@ -406,10 +405,9 @@ public:
 
 		NET_ASSERT(length != (uint16_t)-1);
 
-		PacketStream modifier;
-		modifier.init(self->packet.stage3);
+		PacketStream modifier(self->packet.stage3);
 
-		headerFixupStepTwo(
+		Fixup::headerFixupStepTwo(
 				modifier,
 				self->device->getHeaderSize(),
 				length,
@@ -417,7 +415,7 @@ public:
 
 		for(size_t left = 8; left;) {
 			Chunk chunk = modifier.getChunk();
-			size_t run = left < chunk.length() ? left : chunk.length();
+			size_t run = left < chunk.length ? left : chunk.length;
 			payloadChecksum.consume(chunk.start, run, left & 1);
 			modifier.advance(static_cast<uint16_t>(run));
 			left -= run;

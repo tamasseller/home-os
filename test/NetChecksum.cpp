@@ -63,30 +63,12 @@ TEST(NetChecksum, Realworld) {
 }
 
 TEST(NetChecksum, Patch) {
-	char data[] alignas(uint16_t) = "\x45\x00\x00\x3c\xf5\xdf\x40\x00\x40\x06\x00\x00\xc0\xa8\x01\x07\x0a\x0a\x0a\x01";
+	char data[] alignas(uint16_t) = "\x00\x00\x00\x3c\xf5\xdf\x40\x00\x40\x06\x00\x00\xc0\xa8\x01\x07\x0a\x0a\x0a\x01";
 	InetChecksumDigester generator;
 	generator.consume(data, sizeof(data));
 
-	uint16_t old = reinterpret_cast<uint16_t*>(data)[1];
-	reinterpret_cast<uint16_t*>(data)[1] = 0x1234;
-	generator.patch(old, 0x1234);
-
-	uint16_t chks = generator.result();
-	memcpy(data + 10, &chks, 2);
-
-	InetChecksumDigester checker;
-	checker.consume(data, sizeof(data));
-	CHECK(checker.result() == 0);
-}
-
-TEST(NetChecksum, Higher) {
-	char data[] alignas(uint16_t) = "\x45\x00\x00\x3c\xf5\xdf\x40\x00\x40\x06\x00\x00\xc0\xa8\x01\x07\x0a\x0a\x0a\x01";
-	InetChecksumDigester generator;
-	generator.consume(data, sizeof(data));
-
-	uint16_t old = reinterpret_cast<uint16_t*>(data)[1];
-	reinterpret_cast<uint16_t*>(data)[1] = 0xffff;
-	generator.patch(old, 0xffff);
+	reinterpret_cast<uint16_t*>(data)[0] = 0x1234;
+	generator.patch(0x1234);
 
 	uint16_t chks = generator.result();
 	memcpy(data + 10, &chks, 2);

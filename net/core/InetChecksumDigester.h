@@ -70,12 +70,16 @@ public:
 		state += result;
 	}
 
-	inline void patch(uint16_t old, uint16_t updated) {
-		state += updated - old;
+	inline void patch(uint32_t updated) {
+		state += updated;
+	}
+
+	inline uint16_t getReducedState() {
+		return reduce(state);
 	}
 
 	inline uint16_t result() {
-		return static_cast<uint16_t>(~reduce(state));
+		return static_cast<uint16_t>(~getReducedState());
 	}
 };
 

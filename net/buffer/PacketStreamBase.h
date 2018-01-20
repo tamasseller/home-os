@@ -1,56 +1,97 @@
 /*
- * PacketStream.h
+ * PacketStreamBase.h
  *
- *  Created on: 2017.12.03.
+ *  Created on: 2018.01.20.
  *      Author: tooma
  */
 
-#ifndef PACKETSTREAM_H_
-#define PACKETSTREAM_H_
+#ifndef PACKETSTREAMBASE_H_
+#define PACKETSTREAMBASE_H_
 
 template<class S, class... Args>
-template<class Observer>
-class Network<S, Args...>::ObservedPacketStream:
-	public Observer,
-	public PacketDisassembler,
-	public PacketWriterBase<PacketStream>
-{
-	friend class ObservedPacketStream::PacketWriterBase;
+struct Network<S, Args...>::Chunk {
+	char *start;
+	size_t length;
+};
 
+template<class S, class... Args>
+template<template<class> class ObserverTemplate>
+class Network<S, Args...>::PacketStreamBase:
+	public ObserverTemplate<PacketStreamBase<ObserverTemplate>>,
+	public PacketWriterBase<PacketStreamBase<ObserverTemplate>>
+{
+	using Observer = ObserverTemplate<PacketStreamBase<ObserverTemplate>>;
+	friend Observer;
+	friend class PacketStreamBase::PacketWriterBase;
+
+	Block* current;
 	char *data, *limit;
 
-	constexpr inline uint16_t spaceLeft() const {
-	    return data ? static_cast<uint16_t>(limit - data) : 0;
+	constexpr inline size_t spaceLeft() const {
+	    return limit - data;
 	}
 
-	inline bool takeNext() {
-		if(!PacketDisassembler::advance())
+	inline void updateDataPointers() {
+		data = current->getData();
+		limit = data + current->getSize();
+	}
+
+	inline void updateDataPointers(size_t offset) {
+		data = current->getData() + offset;
+		limit = data + current->getSize() - offset;
+	}
+
+
+	inline bool advance() {
+		if(!current || current->isEndOfPacket())
 			return false;
 
-		Chunk ret = this->getCurrentChunk();
-		data = ret.start;
-		limit = ret.end;
+		if(Block* next = current->getNext())
+			current = next;
+		else
+			return false;
 
-		static_cast<Observer*>(this)->observeInternalBlock(data, limit);
 		return true;
 	}
 
+	inline bool takeNext() {
+		static_cast<Observer*>(this)->observeInternalBlock();
+
+		if(!advance())
+			return false;
+
+		updateDataPointers();
+		return true;
+	}
+
+
 public:
+	inline PacketStreamBase() = default;
+
 	inline void init(const Packet& p){
-		PacketDisassembler::init(p);
-		/*
-		 * Any packet must have headers that can only be written to in-line blocks,
-		 * so it is safe to assume that the first block contains in-line data.
-		 */
-		data = this->current->getData();
-		limit = data + this->current->getSize();
-		static_cast<Observer*>(this)->observeFirstBlock(data, limit);
+		current = Packet::Accessor::getFirst(p);
+		updateDataPointers();
+		static_cast<Observer*>(this)->observeFirstBlock();
+	}
+
+	inline void init(const Packet& p, size_t offset)
+	{
+		current = Packet::Accessor::getFirst(p);
+
+		while(offset > current->getSize()) {
+			offset -= current->getSize();
+			if(!advance()) {
+				invalidate();
+				return;
+			}
+		}
+
+		updateDataPointers(offset);
+		static_cast<Observer*>(this)->observeFirstBlock();
 	}
 
     void invalidate() {
-        Packet nullPacket;
-        nullPacket.init(nullptr);
-        PacketDisassembler::init(nullPacket);
+        current = nullptr;
         data = limit = nullptr;
     }
 
@@ -58,13 +99,13 @@ public:
 	{
 		if(!spaceLeft()) {
 			if(!takeNext())
-				return Chunk {nullptr, nullptr};
+				return Chunk {nullptr, 0};
 		}
 
-		return Chunk {data, limit};
+		return Chunk {data, spaceLeft()};
 	}
 
-	inline void advance(uint16_t x) {
+	inline void advance(size_t x) {
 		data += x;
 	}
 
@@ -72,7 +113,7 @@ public:
 		uint16_t done = 0;
 		while(const uint16_t leftoverLength = static_cast<uint16_t>(outputLength - done)) {
 			if(const auto space = spaceLeft()) {
-				const uint16_t runLength = (space < leftoverLength) ? space : leftoverLength;
+				const size_t runLength = (space < leftoverLength) ? space : leftoverLength;
 				memcpy(output, data, runLength);
 				done = static_cast<uint16_t>(done + runLength);
 				output += runLength;
@@ -103,29 +144,8 @@ public:
 		return true;
 	}
 
-    inline bool cutCurrentAndMoveToNext() {
-		while(!this->current->isEndOfPacket()) {
-			if(!this->moveToNextBlock())
-				return false; // This line is not intended to be reached (LCOV_EXCL_LINE).
-
-			static_cast<Observer*>(this)->observeInternalBlock(
-					this->current->getData(), this->current->getData() + this->current->getSize());
-		}
-
-		Block* next = this->current->getNext();
-		this->current->terminate();
-
-		if((this->current = next) == nullptr)
-			return false;
-
-        data = this->current->getData();
-        limit = data + this->current->getSize();
-        static_cast<Observer*>(this)->observeFirstBlock(data, limit);
-        return true;
-    }
-
 	inline bool atEop() {
-		return !data || (!spaceLeft() && this->current->isEndOfPacket());
+		return !data || (!spaceLeft() && current->isEndOfPacket());
 	}
 
  	inline bool read8(uint8_t &ret) {
@@ -198,15 +218,4 @@ public:
 	}
 };
 
-template<class S, class... Args>
-struct Network<S, Args...>::NullObserver {
-	inline void observeFirstBlock(char*, char*) {}
-	inline void observeInternalBlock(char*, char*) {}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::PacketStream: public ObservedPacketStream<NullObserver> {};
-
-
-
-#endif /* PACKETSTREAM_H_ */
+#endif /* PACKETSTREAMBASE_H_ */

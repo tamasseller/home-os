@@ -22,7 +22,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 	}
 
 	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
-		tcpTxPostProcess(stream, checksum, payload);
+		Fixup::tcpTxPostProcess(stream, checksum, payload);
 	}
 
 	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request)
@@ -30,8 +30,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
         AddressIp4 peerAddress;
         uint8_t ihl;
 
-		PacketStream reader;
-		reader.init(request);
+		PacketStream reader(request);
 
         NET_ASSERT(reader.read8(ihl));
         NET_ASSERT((ihl & 0xf0) == 0x40);
@@ -51,8 +50,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
         uint16_t peerPort, localPort, payloadLength, flags;
         uint8_t ihl;
 
-		PacketStream reader;
-		reader.init(request);
+		PacketStream reader(request);
 
         NET_ASSERT(reader.read8(ihl));
         NET_ASSERT(reader.skipAhead(1));

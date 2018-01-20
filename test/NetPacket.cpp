@@ -14,7 +14,6 @@ using Net = Net64;
 using Accessor = NetworkTestAccessor<Net>;
 
 TEST_GROUP(NetPacket) {
-
 	template<class Child>
 	struct TaskBase: TestTask<Child> {
 		Accessor::PacketBuilder builder;
@@ -35,19 +34,17 @@ TEST_GROUP(NetPacket) {
 		}
 
 		bool checkStreamContent(const char* str) {
-			Accessor::PacketStream reader;
-			reader.init(builder);
+			Accessor::PacketStream reader(builder);
 			return readAndCheck(reader, str);
 		}
 
 		bool checkDirectStreamContent(const char* str) {
-			Accessor::PacketStream reader;
-			reader.init(builder);
+			Accessor::PacketStream reader(builder);
 
 			while(*str) {
 				Net::Chunk chunk = reader.getChunk();
 
-				if(!chunk.length()) return TaskBase::TestTask::bad;
+				if(!chunk.length) return TaskBase::TestTask::bad;
 				if(*chunk.start != *str++) return TaskBase::TestTask::bad;
 
 				reader.advance(1);
@@ -57,21 +54,21 @@ TEST_GROUP(NetPacket) {
 		}
 
 		bool checkBlockContent(const char* str) {
-			Accessor::PacketDisassembler disassembler;
-			disassembler.init(builder);
+			Accessor::PacketStream reader(builder);
 
 			size_t length = strlen(str);
 
 			do {
-				Net::Chunk chunk = disassembler.getCurrentChunk();
-				size_t runLength = chunk.length() < length ? chunk.length() : length;
+				Net::Chunk chunk = reader.getChunk();
+				size_t runLength = chunk.length < length ? chunk.length : length;
 
 				if(memcmp(chunk.start, str, runLength) != 0)
 					return TaskBase::TestTask::bad;
 
 				str += runLength;
 				length -= runLength;
-			}while(disassembler.advance());
+				reader.advance(static_cast<uint16_t>(runLength));
+			}while(!reader.atEop());
 
 			if(length) return TaskBase::TestTask::bad;
 
@@ -80,7 +77,7 @@ TEST_GROUP(NetPacket) {
 	};
 
 	typedef Accessor::PacketBuilder::PacketWriterBase Writer;
-	typedef Accessor::PacketStream::ObservedPacketStream Reader;
+	typedef Accessor::PacketStream::PacketStreamBase Reader;
 
 	template<const char* padding, class Data, bool (Writer::* write)(Data), bool(Reader::* read)(Data&)>
 	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {
@@ -94,8 +91,7 @@ TEST_GROUP(NetPacket) {
 			if(!(this->builder.*write)(value2)) return OverlapTask::bad;
 			this->builder.done();
 
-			Accessor::PacketStream reader;
-			reader.init(this->builder);
+			Accessor::PacketStream reader(this->builder);
 
 			if(this->readAndCheck(reader, padding) == OverlapTask::bad)
 				return OverlapTask::bad;
@@ -215,8 +211,7 @@ TEST(NetPacket, Overread) {
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 			builder.done();
 
-			Accessor::PacketStream reader;
-			reader.init(builder);
+			Accessor::PacketStream reader(builder);
 
 			char temp[strlen(hello)+2];
 			if(reader.copyOut(temp, sizeof(temp)) != strlen(hello)) return bad;
@@ -235,8 +230,7 @@ TEST(NetPacket, OverreadPartial) {
 			init(2);
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 
-			Accessor::PacketStream reader;
-			reader.init(builder);
+			Accessor::PacketStream reader(builder);
 
 			char temp[strlen(hello)+2];
 			if(reader.copyOut(temp, sizeof(temp)) != 0) return bad;
@@ -321,6 +315,7 @@ TEST(NetPacket, HalfWordOverlapRaw) {
 	> task;
 	work(task);
 }
+
 TEST(NetPacket, SimplePatch) {
 	struct Task: TaskBase<Task> {
 		bool run() {
@@ -328,8 +323,7 @@ TEST(NetPacket, SimplePatch) {
 			if(builder.copyIn(hello, strlen(hello)) != strlen(hello)) return bad;
 			builder.done();
 
-			Accessor::PacketStream modifier;
-			modifier.init(builder);
+			Accessor::PacketStream modifier(builder);
 
 			if(modifier.copyIn(world, strlen(world)) != strlen(world))
 					return bad;
@@ -356,8 +350,7 @@ TEST(NetPacket, ComplexPatch) {
 
 			builder.done();
 
-			Accessor::PacketStream modifier;
-			modifier.init(builder);
+			Accessor::PacketStream modifier(builder);
 
 			uint8_t ret;
 			if(!modifier.read8(ret)) return bad;
@@ -373,8 +366,7 @@ TEST(NetPacket, ComplexPatch) {
 
 			if(modifier.skipAhead(4)) return bad;
 
-			Accessor::PacketStream reader;
-			reader.init(builder);
+			Accessor::PacketStream reader(builder);
 
             if(!reader.read8(ret)) return bad;
             if(ret != 123) return bad;
@@ -421,8 +413,7 @@ TEST(NetPacket, OffsetDropSimple) {
     struct Task: TaskBase<Task> {
         bool checkFrom(Net::Packet p, uint8_t from)
         {
-            Net::PacketStream reader;
-            reader.init(p);
+            Net::PacketStream reader(p);
 
             for(uint8_t i = from; i < 3 * Net::blockMaxPayload; i++) {
                 uint8_t ret;
@@ -485,6 +476,178 @@ TEST(NetPacket, OffsetDropAtOnce) {
             p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100);
             if(Accessor::pool.statTxUsed() != 0) return Task::bad;
 
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, OffsetIndirect) {
+    struct Task: TaskBase<Task> {
+    	bool helloDestroyed = false;
+    	bool worldDestroyed = false;
+
+    	static inline void destroy(void* user, const char* data, uint32_t length) {
+    		if(data == hello)
+    			reinterpret_cast<Task*>(user)->helloDestroyed = true;
+    		else if(data == world)
+    			reinterpret_cast<Task*>(user)->worldDestroyed = true;
+    	}
+
+        bool run() {
+            init(5);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.write8('|')) return bad;
+            builder.done();
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3);
+
+            if(helloDestroyed || worldDestroyed) return bad;
+            if(checkStreamContent("llo|world|") != ok) return bad;
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3);
+            if(!helloDestroyed || worldDestroyed) return bad;
+            if(checkStreamContent("|world|") != ok) return bad;
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(2);
+            if(!helloDestroyed || worldDestroyed) return bad;
+            if(checkStreamContent("orld|") != ok) return bad;
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(4);
+            if(!helloDestroyed || !worldDestroyed) return bad;
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+
+TEST(NetPacket, Chain) {
+    struct Task: TaskBase<Task> {
+    	bool helloDestroyed = false;
+    	bool worldDestroyed = false;
+
+    	static inline void destroy(void* user, const char* data, uint32_t length) {
+    		if(data == hello)
+    			reinterpret_cast<Task*>(user)->helloDestroyed = true;
+    		else if(data == world)
+    			reinterpret_cast<Task*>(user)->worldDestroyed = true;
+    	}
+
+        bool run() {
+            init(2);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
+
+            builder.done();
+            Net::Packet p1 = builder;
+            init(3);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.write8('|')) return bad;
+            builder.done();
+            Net::Packet p2 = builder;
+
+            Accessor::PacketChain chain;
+
+            if(!chain.isEmpty()) return bad;
+            chain.put(p1);
+            if(chain.isEmpty()) return bad;
+
+            chain.reset();
+
+            if(!chain.isEmpty()) return bad;
+            chain.put(p1);
+            if(chain.isEmpty()) return bad;
+
+            chain.put(p2);
+
+            Net::Packet readback;
+            Net::PacketStream reader;
+
+            if(!chain.take(readback)) return bad;
+            reader.init(readback);
+            if(readAndCheck(reader, "|hello") != ok) return bad;
+            readback.dispose<Accessor::Pool::Quota::Tx>();
+
+            if(!chain.take(readback)) return bad;
+            reader.init(readback);
+            if(readAndCheck(reader, "|world|") != ok) return bad;
+            readback.dispose<Accessor::Pool::Quota::Tx>();
+
+            if(chain.take(readback)) return bad;
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, ChainFlip) {
+    struct Task: TaskBase<Task> {
+    	bool helloDestroyed = false;
+    	bool worldDestroyed = false;
+
+    	static inline void destroy(void* user, const char* data, uint32_t length) {
+    		if(data == hello)
+    			reinterpret_cast<Task*>(user)->helloDestroyed = true;
+    		else if(data == world)
+    			reinterpret_cast<Task*>(user)->worldDestroyed = true;
+    	}
+
+        bool run() {
+            init(2);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
+
+            builder.done();
+            Net::Packet p1 = builder;
+            init(3);
+
+            if(!builder.write8('|')) return bad;
+            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.write8('|')) return bad;
+            builder.done();
+            Net::Packet p2 = builder;
+
+            Accessor::Packet::Accessor::getFirst(p2)->findEndOfPacket()->setNext(
+            		Accessor::Packet::Accessor::getFirst(p1)
+			);
+
+            Accessor::PacketChain chain = Accessor::PacketChain::flip(Accessor::Packet::Accessor::getFirst(p2));
+
+            Net::Packet readback;
+            Net::PacketStream reader;
+
+            if(!chain.take(readback)) return bad;
+            reader.init(readback);
+            if(readAndCheck(reader, "|hello") != ok) return bad;
+            readback.dispose<Accessor::Pool::Quota::Tx>();
+
+            if(!chain.take(readback)) return bad;
+            reader.init(readback);
+            if(readAndCheck(reader, "|world|") != ok) return bad;
+            readback.dispose<Accessor::Pool::Quota::Tx>();
+
+            if(chain.take(readback)) return bad;
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
             return ok;
         }
     } task;

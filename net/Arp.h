@@ -16,11 +16,10 @@ inline void Network<S, Args...>::Ethernet<Driver>::arpPacketReceived(Packet pack
 {
 	uint16_t opCode, hType, pType;
     uint8_t hLen, pLen;
-	PacketStream reader;
 
     state.increment(&DiagnosticCounters::Arp::inputReceived);
 
-	reader.init(packet);
+    PacketStream reader(packet);
 	reader.skipAhead(static_cast<Interface*>(this)->getHeaderSize());
 
 	if(!reader.read16net(hType) ||
@@ -57,8 +56,7 @@ template<class S, class... Args>
 template<class Driver>
 inline void Network<S, Args...>::Ethernet<Driver>::processArpReplyPacket(Packet start)
 {
-    PacketStream reader;
-    reader.init(start);
+    PacketStream reader(start);
 
 	/*
 	 * Skip destination ethernet header and initial fields of the ARP payload all the
@@ -111,14 +109,11 @@ inline bool Network<S, Args...>::Ethernet<Driver>::assembleReply(Launcher *launc
 	NET_ASSERT(result == Result::Done);
 
 	auto self = static_cast<Ethernet*>(static_cast<ArpReplyJob*>(item));
-	PacketBuilder builder;
-
-	builder.init(self->poolParams.allocator);
+	PacketBuilder builder(self->poolParams.allocator);
 
 	Packet requestPacket;
 	while(self->arpRequestQueue.take(requestPacket)) {
-		PacketStream reader;
-		reader.init(requestPacket);
+		PacketStream reader(requestPacket);
 
 		/*
 		 * Skip destination ethernet header and initial fields of the ARP payload all the

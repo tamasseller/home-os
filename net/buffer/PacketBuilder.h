@@ -22,7 +22,7 @@ public:
 
 		while(const uint16_t leftoverLength = static_cast<uint16_t>(inputLength - done)) {
 			if(const auto space = self->spaceLeft()) {
-				const uint16_t runLength = (space < leftoverLength) ? space : leftoverLength;
+				const size_t runLength = (space < leftoverLength) ? space : leftoverLength;
 				memcpy(self->data, input, runLength);
 				done = static_cast<uint16_t>(done + runLength);
 				input += runLength;
@@ -93,6 +93,11 @@ class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketW
 	}
 
 public:
+	inline PacketBuilder() = default;
+	inline PacketBuilder(const typename Pool::Allocator& allocator) {
+		this->init(allocator);
+	}
+
 	inline void init(const typename Pool::Allocator& allocator) {
 		this->allocator = allocator;
 		PacketAssembler::init(this->allocator.get());
@@ -119,7 +124,7 @@ public:
                 return false;
         }
 
-        block->setIndirect(data, length, destructor, userData);
+        block->setExternal(data, length, destructor, userData);
         this->data = this->limit = nullptr;
         return true;
     }

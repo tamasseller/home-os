@@ -485,7 +485,7 @@ TEST(NetUdp, SendSimple) {
 
     work(task);
 }
-
+#if 0
 TEST(NetUdp, Echo) {
     struct Task: public TestTask<Task> {
 
@@ -556,3 +556,4 @@ TEST(NetUdp, Echo) {
 
     work(task);
 }
+#endif

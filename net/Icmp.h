@@ -43,12 +43,12 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 
 	while(!reader.atEop()) {
 		Chunk chunk = reader.getChunk();
-		sum.consume(chunk.start, chunk.length(), offset & 1);
-		offset += chunk.length();
-		reader.advance(static_cast<uint16_t>(chunk.length()));
+		sum.consume(chunk.start, chunk.length, offset & 1);
+		offset += chunk.length;
+		reader.advance(static_cast<uint16_t>(chunk.length));
 	}
 
-	sum.patch(0, correctEndian(typeCode));
+	sum.patch(correctEndian(typeCode));
 
 	if(sum.result() != 0)
 		goto formatError;
@@ -64,8 +64,7 @@ formatError:
 template<class S, class... Args>
 inline void Network<S, Args...>::processIcmpPacket(Packet start)
 {
-    PacketStream reader;
-    reader.init(start);
+    PacketStream reader(start);
 
 	/*
 	 * Skip initial fields of the IP header payload all the way to the source address.
@@ -90,8 +89,7 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 	}
 
 	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request) {
-		PacketStream reader;
-		reader.init(request);
+		PacketStream reader(request);
 
     	uint8_t headerLength;
     	NET_ASSERT(reader.read8(headerLength));
@@ -113,8 +111,7 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 	}
 
 	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply) {
-		PacketStream reader;
-		reader.init(request);
+		PacketStream reader(request);
 
     	uint8_t headerLength;
     	reader.read8(headerLength);
@@ -137,9 +134,9 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 			do {
 				Chunk chunk = reader.getChunk();
 
-				NET_ASSERT(reply.copyIn(chunk.start, static_cast<uint16_t>(chunk.length())));
+				NET_ASSERT(reply.copyIn(chunk.start, static_cast<uint16_t>(chunk.length)));
 
-				reader.advance(static_cast<uint16_t>(chunk.length()));
+				reader.advance(static_cast<uint16_t>(chunk.length));
 			} while(!reader.atEop());
 		}
 
