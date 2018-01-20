@@ -17,7 +17,7 @@ class Network<S, Args...>::PacketChain {
 public:
 	inline PacketChain(): head(nullptr), tail(nullptr) {}
 
-	inline bool take(Packet &ret)
+	bool take(Packet &ret)
 	{
 		if(!head)
 			return false;
@@ -34,7 +34,7 @@ public:
 		return true;
 	}
 
-	inline void put(Packet packet)
+	void put(Packet packet)
 	{
 		Block *first = Packet::Accessor::getFirst(packet);
 		Block *last = first->findEndOfPacket();
@@ -56,7 +56,7 @@ public:
 		return head == nullptr;
 	}
 
-	inline static PacketChain flip(Block* first) {
+	static PacketChain flip(Block* first) {
 		PacketChain ret;
 
 		Block *last = first->findEndOfPacket();

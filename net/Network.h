@@ -70,6 +70,7 @@ struct NetworkOptions {
 		template<uint16_t, class, class = void> struct Interfaces;
 
 		class Block;
+		class DataChain;
 		class PacketChain;
 		class PacketBuilder;
 
@@ -86,8 +87,9 @@ struct NetworkOptions {
 
 		template<class> class PacketWriterBase;
 		template <class> class NullObserver;
-		template <class> class ChecksumValidatorObserver;
+		template <class> class ChecksumObserver;
 		template<template <class> class> class PacketStreamBase;
+		class GeneratorPacketStream;
 	    class ValidatorPacketStream;
 		class PacketTransmissionRequest;
 
@@ -232,11 +234,14 @@ typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::st
 
 #include "buffer/Block.h"
 #include "buffer/Packet.h"
+#include "buffer/DataChain.h"
 #include "buffer/PacketChain.h"
 #include "buffer/PacketStream.h"
 #include "buffer/PacketBuilder.h"
 #include "buffer/PacketAssembler.h"
+#include "buffer/ChecksumObserver.h"
 #include "buffer/PacketStreamBase.h"
+#include "buffer/GeneratorPacketStream.h"
 #include "buffer/ValidatorPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"
 

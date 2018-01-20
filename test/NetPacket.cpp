@@ -398,7 +398,7 @@ TEST(NetPacket, Indirect) {
             if(!builder.write8('|')) return bad;
             if(!builder.addByReference(hello, strlen(hello))) return bad;
             if(!builder.write8('|')) return bad;
-            if(!builder.addByReference(world, strlen(hello))) return bad;
+            if(!builder.addByReference(world, strlen(world))) return bad;
             if(!builder.write8('|')) return bad;
             builder.done();
 
@@ -501,7 +501,7 @@ TEST(NetPacket, OffsetIndirect) {
             if(!builder.write8('|')) return bad;
             if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
             if(!builder.write8('|')) return bad;
-            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.addByReference(world, strlen(world), destroy, this)) return bad;
             if(!builder.write8('|')) return bad;
             builder.done();
 
@@ -556,7 +556,7 @@ TEST(NetPacket, Chain) {
             init(3);
 
             if(!builder.write8('|')) return bad;
-            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.addByReference(world, strlen(world), destroy, this)) return bad;
             if(!builder.write8('|')) return bad;
             builder.done();
             Net::Packet p2 = builder;
@@ -621,7 +621,7 @@ TEST(NetPacket, ChainFlip) {
             init(3);
 
             if(!builder.write8('|')) return bad;
-            if(!builder.addByReference(world, strlen(hello), destroy, this)) return bad;
+            if(!builder.addByReference(world, strlen(world), destroy, this)) return bad;
             if(!builder.write8('|')) return bad;
             builder.done();
             Net::Packet p2 = builder;
@@ -654,3 +654,177 @@ TEST(NetPacket, ChainFlip) {
 
     work(task);
 }
+
+TEST(NetPacket, DataChain) {
+    struct Task: TaskBase<Task> {
+    	bool helloDestroyed = false;
+    	bool worldDestroyed = false;
+
+    	static inline void destroy(void* user, const char* data, uint32_t length) {
+    		if(data == hello)
+    			reinterpret_cast<Task*>(user)->helloDestroyed = true;
+    		else if(data == world)
+    			reinterpret_cast<Task*>(user)->worldDestroyed = true;
+    	}
+
+        bool run() {
+            Accessor::DataChain chain;
+            Accessor::PacketStream reader;
+
+            init(1);
+			if(builder.copyIn(hello, 5) != 5) return bad;
+			if(!builder.write8(' ')) return bad;
+			if(builder.copyIn(world, 5) != 5) return bad;
+			if(!builder.write8('\n')) return bad;
+			builder.done();											// 'hello world\n'
+			builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(4); // 'o world\n'
+
+			chain.put(builder); 									// 'o world\n'
+
+			init(3);
+            if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
+            if(builder.copyIn(" cruel ", 7) != 7) return bad;
+            if(!builder.addByReference(world, strlen(world), destroy, this)) return bad;
+            														//  hello     world
+            builder.done();											// '^| cruel |^'
+
+            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(4); //  hello         world
+            														//     '^| cruel |^'
+
+            														//       hello         world
+            chain.put(builder);										// 'o world\n^| cruel |^'
+
+            Accessor::DataChain::Packetizatation p;
+
+            if(chain.packetize(p, 22)) return bad;
+
+            if(!chain.packetize(p, 21)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "o world\no cruel world") != ok) return bad;
+
+            chain.revert(p);
+
+            if(!chain.packetize(p, 2)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "o ") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+            if(Accessor::pool.statTxUsed() != 4) return Task::bad;
+            if(helloDestroyed || worldDestroyed) return bad;
+
+            if(!chain.packetize(p, 19)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "world\no cruel world") != ok) return bad;
+
+            chain.revert(p);
+
+            if(!chain.packetize(p, 10)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "world\no cr") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+            if(Accessor::pool.statTxUsed() != 2) return Task::bad;
+            if(!helloDestroyed || worldDestroyed) return bad;
+
+            if(!chain.packetize(p, 4)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "uel ") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+            if(Accessor::pool.statTxUsed() != 1) return Task::bad;
+
+            if(!chain.packetize(p, 5)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "world") != ok) return bad;
+
+            chain.revert(p);
+
+            if(!chain.packetize(p, 2)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "wo") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+
+            if(!chain.packetize(p, 2)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "rl") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+
+            if(chain.packetize(p, 2)) return bad;
+
+            if(!chain.packetize(p, 1)) return bad;
+            reader.init(p);
+            if(readAndCheck(reader, "d") != ok) return bad;
+
+            chain.apply<Accessor::Pool::Quota::Tx>(p);
+
+            if(chain.packetize(p, 1)) return bad;
+            if(chain.packetize(p, 0)) return bad;
+
+            if(Accessor::pool.statTxUsed()) return Task::bad;
+            if(!helloDestroyed || !worldDestroyed) return bad;
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, ValidatorSimple) {
+	struct Task: TaskBase<Task> {
+	        bool run() {
+	        	const uint8_t header[] = {0x41, 0x10, 0xbe, 0xef, 'h', 'e', 'l', 'l'};
+	        	const uint8_t data[] = {'o', 'w', 'o', 'r', 0x4c, 0x44, 0x50, 0x3e, 0xda, 0x7a};
+	            init(2);
+
+	            if(!builder.copyIn((const char*)header, sizeof(header))) return bad;
+	            if(!builder.addByReference((const char*)data, sizeof(data))) return bad;
+	            builder.done();
+
+	            Accessor::ValidatorPacketStream stream(builder);
+	            if(!stream.finishAndCheck()) return bad;
+
+	            stream.restart(10); // 'hellowor' + checksum
+	            if(!stream.finishAndCheck()) return bad;
+
+	            if(!stream.checkTotalLength(sizeof(data) + sizeof(header))) return bad;
+
+	            return ok;
+	        }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, GeneratorSimple) {
+	struct Task: TaskBase<Task> {
+	        bool run() {
+	        	const uint8_t header[] = {0x42, 0, 0, 0};
+	        	const uint8_t header2[] = {0, 8, 0, 8, 'h', 'e', 'l', 'l', 'o'};
+	            init(3);
+
+	            if(!builder.copyIn((const char*)header, sizeof(header))) return bad;
+	            if(!builder.addByReference((const char*)header2, sizeof(header2))) return bad;
+	            if(!builder.addByReference(world, strlen(world))) return bad;
+	            builder.done();
+
+	            Accessor::GeneratorPacketStream stream(builder);
+
+	            stream.finish();
+	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0xbdef))) return bad;
+
+	            stream.restart(8); // 'hellowor'
+	            stream.finish();
+	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0x4c44))) return bad;
+
+	            if(!stream.checkTotalLength(strlen(world) + sizeof(header) + sizeof(header2))) return bad;
+
+	            return ok;
+	        }
+    } task;
+
+    work(task);
+}
+

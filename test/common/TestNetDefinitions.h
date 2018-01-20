@@ -195,9 +195,12 @@ struct NetworkTestAccessor: Net {
 	using Net::Chunk;
 	using Net::Block;
 	using Net::Packet;
+	using Net::DataChain;
 	using Net::PacketChain;
 	using Net::PacketBuilder;
 	using Net::PacketAssembler;
+	using Net::ValidatorPacketStream;
+	using Net::GeneratorPacketStream;
 
 	static void overrideHeaderSize(typename Net::Interface* interface, uint16_t headerSize) {
 		interface->headerSize = headerSize;

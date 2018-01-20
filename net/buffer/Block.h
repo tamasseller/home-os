@@ -217,9 +217,14 @@ public:
 	/**
 	 * Set the size of the contained data (implies in-line storage).
 	 */
-	inline void setSize(uint16_t size) {
-	    NET_ASSERT(size < Header::sizeMask);
-		writeSizeField(size);
+	inline void setSize(uint32_t size)
+	{
+	    if(isExternal()) {
+	    	external.size = size + external.offset;
+	    } else {
+		    NET_ASSERT(size < Header::sizeMask);
+			writeSizeField(static_cast<uint16_t>(size));
+	    }
 	}
 
 	/**
@@ -232,14 +237,14 @@ public:
 	/**
 	 * Set the end of packet flag.
 	 */
-	inline void setEndOfPacket(bool x) {
+	inline void setEndOfPacket() {
 		header.sizeAndFlags = static_cast<uint16_t>(header.sizeAndFlags | Header::endOfPacket);
 	}
 
 	/**
 	 * Reset the end of packet flag.
 	 */
-	inline void clearEndOfPacket(bool x) {
+	inline void clearEndOfPacket() {
 		header.sizeAndFlags = static_cast<uint16_t>(header.sizeAndFlags & ~Header::endOfPacket);
 	}
 
@@ -279,9 +284,9 @@ public:
 		if(isExternal()) {
 			external.offset = static_cast<uint32_t>(external.offset + n);
 		} else {
-			NET_ASSERT(n <= getSize());
+			NET_ASSERT(n <= readSizeField());
 		    writeInlineOffset(static_cast<uint16_t>(getInlineOffset() + n));
-		    setSize(static_cast<uint16_t>(getSize() - n));
+		    writeSizeField(static_cast<uint16_t>(readSizeField() - n));
 		}
 	}
 

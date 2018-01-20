@@ -41,7 +41,6 @@ class Network<S, Args...>::PacketStreamBase:
 		limit = data + current->getSize() - offset;
 	}
 
-
 	inline bool advance() {
 		if(!current || current->isEndOfPacket())
 			return false;
@@ -55,7 +54,7 @@ class Network<S, Args...>::PacketStreamBase:
 	}
 
 	inline bool takeNext() {
-		static_cast<Observer*>(this)->observeInternalBlock();
+		static_cast<Observer*>(this)->observeInternalBlockLeave();
 
 		if(!advance())
 			return false;
@@ -103,6 +102,10 @@ public:
 		}
 
 		return Chunk {data, spaceLeft()};
+	}
+
+	inline Chunk getFullChunk() {
+		return Chunk {current->getData(), current->getSize()};
 	}
 
 	inline void advance(size_t x) {

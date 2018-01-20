@@ -41,7 +41,7 @@ public:
 	}
 
 	inline void done() {
-		current->setEndOfPacket(true);
+		current->setEndOfPacket();
 		current->terminate();
 	}
 };
