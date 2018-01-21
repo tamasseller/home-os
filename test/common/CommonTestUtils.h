@@ -75,8 +75,9 @@ public:
 		const char* result = Os::start(startParam);
 		if(expectedError)
 			CHECK(pet::Str::cmp(result, expectedError) == 0);
-		else
+		else {
 			CHECK(result == nullptr);
+		}
 	}
 };
 

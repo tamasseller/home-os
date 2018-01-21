@@ -160,8 +160,8 @@ class LinuxTapDevice {
 			while(!packet.atEop()) {
 				typename Net::Chunk chunk = packet.getChunk();
 				iov[n].iov_base = chunk.start;
-				iov[n].iov_len = chunk.length();
-				packet.advance(static_cast<uint16_t>(chunk.length()));
+				iov[n].iov_len = chunk.length;
+				packet.advance(static_cast<uint16_t>(chunk.length));
 				n++;
 				Net::Os::assert(n < nBlocks, "DAFUQ?");
 			}

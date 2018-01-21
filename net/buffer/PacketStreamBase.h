@@ -136,6 +136,10 @@ public:
 		return true;
 	}
 
+	inline bool isInitialized() {
+		return current != nullptr;
+	}
+
 	inline bool atEop() {
 		return !data || (!spaceLeft() && current->isEndOfPacket());
 	}

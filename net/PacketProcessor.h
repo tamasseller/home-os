@@ -14,21 +14,29 @@ template<class S, class... Args>
 class Network<S, Args...>::PacketProcessor: Os::Event {
 	using PacketReader = Network<S, Args...>::PacketStream;
 
+	PacketChain chain;
+
 	template<class C>
-	static inline void process(uintptr_t arg, C&& c) {
-		PacketChain chain = PacketChain::flip(reinterpret_cast<Block*>(arg)); // TODO convert to field
+	inline void process(uintptr_t arg, C&& c) {
+		if(chain.isEmpty())
+			chain = PacketChain::flip(reinterpret_cast<Block*>(arg));
 
+		Packet p;
+		chain.take(p);
+		c(p);
 
-		for(Packet p; chain.take(p);) {
-			// TODO refactor while loop into event reissueing loop (to keep handler runtime low)
-			c(p);
+		if(!chain.isEmpty()) {
+			Os::submitEvent(this, [](uintptr_t old, uintptr_t& result){
+				result = old;
+				return true;
+			});
 		}
 	}
 
 	template<class T, void (T::*worker)(Packet)>
 	struct Wrapper {
 		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
-			process(arg, [event](Packet packet){
+			static_cast<PacketProcessor*>(event)->process(arg, [event](Packet packet){
 				(static_cast<T*>(static_cast<PacketProcessor*>(event))->*worker)(packet);
 			});
 		}
@@ -37,7 +45,7 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 	template<void (*worker)(Packet)>
 	struct StaticWrapper {
 		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
-			process(arg, [event](Packet packet){
+			static_cast<PacketProcessor*>(event)->process(arg, [event](Packet packet){
 				(*worker)(packet);
 			});
 		}

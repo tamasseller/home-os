@@ -164,34 +164,36 @@ template<class S, class... Args>
 template<class Child, class Channel>
 class Network<S, Args...>::IpRxJob: public Os::IoJob, public PacketStream {
 protected:
-    Packet packet; // TODO check if can be peeked from data.packets instead.
-
     typename Channel::IoData data;
 
-    inline void preprocess() {}
+    inline void preprocess(Packet) {}
+
     inline void reset() {}
 
+    inline void dispose(Packet packet) {
+    	packet.template dispose<Pool::Quota::Rx>();
+    }
+
     inline void invalidateAllStates() {
-        packet.init(nullptr);
         static_cast<PacketStream*>(this)->invalidate();
         static_cast<Child*>(this)->reset();
+
+        Packet packet;
+		if(data.packets.take(packet))
+			static_cast<Child*>(this)->dispose(packet);
     }
 
 private:
     inline bool fetchPacket()
     {
-        if(packet.isValid()) {
+        if(this->isInitialized()) {
         	/*
         	 * If we have a valid packet that is not consumed return true
         	 * right away to indicate that there is data to be processed.
         	 */
-        	if(!this->atEop())
-        		return true;
+			if(!this->atEop())
+				return true;
 
-        	/*
-        	 * Drop the packet if it have been consumed.
-        	 */
-        	packet.template dispose<Pool::Quota::Rx>();
 			invalidateAllStates();
         }
 
@@ -200,9 +202,10 @@ private:
     	 * been dropped above) and a new one can be obtained then fetch it
     	 * and return true to indicate that there is data to be processed.
     	 */
-        if(!packet.isValid() && data.packets.take(packet)) {
+        Packet packet;
+        if(data.packets.peek(packet)) {
 			static_cast<PacketStream*>(this)->init(packet);
-			static_cast<Child*>(this)->preprocess();
+			static_cast<Child*>(this)->preprocess(packet);
 			return true;
         }
 
@@ -220,13 +223,11 @@ private:
             self->fetchPacket();
             return true;
         } else {
-            if(self->packet.isValid())
-                self->packet.template dispose<Pool::Quota::Rx>();
+            Packet packet;
 
-            while(self->data.packets.take(self->packet)) // TODO optimize chain deallocation at once.
-                self->packet.template dispose<Pool::Quota::Rx>();
+        	self->invalidateAllStates();
 
-            self->invalidateAllStates();
+            self->data.packets.template dropAll<Pool::Quota::Rx>();
             return false;
         }
     }
@@ -238,7 +239,6 @@ public:
         return !fetchPacket();
     }
 
-
     void init() {
         invalidateAllStates();
     }
@@ -247,7 +247,7 @@ public:
     {
         auto self = static_cast<IpRxJob*>(item);
 
-        NET_ASSERT(!self->packet.isValid());
+        NET_ASSERT(self->data.packets.isEmpty());
 
         launcher->launch(channel, &IpRxJob::received, &self->data);
         return true;
@@ -267,7 +267,7 @@ class Network<S, Args...>::IpReceiver: public Os::template IoRequest<IpRxJob<IpR
         peerAddress = AddressIp4::allZero;
     }
 
-    inline void preprocess() {
+    inline void preprocess(Packet) {
         uint8_t ihl;
         NET_ASSERT(this->read8(ihl));
         NET_ASSERT(this->skipAhead(8));

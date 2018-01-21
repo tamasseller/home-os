@@ -97,6 +97,10 @@ public:
             }
         }
     }
+
+	bool operator ==(const Packet& other) {
+		return first == other.first;
+	}
 };
 
 #endif /* PACKET_H_ */

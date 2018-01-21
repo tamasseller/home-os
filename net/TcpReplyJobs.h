@@ -17,7 +17,7 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 	friend typename Base::IpTxJob;
 	friend Base;
 
-	inline void replySent(Packet& request) {
+	inline void replySent() {
 		state.increment(&DiagnosticCounters::Tcp::outputSent);
 	}
 
@@ -86,14 +86,82 @@ class Network<S, Args...>::TcpRstJob: public IpReplyJob<TcpRstJob, InetChecksumD
 };
 
 template<class S, class... Args>
-class Network<S, Args...>::TcpAckJob: public IpTxJob<TcpAckJob> {
-	// TODO reply job style, but with sockets instead of packets as its input.
+class Network<S, Args...>::TcpRetransmitJob: public IpTxJob<TcpRetransmitJob> {
+	friend typename TcpRetransmitJob::IpTxJob;
+
+	pet::LinkedList<TcpSocket> sockets;
+
+	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
+		Fixup::tcpTxPostProcess(stream, checksum, payload);
+	}
+
+    inline bool restartIfNeeded(Launcher *launcher, IoJob* item)
+    {
+        if(!this->sockets.isEmpty()) {
+            startReplySequence(launcher, item);
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool onPrepFailed(Launcher *launcher, IoJob* item) {
+    	// TODO
+        return restartIfNeeded(launcher, item);
+    }
+
+    inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
+    	// TODO
+    	return restartIfNeeded(launcher, item);
+    }
+
+	inline bool onPreparationDone(Launcher *launcher, IoJob* item)
+	{
+		// TODO
+		return TcpRetransmitJob::IpTxJob::template startTransmission<InetChecksumDigester>(
+				launcher, item, IpProtocolNumbers::tcp, 0x40 /* TODO */);
+	}
+
+    inline bool onNoRoute(Launcher *launcher, IoJob* item) {
+        return onPrepFailed(launcher, item);
+    }
+
+    inline bool onArpTimeout(Launcher *launcher, IoJob* item) {
+        return onPrepFailed(launcher, item);
+    }
+
+    /*
+     * These methods should never be called. (LCOV_EXCL_START)
+     */
+
+    inline bool onPreparationAborted(Launcher *launcher, IoJob* item, Result result) {
+        NET_ASSERT(false);
+        return false;
+    }
+
+    /*
+     * These methods should never be called. (LCOV_EXCL_STOP)
+     */
+
+    static bool startReplySequence(Launcher *launcher, IoJob* item) {
+    	auto self = static_cast<TcpRetransmitJob*>(item);
+    	auto socket = self->sockets.iterator().current();
+
+    	// TODO
+    	uint16_t length = 123;
+
+		return TcpRetransmitJob::IpTxJob::startPreparation(launcher, item, socket->data.peerAddress, length, 0, 0);
+    }
 
 	/* TODO:
 	 *		1. send an empty acknowledge packet with the current ack number
 	 *		2. put packet into the acked list
 	 */
-
+public:
+    void handle(TcpSocket &socket) {
+    	this->sockets.addBack(&socket);
+		this->launch(&TcpRetransmitJob::startReplySequence);
+    }
 };
 
 #endif /* TCPREPLYJOBS_H_ */

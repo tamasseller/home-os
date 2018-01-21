@@ -155,7 +155,6 @@ inline void Network<S, Args...>::processTcpPacket(Packet packet)
 			}
 		}
 	}
-
 }
 
 template<class S, class... Args>
@@ -187,9 +186,11 @@ public:
 	};
 
 	class SocketData: public InputChannel::IoData, WindowWaiterData {
-		using State = TcpConstants::State;
 		friend class TcpInputChannel;
 		friend class TcpListener;
+		friend class TcpRetransmitJob;
+
+		using State = TcpConstants::State;
 
 		/// Acknowledged packets (payload only).
 		PacketChain receivedData;
@@ -320,7 +321,12 @@ Network<S, Args...>::TcpInputChannel::WindowWaiterData::getSocketData() {
 template<class S, class... Args>
 class Network<S, Args...>::TcpSocket {
 	friend TcpListener;
+	friend TcpRetransmitJob;
+	friend pet::LinkedList<TcpSocket>;
+
 	typename TcpInputChannel::SocketData data;
+
+	TcpSocket *next;
 };
 
 #endif /* TCP_H_ */

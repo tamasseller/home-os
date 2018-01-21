@@ -15,6 +15,7 @@ class Network<S, Args...>::TcpListener:
 	friend class TcpListener::IpRxJob;
 
 	AddressIp4 peerAddress;
+	Packet packet;
     uint32_t initialReceivedSequenceNumber;
     uint16_t peerPort;
 
@@ -25,7 +26,15 @@ class Network<S, Args...>::TcpListener:
     	peerPort = 0;
     }
 
-    inline void preprocess() {
+    inline void dispose(Packet packet) {
+    	if(this->packet.isValid()) {
+    		NET_ASSERT(packet == this->packet);
+    		packet.template dispose<Pool::Quota::Rx>();
+    	}
+    }
+
+    inline void preprocess(Packet packet) {
+    	this->packet = packet;
         uint8_t ihl;
         NET_ASSERT(this->read8(ihl));
         NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
@@ -67,8 +76,11 @@ public:
 	void deny()
 	{
 		state.increment(&DiagnosticCounters::Tcp::inputConnectionDenied);
-		state.tcpRstJob.handlePacket(this->packet);
+		Packet packet = this->packet;
+		this->packet.init(nullptr);
+
 		this->invalidateAllStates();
+		state.tcpRstJob.handlePacket(packet);
 	}
 
 	bool accept(TcpSocket& socket)
@@ -79,7 +91,6 @@ public:
 		}
 
 		state.increment(&DiagnosticCounters::Tcp::inputConnectionAccepted);
-
 
 		uint32_t initialSendSequenceNumber = 0; // TODO time based generator.
 
@@ -94,9 +105,7 @@ public:
 		socket.data.nextSequenceNumber = initialSendSequenceNumber + 1;
 		socket.data.peerWindowSize = 0;
 
-		// TODO generate SYN-ACK packet (with ACK = initialReceivedSequenceNumber, SEQ = initialSendSequenceNumber)
-		// TODO send syn packet.
-		// TODO add to the retranmit queue
+		state.tcpRetransmitJob.handle(socket);
 
 		return true;
 	}

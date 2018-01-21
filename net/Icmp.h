@@ -84,7 +84,7 @@ class Network<S, Args...>::IcmpEchoReplyJob: public IpReplyJob<IcmpEchoReplyJob>
 	typedef typename IcmpEchoReplyJob::IpReplyJob Base;
 	friend Base;
 
-	inline void replySent(Packet& request) {
+	inline void replySent() {
 		state.increment(&DiagnosticCounters::Icmp::outputSent);
 	}
 
@@ -152,7 +152,7 @@ class Network<S, Args...>::IcmpReceiver:
 {
 	friend typename IcmpReceiver::IoRequest::IpRxJob;
 
-    inline void preprocess() {
+    inline void preprocess(Packet) {
     	state.increment(&DiagnosticCounters::Icmp::inputProcessed);
     }
 

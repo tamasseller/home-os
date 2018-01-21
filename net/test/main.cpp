@@ -32,8 +32,8 @@ class UdpEchoTask: Os::Task {
 
             while(!rx.atEop()) {
                 Net::Chunk c = rx.getChunk();
-                Os::assert(tx.fill(c.start, (uint16_t)c.length()), "WTF?");
-                rx.advance((uint16_t)c.length());
+                Os::assert(tx.fill(c.start, (uint16_t)c.length), "WTF?");
+                rx.advance((uint16_t)c.length);
             }
 
             tx.send();

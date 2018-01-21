@@ -28,7 +28,6 @@ protected:
 
 private:
     PacketChain requestQueue;
-    Packet request;
 
     inline bool restartIfNeeded(Launcher *launcher, IoJob* item)
     {
@@ -40,20 +39,28 @@ private:
         return false;
     }
 
-    inline bool onPrepFailed(Launcher *launcher, IoJob* item) {
-        this->request.template dispose<Pool::Quota::Rx>();
+    inline bool onPrepFailed(Launcher *launcher, IoJob* item)
+    {
+        Packet request;
+    	NET_ASSERT(requestQueue.take(request));
+		request.template dispose<Pool::Quota::Rx>();
+
         return restartIfNeeded(launcher, item);
     }
 
-    inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
-    	static_cast<Child*>(this)->replySent(request);
-    	this->disposePacket();
+    inline bool onSent(Launcher *launcher, IoJob* item, Result result)
+    {
+    	static_cast<Child*>(this)->replySent();
+    	this->IpReplyJob::IpTxJob::disposePacket();
     	return restartIfNeeded(launcher, item);
     }
 
 	inline bool onPreparationDone(Launcher *launcher, IoJob* item)
 	{
-    	FinalReplyInfo info = static_cast<Child*>(this)->generateReply(request, this->accessPacket());
+        Packet request;
+    	NET_ASSERT(requestQueue.take(request));
+
+		FinalReplyInfo info = static_cast<Child*>(this)->generateReply(request, this->accessPacket());
 
 		request.template dispose<Pool::Quota::Rx>();
 		return IpReplyJob::IpTxJob::template startTransmission<PayloadDigester>(launcher, item, info.protocol, info.ttl);
@@ -82,9 +89,10 @@ private:
     static bool startReplySequence(Launcher *launcher, IoJob* item) {
     	auto self = static_cast<IpReplyJob*>(item);
 
-    	self->requestQueue.take(self->request);
+        Packet request;
+    	NET_ASSERT(self->requestQueue.peek(request));
 
-    	InitialReplyInfo info = static_cast<Child*>(self)->getReplyInfo(self->request);
+    	InitialReplyInfo info = static_cast<Child*>(self)->getReplyInfo(request);
 
 		return IpReplyJob::IpTxJob::startPreparation(launcher, item, info.dst, info.length, 0, 0);
     }

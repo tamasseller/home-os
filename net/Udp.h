@@ -88,7 +88,7 @@ class Network<S, Args...>::UdpReceiver:
     	peerPort = 0;
     }
 
-    inline void preprocess() {
+    inline void preprocess(Packet) {
         uint8_t ihl;
         NET_ASSERT(this->read8(ihl));
 

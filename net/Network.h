@@ -115,7 +115,7 @@ struct NetworkOptions {
 		template<class, class = DummyDigester> class IpReplyJob;
 		class IcmpEchoReplyJob;
 		class ArpReplyJob;
-		class TcpAckJob;
+		class TcpRetransmitJob;
 		class TcpRstJob;
 
 		class PacketProcessor;
@@ -138,7 +138,7 @@ struct NetworkOptions {
 
 			UdpInputChannel udpInputChannel;
 
-			TcpAckJob tcpAckJob;
+			TcpRetransmitJob tcpRetransmitJob;
 			TcpRstJob tcpRstJob;
 			TcpListenerChannel tcpListenerChannel;
 			TcpInputChannel tcpInputChannel;

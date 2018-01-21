@@ -17,20 +17,26 @@ class Network<S, Args...>::PacketChain {
 public:
 	inline PacketChain(): head(nullptr), tail(nullptr) {}
 
-	bool take(Packet &ret)
+	bool peek(Packet &ret)
 	{
 		if(!head)
 			return false;
 
 		ret.init(head);
+		return true;
+	}
+
+	bool take(Packet &ret)
+	{
+		if(!peek(ret))
+			return false;
 
 		Block *last = head->findEndOfPacket();
-		head = last->findEndOfPacket()->getNext();
-		last->terminate();
 
-		if(!head)
+		if(!(head = last->getNext()))
 			tail = nullptr;
 
+		last->terminate();
 		return true;
 	}
 
@@ -46,6 +52,26 @@ public:
 			head = first;
 
 		tail = last;
+	}
+
+	template<typename Pool::Quota quota>
+	void dropAll() {
+		if(head) {
+			typename Pool::Deallocator deallocator(head);
+
+	        for(Block* current = head->getNext(); current;) {
+	            Block* next = current->getNext();
+
+	            current->cleanup();
+                deallocator.take(current);
+
+	            current = next;
+	        }
+
+			deallocator.template deallocate<quota>(&state.pool);
+
+			head = tail = nullptr;
+		}
 	}
 
 	inline void reset() {
