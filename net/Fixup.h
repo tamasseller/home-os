@@ -37,27 +37,39 @@ struct Network<S, Args...>::Fixup {
 	static inline uint16_t headerFixupStepOne(
 			Packet packet,
 			size_t l2headerLength,
-			size_t ipHeaderLength,
+			size_t _, // TODO
 			HeaderDigester &headerChecksum,
 			PayloadDigester &payloadChecksum,
 			uint8_t ttl,
 			uint8_t protocol)
 	{
-		static constexpr size_t ttlOffset = 8;
+		SummedPacketStream stream(packet);
 
-		ValidatorPacketStream reader(packet, static_cast<uint16_t >(l2headerLength));
+		stream.skipAhead(static_cast<uint16_t >(l2headerLength));
 
-		reader.skipAhead(static_cast<uint16_t >(ttlOffset));
-		reader.finish();
-		headerChecksum.patch(reader.getReducedState());
+        uint16_t ret;
+        NET_ASSERT(stream.read16net(ret));
+        NET_ASSERT((ret & 0xf000) == 0x4000); // IPv4 only for now
+        uint16_t ipHeaderLength = static_cast<uint16_t>((ret & 0x0f00) >> 6);
 
-		reader.restart(0xffff);
-		reader.goToEnd();
-		payloadChecksum.patch(reader.getReducedState());
+        stream.start(ipHeaderLength - 2);
+        stream.patch(correctEndian(static_cast<uint16_t>(ret)));
 
-		headerChecksum.patch(correctEndian(static_cast<uint16_t>(reader.getLength())));
+		stream.skipAhead(static_cast<uint16_t>(6));
+		stream.write8(ttl);
+		stream.write8(protocol);
+		stream.finish();
+		headerChecksum.patch(stream.getReducedState());
 
-		return static_cast<uint16_t>(reader.getLength());
+		stream.start(0xffff);
+		stream.finish();
+		payloadChecksum.patch(stream.getReducedState());
+
+		auto length = stream.getLength() - l2headerLength;
+		headerChecksum.patch(correctEndian(static_cast<uint16_t>(length)));
+
+		stream.goToEnd();
+		return static_cast<uint16_t>(length);
 	}
 
 	static inline void headerFixupStepTwo(

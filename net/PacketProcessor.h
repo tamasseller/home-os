@@ -61,7 +61,8 @@ public:
 	inline PacketProcessor(Callback callback): Os::Event(callback) {}
 
 	void process(Packet packet) {
-		Block* first = packet.first, *last = first;
+		Block* first = Packet::Accessor::getFirst(packet);
+		Block* last = first;
 
 		while(Block* next = last->getNext())
 			last = next;

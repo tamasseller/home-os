@@ -19,7 +19,7 @@
 
 #include "common/CommonTestUtils.h"
 
-#include "BufferPool.h"
+#include "core/BufferPool.h"
 
 using Os = OsRr;
 

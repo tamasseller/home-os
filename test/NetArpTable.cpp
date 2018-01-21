@@ -7,7 +7,7 @@
 
 #include "common/CommonTestUtils.h"
 
-#include "ArpTable.h"
+#include "core/ArpTable.h"
 
 using Os = OsRr;
 

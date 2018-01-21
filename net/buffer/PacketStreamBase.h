@@ -54,39 +54,28 @@ class Network<S, Args...>::PacketStreamBase:
 	}
 
 	inline bool takeNext() {
-		static_cast<Observer*>(this)->observeInternalBlockLeave();
+		if(data)
+			static_cast<Observer*>(this)->observeBlockAtLeave();
 
-		if(!advance())
+		if(!advance()) {
+			invalidate();
 			return false;
+		}
 
 		updateDataPointers();
 		return true;
 	}
-
 
 public:
 	inline PacketStreamBase() = default;
 
 	inline void init(const Packet& p){
 		current = Packet::Accessor::getFirst(p);
-		updateDataPointers();
-		static_cast<Observer*>(this)->observeFirstBlock();
-	}
 
-	inline void init(const Packet& p, size_t offset)
-	{
-		current = Packet::Accessor::getFirst(p);
-
-		while(offset > current->getSize()) {
-			offset -= current->getSize();
-			if(!advance()) {
-				invalidate();
-				return;
-			}
-		}
-
-		updateDataPointers(offset);
-		static_cast<Observer*>(this)->observeFirstBlock();
+		if(current)
+			updateDataPointers();
+		else
+			invalidate();
 	}
 
     void invalidate() {

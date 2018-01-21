@@ -7,7 +7,7 @@
 
 #include "common/CommonTestUtils.h"
 
-#include "InetChecksumDigester.h"
+#include "core/InetChecksumDigester.h"
 
 TEST_GROUP(NetChecksum) {};
 

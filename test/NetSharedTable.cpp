@@ -25,7 +25,7 @@
 
 #include "common/CommonTestUtils.h"
 
-#include "SharedTable.h"
+#include "core/SharedTable.h"
 
 using Os = OsRr;
 

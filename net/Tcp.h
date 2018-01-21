@@ -108,7 +108,7 @@ inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::check
 	reader.patch(correctEndian(static_cast<uint16_t>(length)));
 	reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
 
-	if(!reader.finishAndCheck())
+	if(!reader.finish() || reader.result())
 		goto formatError;
 
 	return &tcpPacketHandler;

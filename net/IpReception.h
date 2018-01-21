@@ -82,28 +82,25 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
 
     RxPacketHandler* handler = &rawPacketHandler;
     AddressIp4 srcIp, dstIp;
-    uint16_t ipLength, id, fragmentOffsetAndFlags;
+    uint16_t ipLength, id, fragmentOffsetAndFlags, ret, ihl;
     uint8_t protocol;
 
-    ValidatorPacketStream reader(packet);
+    SummedPacketStream reader(packet);
 
-    uint8_t versionAndHeaderLength;
-    if(!reader.read8(versionAndHeaderLength))
-        goto formatError;
+    NET_ASSERT(reader.read16net(ret));
 
-    NET_ASSERT((versionAndHeaderLength & 0xf0) == 0x40); // IPv4 only for now.
+    NET_ASSERT((ret & 0xf000) == 0x4000); // IPv4 only for now.
+    ihl = static_cast<uint16_t>((ret & 0x0f00) >> 6);
 
-    if(!reader.skipAhead(1))
-        goto formatError;
+    if(ihl < 20)
+            goto formatError;
 
-    if(!reader.read16net(ipLength))
-        goto formatError;
+    reader.start(ihl - 2);
+    reader.patch(correctEndian(ret));
 
-    if(!reader.read16net(id))
-        goto formatError;
-
-    if(!reader.read16net(fragmentOffsetAndFlags))
-        goto formatError;
+    NET_ASSERT(reader.read16net(ipLength));
+    NET_ASSERT(reader.read16net(id));
+	NET_ASSERT(reader.read16net(fragmentOffsetAndFlags));
 
     if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
         /*
@@ -116,19 +113,12 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     /*
      * Skip TTL.
      */
-    if(!reader.skipAhead(1))
-        goto formatError;
+    NET_ASSERT(reader.skipAhead(1));
+    NET_ASSERT(reader.read8(protocol));
+    NET_ASSERT(reader.skipAhead(2));
+    NET_ASSERT(reader.read32net(srcIp.addr) && reader.read32net(dstIp.addr));
 
-    if(!reader.read8(protocol))
-        goto formatError;
-
-    if(!reader.skipAhead(2))
-        goto formatError;
-
-    if(!reader.read32net(srcIp.addr) || !reader.read32net(dstIp.addr))
-        goto formatError;
-
-    if(!reader.finishAndCheck())
+	if(!reader.finish() || reader.result())
         goto formatError;
 
     switch(protocol) {
@@ -137,8 +127,8 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
         break;
     case IpProtocolNumbers::tcp:
     case IpProtocolNumbers::udp: {
-            auto payloadLength = static_cast<uint16_t>(ipLength - ((versionAndHeaderLength & 0x0f) << 2));
-            reader.restart(payloadLength);
+            auto payloadLength = static_cast<uint16_t>(ipLength - ihl);
+            reader.start(payloadLength);
             reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
             reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
             reader.patch(correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
@@ -155,7 +145,7 @@ inline void Network<S, Args...>::processReceivedPacket(Packet packet)
     }
 
     if(handler) {
-        if(!reader.checkTotalLength(ipLength))
+    	if(!reader.goToEnd() || (reader.getLength() != ipLength))
             goto formatError;
 
         handler->handlePacket(packet);

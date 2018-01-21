@@ -35,6 +35,9 @@ public:
 
 	template<typename Pool::Quota quota>
 	void dispose() {
+		if(!first)
+			return;
+
         typename Pool::Deallocator deallocator(first);
 
         for(Block* current = first->getNext(); current;) {

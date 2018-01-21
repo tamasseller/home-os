@@ -1,12 +1,12 @@
 /*
- * ChecksumObserver.h
+ * SummedPacketStream.h
  *
- *  Created on: 2018.01.20.
+ *  Created on: 2018.01.21.
  *      Author: tooma
  */
 
-#ifndef CHECKSUMOBSERVER_H_
-#define CHECKSUMOBSERVER_H_
+#ifndef SUMMEDPACKETSTREAM_H_
+#define SUMMEDPACKETSTREAM_H_
 
 #include "Network.h"
 
@@ -15,12 +15,21 @@ template<class Child>
 struct Network<S, Args...>::ChecksumObserver: InetChecksumDigester
 {
 	size_t remainingLength;
-	size_t totalLength;
-	size_t skip;
-	bool offsetOdd;
+	size_t totalLength = 0;
+	size_t skip = 0;
+	bool offsetOdd = false;
+
+	inline size_t getOffset() {
+		auto stream = static_cast<Child*>(this);
+		return stream->data - stream->current->getData();
+	}
 
 	inline void updateDigester(Chunk chunk)
 	{
+		chunk.start += skip;
+		chunk.length -= skip;
+		skip = 0;
+
 		if(chunk.length < remainingLength) {
 			this->consume(chunk.start, chunk.length, offsetOdd);
 			remainingLength -= chunk.length;
@@ -33,49 +42,27 @@ struct Network<S, Args...>::ChecksumObserver: InetChecksumDigester
 			offsetOdd = !offsetOdd; // TODO rewrite as XOR to motivate that it is compiled like that.
 	}
 
-public:
-	using InetChecksumDigester::patch;
-	using InetChecksumDigester::getReducedState;
-
-	inline void observeInternalBlockLeave() {
+	inline void observeBlockAtLeave() {
 		auto chunk = static_cast<Child*>(this)->getFullChunk();
 		totalLength += chunk.length;
-
-		chunk.start += skip;
-		chunk.length -= skip;
-
 		updateDigester(chunk);
 	}
 
-	inline void observeInternalBlockEnter()
-	{
-	}
-
-	inline void observeFirstBlock()
-	{
-		uint8_t firstByte = *static_cast<Child*>(this)->data;
-
-		NET_ASSERT((firstByte & 0xf0) == 0x40); // IPv4 only for now.
-
-		remainingLength = (firstByte & 0xf) << 2;
-		totalLength = 0;
-		offsetOdd = false;
-		skip = 0;
-	}
+public:
+	using InetChecksumDigester::patch;
+	using InetChecksumDigester::getReducedState;
+	using InetChecksumDigester::result;
 
 	bool finish()
 	{
 		auto stream = static_cast<Child*>(this);
 
-		if(!stream->skipAhead(static_cast<uint16_t>(remainingLength)))
+		if(!stream->skipAhead(static_cast<uint16_t>(remainingLength - getOffset() + skip)))
 			return false;
 
 		updateDigester(stream->getFullChunk());
-		return true;
-	}
 
-	bool finishAndCheck() {
-		return finish() && (this->result() == 0);
+		return true;
 	}
 
 	bool goToEnd() {
@@ -86,11 +73,7 @@ public:
 		return totalLength;
 	}
 
-	bool checkTotalLength(size_t expectedLength) {
-		return goToEnd() && (totalLength == expectedLength);
-	}
-
-	void restart(size_t newLength)
+	void start(size_t newLength)
 	{
 		InetChecksumDigester::reset();
 
@@ -98,9 +81,18 @@ public:
 		offsetOdd = false;
 
 		auto stream = static_cast<Child*>(this);
-		auto chunk = static_cast<Child*>(this)->getChunk();
-		skip = stream->getFullChunk().length - chunk.length;
+		skip += getOffset();
 	}
 };
 
-#endif /* CHECKSUMOBSERVER_H_ */
+template<class S, class... Args>
+class Network<S, Args...>::SummedPacketStream: public PacketStreamBase<ChecksumObserver>
+{
+public:
+	inline SummedPacketStream() = default;
+	inline SummedPacketStream(const Packet& p) {
+		this->init(p);
+	}
+};
+
+#endif /* SUMMEDPACKETSTREAM_H_ */

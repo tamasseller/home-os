@@ -775,7 +775,9 @@ TEST(NetPacket, DataChain) {
 TEST(NetPacket, ValidatorSimple) {
 	struct Task: TaskBase<Task> {
 	        bool run() {
-	        	const uint8_t header[] = {0x41, 0x10, 0xbe, 0xef, 'h', 'e', 'l', 'l'};
+	        							/* some junk      |      first block      |  second block frag */
+	        	const uint8_t header[] = {0xba, 0xda, 0x55, 0x41, 0x10, 0xbe, 0xef, 'h', 'e', 'l', 'l'};
+	        							/* second block end fragment  |  some unchecked data */
 	        	const uint8_t data[] = {'o', 'w', 'o', 'r', 0x4c, 0x44, 0x50, 0x3e, 0xda, 0x7a};
 	            init(2);
 
@@ -783,13 +785,28 @@ TEST(NetPacket, ValidatorSimple) {
 	            if(!builder.addByReference((const char*)data, sizeof(data))) return bad;
 	            builder.done();
 
-	            Accessor::ValidatorPacketStream stream(builder);
-	            if(!stream.finishAndCheck()) return bad;
+	            Accessor::SummedPacketStream stream(builder);
 
-	            stream.restart(10); // 'hellowor' + checksum
-	            if(!stream.finishAndCheck()) return bad;
+	            if(!stream.skipAhead(3)) return bad;	// skip initial junk
 
-	            if(!stream.checkTotalLength(sizeof(data) + sizeof(header))) return bad;
+	            uint16_t ret;
+	            if(!stream.read16net(ret)) return bad;	// header length kind of read
+	            if(ret != 0x4110) return bad;
+
+	            stream.start(2);						// check the rest of the header
+
+	            if(!stream.finish()) return bad;		// finish block and check against already read part
+	            if(stream.result() == static_cast<uint16_t>(~0x4110u)) return bad;
+
+	            stream.start(10); // 'hellowor' + checksum
+	            if(!stream.finish()) return bad;
+	            if(stream.result()) return bad;
+
+	            if(!stream.read16net(ret)) return bad;
+	            if(ret != 0x503e) return bad;
+
+	            if(!stream.goToEnd()) return bad;
+	            if(stream.getLength() != (sizeof(data) + sizeof(header))) return bad;
 
 	            return ok;
 	        }
@@ -801,25 +818,44 @@ TEST(NetPacket, ValidatorSimple) {
 TEST(NetPacket, GeneratorSimple) {
 	struct Task: TaskBase<Task> {
 	        bool run() {
-	        	const uint8_t header[] = {0x42, 0, 0, 0};
+	        							/* l2 sort of junk      | header 1st part */
+	        	const uint8_t header[] = {0x30, 0xda, 0xfa, 0xca, 0x42, 0, 0, 0};
+	        							/* header 2nd | actual payload part one */
 	        	const uint8_t header2[] = {0, 8, 0, 8, 'h', 'e', 'l', 'l', 'o'};
-	            init(3);
 
+	            init(3);
 	            if(!builder.copyIn((const char*)header, sizeof(header))) return bad;
 	            if(!builder.addByReference((const char*)header2, sizeof(header2))) return bad;
 	            if(!builder.addByReference(world, strlen(world))) return bad;
 	            builder.done();
 
-	            Accessor::GeneratorPacketStream stream(builder);
+	            Accessor::SummedPacketStream stream(builder);
 
-	            stream.finish();
+	            if(!stream.skipAhead(4)) return bad;	// skip initial junk
+
+	            uint16_t ret;
+	            if(!stream.read16net(ret)) return bad;	// read some header info
+	            if(ret != 0x4200) return bad;
+	            stream.start(6);						// set to check rest of header
+
+	            stream.patch(Accessor::correctEndian(static_cast<uint16_t>(0x4200)));
+	            	//update digester with already read data.
+
+	            stream.finish();						// go through the rest of the header
+
 	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0xbdef))) return bad;
 
-	            stream.restart(8); // 'hellowor'
+	            stream.start(8); // 'hellowor'
 	            stream.finish();
 	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0x4c44))) return bad;
 
-	            if(!stream.checkTotalLength(strlen(world) + sizeof(header) + sizeof(header2))) return bad;
+	            uint8_t ret8;
+	            if(!stream.read8(ret8)) return bad;
+	            if(ret8 != 'l') return bad;
+
+	            if(!stream.goToEnd()) return bad;
+	            if(!stream.goToEnd()) return bad;
+	            if(stream.getLength() != (strlen(world) + sizeof(header) + sizeof(header2))) return bad;
 
 	            return ok;
 	        }
@@ -827,4 +863,3 @@ TEST(NetPacket, GeneratorSimple) {
 
     work(task);
 }
-

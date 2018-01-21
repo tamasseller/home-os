@@ -13,8 +13,7 @@
 template<class S, class... Args>
 template<class>
 struct Network<S, Args...>::NullObserver {
-	inline void observeFirstBlock() {}
-	inline void observeInternalBlockLeave() {}
+	inline void observeBlockAtLeave() {}
 };
 
 template<class S, class... Args>

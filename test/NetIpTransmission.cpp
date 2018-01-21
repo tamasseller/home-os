@@ -510,7 +510,7 @@ TEST_GROUP(NetIpTransmitter) {
                 struct Task: public TestTask<Task> {
                     bool destroyed = false;
 
-                    static void destroy(void* ptr, const char* data, uint16_t length) {
+                    static void destroy(void* ptr, const char* data, uint32_t length) {
                         auto *self = reinterpret_cast<Task*>(ptr);
 
                         if(data == text && length == strlen(text))

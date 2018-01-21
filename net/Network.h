@@ -89,8 +89,7 @@ struct NetworkOptions {
 		template <class> class NullObserver;
 		template <class> class ChecksumObserver;
 		template<template <class> class> class PacketStreamBase;
-		class GeneratorPacketStream;
-	    class ValidatorPacketStream;
+		class SummedPacketStream;
 		class PacketTransmissionRequest;
 
 	public:
@@ -239,10 +238,8 @@ typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::st
 #include "buffer/PacketStream.h"
 #include "buffer/PacketBuilder.h"
 #include "buffer/PacketAssembler.h"
-#include "buffer/ChecksumObserver.h"
 #include "buffer/PacketStreamBase.h"
-#include "buffer/GeneratorPacketStream.h"
-#include "buffer/ValidatorPacketStream.h"
+#include "buffer/SummedPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"
 
 #endif /* NETWORK_H_ */
