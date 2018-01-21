@@ -10,6 +10,8 @@ INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 
 ifeq ('x','')
+endif
+
 
 
 # Atomic list related tests.
@@ -65,7 +67,6 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 # Networking related tests.
 
-endif
 SOURCES += $(ROOT)/test/NetTcp.cpp
 SOURCES += $(ROOT)/test/NetUdp.cpp
 SOURCES += $(ROOT)/test/NetIcmp.cpp
@@ -134,10 +135,14 @@ CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
 CXXFLAGS += -fsanitize=undefined
 
+LIBS += ubsan gcov
+
 CXXFLAGS += -rdynamic								# Allows meaningful backtraces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code
 
-LD = $(CXX) 
+LD = $(CXX)
+
+LCOVFLAGS = $()	# disable branch coverage
 
 include ../toolchains/Compiler.host.mk
 include ../ultimate-makefile/Makefile.ultimate
