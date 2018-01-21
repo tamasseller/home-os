@@ -1,142 +1,14 @@
 /*
- * Udp.h
+ * UdpTransmitter.h
  *
- *  Created on: 2018.01.02.
+ *  Created on: 2018.01.21.
  *      Author: tooma
  */
 
-#ifndef UDP_H_
-#define UDP_H_
+#ifndef UDPTRANSMITTER_H_
+#define UDPTRANSMITTER_H_
 
-template<class S, class... Args>
-template<class Reader>
-inline typename Network<S, Args...>::RxPacketHandler* Network<S, Args...>::checkUdpPacket(Reader& reader, uint16_t length)
-{
-    static struct UdpPacketHandler: RxPacketHandler {
-        virtual void handlePacket(Packet packet) {
-            processUdpPacket(packet);
-        }
-    } udpPacketHandler;
-
-	uint16_t cheksumField;
-
-	state.increment(&DiagnosticCounters::Udp::inputReceived);
-
-	if(length < 8)
-		goto formatError;
-
-	if(!reader.skipAhead(6))
-		goto formatError;
-
-	if(!reader.read16net(cheksumField))
-		goto formatError;
-
-	/*
-	 * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
-	 *
-	 * 		"An all zero transmitted checksum value means that the transmitter generated
-	 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
-	 */
-	if(cheksumField) {
-		reader.patch(correctEndian(static_cast<uint16_t>(length)));
-		reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
-
-		if(!reader.finish() || reader.result())
-			goto formatError;
-	}
-
-	return &udpPacketHandler;
-
-formatError:
-
-	state.increment(&DiagnosticCounters::Udp::inputFormatError);
-	return nullptr;
-}
-
-template<class S, class... Args>
-inline void Network<S, Args...>::processUdpPacket(Packet start)
-{
-    PacketStream reader(start);
-
-	uint8_t ihl;
-
-	NET_ASSERT(reader.read8(ihl));
-
-	NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)));
-
-	uint16_t port;
-	NET_ASSERT(reader.read16net(port));
-
-	if(!state.udpInputChannel.takePacket(start, DstPortTag(port))) {
-		start.template dispose<Pool::Quota::Rx>(); // TODO reply ICMP DUR PUR
-		state.increment(&DiagnosticCounters::Udp::inputNoPort);
-	}
-}
-
-template<class S, class... Args>
-class Network<S, Args...>::UdpReceiver:
-    public Os::template IoRequest<IpRxJob<UdpReceiver, UdpInputChannel>, &IpRxJob<UdpReceiver, UdpInputChannel>::onBlocking>
-{
-	friend class UdpReceiver::IpRxJob;
-
-	AddressIp4 peerAddress;
-    uint16_t peerPort;
-    uint16_t length;
-
-    inline void reset() {
-        peerAddress = AddressIp4::allZero;
-    	peerPort = 0;
-    }
-
-    inline void preprocess(Packet) {
-        uint8_t ihl;
-        NET_ASSERT(this->read8(ihl));
-
-        NET_ASSERT(this->skipAhead(11));
-        NET_ASSERT(this->read32net(this->peerAddress.addr));
-
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
-
-        NET_ASSERT(this->read16net(this->peerPort));
-
-        NET_ASSERT(this->skipAhead(2));
-
-        NET_ASSERT(this->read16net(this->length));
-        this->length = static_cast<uint16_t>(this->length - 8);
-
-        NET_ASSERT(this->skipAhead(2));
-
-        state.increment(&DiagnosticCounters::Udp::inputProcessed);
-    }
-
-public:
-    AddressIp4 getPeerAddress() const {
-        return peerAddress;
-    }
-
-    uint16_t getPeerPort() const {
-        return peerPort;
-    }
-
-    uint16_t getLength() const {
-        return length;
-    }
-
-	void init() {
-	    UdpReceiver::IpRxJob::init();
-		UdpReceiver::IoRequest::init();
-	}
-
-	bool receive(uint16_t port) {
-		this->data.accessTag() = DstPortTag(port);
-		return this->launch(&UdpReceiver::IpRxJob::startReception, &state.udpInputChannel);
-	}
-
-	void close() {
-		this->cancel();
-		this->wait();
-	}
-};
+#include "Network.h"
 
 template<class S, class... Args>
 class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitter> {
@@ -233,5 +105,4 @@ public:
     }
 };
 
-
-#endif /* UDP_H_ */
+#endif /* UDPTRANSMITTER_H_ */

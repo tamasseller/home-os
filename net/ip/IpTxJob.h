@@ -1,14 +1,17 @@
 /*
- * IpTransmitter.h
+ * IpTxJob.h
  *
- *  Created on: 2017.11.26.
+ *  Created on: 2018.01.21.
  *      Author: tooma
  */
 
-#ifndef IPTRANSMISSION_H_
-#define IPTRANSMISSION_H_
+#ifndef IPTXJOB_H_
+#define IPTXJOB_H_
 
 #include "Network.h"
+
+static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
+static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
 
 /**
  * Multi-operation composite I/O job object for sending a simple "raw"
@@ -90,17 +93,10 @@
  *       no longer required to be kept, thus are freed up and reclaimed by the pool.
  */
 
-static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
-static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
-
 template<class S, class... Args>
 template<class Child>
 class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	friend class Os::IoChannel;
-	using IoJob = typename Os::IoJob;
-	using Result = typename IoJob::Result;
-	using Launcher = typename IoJob::Launcher;
-	using Callback = typename IoJob::Callback;
 
 	/*
 	 * Constant packet pieces and parameters for well-known management protocols.
@@ -440,114 +436,4 @@ public:
 	}
 };
 
-template<class S, class... Args>
-template<class Child>
-class Network<S, Args...>::IpTransmitterBase: protected Os::template IoRequest<IpTxJob<Child>> {
-	friend class IpTransmitterBase::IpTxJob;
-
-	const char* error;
-
-protected:
-	inline bool onSent(Launcher *launcher, IoJob* item, Result result) {
-        if(result != Result::Done)
-            error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-
-        this->disposePacket();
-        return false;
-	}
-
-    inline bool onNoRoute(Launcher *launcher, IoJob* item) {
-        error = NetErrorStrings::noRoute;
-        return false;
-    }
-
-    inline bool onArpTimeout(Launcher *launcher, IoJob* item) {
-        error = NetErrorStrings::unresolved;
-        return false;
-    }
-
-    inline bool onPreparationAborted(Launcher *launcher, IoJob* item, Result result) {
-        error = (result == Result::TimedOut) ? NetErrorStrings::genericTimeout : NetErrorStrings::genericCancel;
-        return false;
-    }
-
-	bool check() {
-		if(this->isOccupied())
-			this->wait();
-
-		return error == nullptr;
-	}
-
-	void reset() {
-		if(this->isOccupied())
-			this->wait();
-
-		error = nullptr;
-	}
-
-public:
-	using IpTransmitterBase::IoRequest::init;
-	using IpTransmitterBase::IoRequest::isOccupied;
-	using IpTransmitterBase::IoRequest::wait;
-	using IpTransmitterBase::IoRequest::cancel;
-
-	inline uint16_t fill(const char* data, uint16_t length)
-	{
-		if(!this->check())
-			return false;
-
-		return this->accessPacket().copyIn(data, length);
-	}
-
-    inline bool addIndirect(const char* data, uint16_t length, typename Block::Destructor destructor = nullptr, void* userData = nullptr) {
-		if(!this->check())
-			return false;
-
-        return this->accessPacket().addByReference(data, length, destructor, userData);
-    }
-
-	inline const char* getError() {
-		return this->error;
-	}
-};
-
-template<class S, class... Args>
-class Network<S, Args...>::IpTransmitter: public IpTransmitterBase<IpTransmitter> {
-	friend class IpTransmitter::IpTransmitterBase::IpTxJob;
-	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) { return false; }
-public:
-
-	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
-	{
-    	this->reset();
-		bool later = this->launch(&IpTransmitter::IpTransmitterBase::IpTxJob::startPreparation, dst, inLineSize, indirectCount, arpRequestRetry);
-		return later || this->getError() == nullptr;
-	}
-
-    inline bool prepareTimeout(size_t timeout, AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
-    {
-    	this->reset();
-        bool later = this->launchTimeout(&IpTransmitter::IpTransmitterBase::IpTxJob::startPreparation, timeout, dst, inLineSize, indirectCount, arpRequestRetry);
-        return later || this->getError() == nullptr;
-    }
-
-	inline bool send(uint8_t protocol, uint8_t ttl = 64)
-	{
-		if(!this->check())
-			return false;
-
-		bool later = this->launch(&IpTransmitter::IpTransmitterBase::IpTxJob::startTransmission, protocol, ttl);
-        return later || this->getError() == nullptr;
-	}
-
-    inline bool sendTimeout(size_t timeout, uint8_t protocol, uint8_t ttl = 64)
-    {
-        if(!this->check())
-            return false;
-
-        bool later = this->launchTimeout(&IpTransmitter::IpTransmitterBase::IpTxJob::startTransmission, timeout, protocol, ttl);
-        return later || this->getError() == nullptr;
-    }
-};
-
-#endif /* IPTRANSMISSION_H_ */
+#endif /* IPTXJOB_H_ */

@@ -16,11 +16,6 @@ struct Network<S, Args...>::DummyDigester {
 	inline void patch(uint16_t) {}
 };
 
-
-template<class S, class... Args>
-inline Network<S, Args...>::State::State():
-    rxProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processReceivedPacket>()) {}
-
 template<class S, class... Args>
 struct Network<S, Args...>::BufferStats {
 	size_t nBuffersUsed, nTxUsed, nRxUsed;
@@ -47,11 +42,10 @@ template<class S, class... Args>
 inline void Network<S, Args...>::init(Buffers &buffers) {
     state.~State();
     new(&state) State();
-    state.rawInputChannel.init();
-    state.icmpInputChannel.init();
-    state.udpInputChannel.init();
-    state.tcpInputChannel.init();
-    state.tcpListenerChannel.init();
+    state.rawCore.init();
+    state.icmpCore.init();
+    state.udpCore.init();
+    state.tcpCore.init();
 	state.pool.init(buffers);
 	state.interfaces.init();
 	state.ager.start(secTicks);
@@ -60,17 +54,6 @@ inline void Network<S, Args...>::init(Buffers &buffers) {
 template<class S, class... Args>
 inline bool Network<S, Args...>::addRoute(const Route& route, bool setUp) {
     return state.routingTable.add(route, setUp);
-}
-
-template<class S, class... Args>
-inline void Network<S, Args...>::State::Ager::age() {
-	state.interfaces.ageContent();
-	this->extend(secTicks);
-}
-
-template<class S, class... Args>
-inline void Network<S, Args...>::State::Ager::doAgeing(typename Os::Sleeper* sleeper) {
-	static_cast<Ager*>(sleeper)->age();
 }
 
 template<class S, class... Args>

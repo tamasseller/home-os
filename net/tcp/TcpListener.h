@@ -10,7 +10,9 @@
 
 template<class S, class... Args>
 class Network<S, Args...>::TcpListener:
-    protected Os::template IoRequest<IpRxJob<TcpListener, TcpListenerChannel>, &IpRxJob<TcpListener, TcpListenerChannel>::onBlocking>
+    protected Os::template IoRequest<
+    	IpRxJob<TcpListener, typename TcpCore::ListenerChannel>,
+    	&IpRxJob<TcpListener, typename TcpCore::ListenerChannel>::onBlocking>
 {
 	friend class TcpListener::IpRxJob;
 
@@ -80,12 +82,12 @@ public:
 		this->packet.init(nullptr);
 
 		this->invalidateAllStates();
-		state.tcpRstJob.handlePacket(packet);
+		state.tcpCore.rstJob.handlePacket(packet);
 	}
 
 	bool accept(TcpSocket& socket)
 	{
-		if(socket.data.state != TcpInputChannel::SocketData::State::Closed) {
+		if(socket.data.state != TcpCore::InputChannel::SocketData::State::Closed) {
 			error = NetErrorStrings::alreadyConnected;
 			return false;
 		}
@@ -94,7 +96,7 @@ public:
 
 		uint32_t initialSendSequenceNumber = 0; // TODO time based generator.
 
-		socket.data.state = TcpInputChannel::SocketData::State::SynReceived;
+		socket.data.state = TcpCore::InputChannel::SocketData::State::SynReceived;
 
 		// Receive sequence space parameters.
 		socket.data.expectedSequenceNumber = initialReceivedSequenceNumber + 1;
@@ -105,7 +107,7 @@ public:
 		socket.data.nextSequenceNumber = initialSendSequenceNumber + 1;
 		socket.data.peerWindowSize = 0;
 
-		state.tcpRetransmitJob.handle(socket);
+		state.tcpCore.retransmitJob.handle(socket);
 
 		return true;
 	}
@@ -113,7 +115,7 @@ public:
 	bool listen(uint16_t port)
 	{
 		this->data.accessTag() = DstPortTag(port);
-		return this->launch(&TcpListener::IpRxJob::startReception, &state.tcpListenerChannel);
+		return this->launch(&TcpListener::IpRxJob::startReception, &state.tcpCore.listenerChannel);
 	}
 
 	void close()

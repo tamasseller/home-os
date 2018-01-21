@@ -16,7 +16,7 @@ using Accessor = NetworkTestAccessor<Net>;
 TEST_GROUP(NetIpReception)
 {
     template<class... C>
-    static bool checkContent(Net::IpReceiver &r, C... c) {
+    static bool checkContent(Net::RawReceiver &r, C... c) {
         const uint8_t expected[] = {static_cast<uint8_t>(c)...};
 
         for(uint8_t e: expected) {
@@ -89,7 +89,7 @@ TEST(NetIpReception, ReceiveRawWithListener) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IpReceiver r;
+            Net::RawReceiver r;
 
             r.init();
             r.receive();
@@ -119,7 +119,7 @@ TEST(NetIpReception, ReceiveRawRestart) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IpReceiver r;
+            Net::RawReceiver r;
 
             r.init();
 
@@ -152,7 +152,7 @@ TEST(NetIpReception, Misusage) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IpReceiver r;
+            Net::RawReceiver r;
 
             r.init();
 
@@ -188,7 +188,7 @@ TEST(NetIpReception, ReceiveRawMultiple) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IpReceiver r;
+            Net::RawReceiver r;
 
             r.init();
             r.receive();

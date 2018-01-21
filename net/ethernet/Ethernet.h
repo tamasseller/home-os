@@ -14,8 +14,8 @@ template<class S, class... Args>
 template<class Driver>
 class Network<S, Args...>::Ethernet:
 	public Os::template IoChannelBase<Ethernet<Driver>, Interface>,
-	public ArpReplyJob,
-	private PacketProcessor,
+	public ArpReplyJob,	// TODO move into ArpCore
+	private PacketProcessor, // TODO move into ArpCore
 	public Driver
 {
     friend class Ethernet::IoChannelBase;
@@ -129,10 +129,10 @@ class Network<S, Args...>::Ethernet:
 	using Launcher = typename IoJob::Launcher;
 	using Callback = typename IoJob::Callback;
 
-	inline void processArpReplyPacket(Packet chain);
-    static inline bool replySent(Launcher *launcher, IoJob* item, Result result);
-	static inline bool assembleReply(Launcher *launcher, IoJob* item, Result result);
-    static inline bool startReplySequence(Launcher *launcher, IoJob* item);
+	inline void processArpReplyPacket(Packet chain); // TODO move into ArpCore::ArpReplyJob
+    static inline bool replySent(Launcher *launcher, IoJob* item, Result result); // TODO move into ArpCore::ArpReplyJob
+	static inline bool assembleReply(Launcher *launcher, IoJob* item, Result result); // TODO move into ArpCore::ArpReplyJob
+    static inline bool startReplySequence(Launcher *launcher, IoJob* item); // TODO move into ArpCore::ArpReplyJob
 
 public:
     inline Ethernet():

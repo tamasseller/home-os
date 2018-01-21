@@ -66,8 +66,19 @@ struct NetworkOptions {
 		static_assert(IfsToBeUsed::n, "No interfaces specified");
 		static_assert(bufferCount < 32768, "Too many blocks requested");
 
+	public:
+		typedef Scheduler Os;
+		class Interface;
+		class Packet;
+
+	private:
+		using IoJob = typename Os::IoJob;
+		using Result = typename IoJob::Result;
+		using Launcher = typename IoJob::Launcher;
+		using Callback = typename IoJob::Callback;
+
 		template<class> class Ethernet;
-		template<uint16_t, class, class = void> struct Interfaces;
+		template<uint16_t, class, class = void> struct Interfaces; // TODO rename
 
 		class Block;
 		class DataChain;
@@ -79,11 +90,6 @@ struct NetworkOptions {
 		class ConnectionTag;
 
 		template<class> class PacketInputChannel;
-		typedef PacketInputChannel<NullTag> IcmpInputChannel;
-		typedef PacketInputChannel<NullTag> RawInputChannel;
-		typedef PacketInputChannel<DstPortTag> UdpInputChannel;
-		typedef PacketInputChannel<DstPortTag> TcpListenerChannel;
-		class TcpInputChannel;
 
 		template<class> class PacketWriterBase;
 		template <class> class NullObserver;
@@ -92,18 +98,8 @@ struct NetworkOptions {
 		class SummedPacketStream;
 		class PacketTransmissionRequest;
 
-	public:
-		class Interface;
-		struct Chunk;
-		class Fixup;
-		class Packet;
-		class PacketStream;
-		class PacketAssembler;
-		typedef Scheduler Os;
-		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
-
-	private:
 		typedef ::RoutingTable<Os, Interface, routingTableEntries> RoutingTable;
+
 
 		class DummyDigester;
 
@@ -113,74 +109,40 @@ struct NetworkOptions {
 		template<class> class IpTransmitterBase;
 		template<class, class> class IpRxJob;
 		template<class, class = DummyDigester> class IpReplyJob;
-		class IcmpEchoReplyJob;
-		class ArpReplyJob;
-		class TcpRetransmitJob;
-		class TcpRstJob;
 
 		class PacketProcessor;
+		class ArpReplyJob;
 
-		static struct State: DiagnosticCounterStorage<useDiagnosticCounters> {
-			struct Ager: Os::Timeout {
-				inline void age();
-				static inline void doAgeing(typename Os::Sleeper*);
-				inline Ager(): Os::Timeout(&Ager::doAgeing) {}
-			} ager;
+		class RawCore;
+		class IcmpCore;
+		class UdpCore;
+		class TcpCore;
+		struct State;
 
-            inline void* operator new(size_t, void* x) { return x; }
-
-            PacketProcessor rxProcessor;
-
-            RawInputChannel rawInputChannel;
-
-            IcmpEchoReplyJob icmpReplyJob;
-			IcmpInputChannel icmpInputChannel;
-
-			UdpInputChannel udpInputChannel;
-
-			TcpRetransmitJob tcpRetransmitJob;
-			TcpRstJob tcpRstJob;
-			TcpListenerChannel tcpListenerChannel;
-			TcpInputChannel tcpInputChannel;
-
-			Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
-			RoutingTable routingTable;
-			Pool pool;
-
-			inline State();
-		} state;
-
-
-		template<typename Pool::Quota> static inline Packet dropIpHeader(Packet packet);
+		static State state;
 
 		inline static constexpr uint16_t bytesToBlocks(size_t);
-
-		using IoJob = typename Os::IoJob;
-		using Result = typename IoJob::Result;
-		using Launcher = typename IoJob::Launcher;
-		using Callback = typename IoJob::Callback;
-
-		template<class Reader> static inline RxPacketHandler* checkIcmpPacket(Reader&);
-		template<class Reader> static inline RxPacketHandler* checkUdpPacket(Reader&, uint16_t);
-		template<class Reader> static inline RxPacketHandler* checkTcpPacket(Reader&, uint16_t);
 		static inline void processReceivedPacket(Packet start);
-		static inline void processIcmpPacket(Packet start);
-		static inline void processRawPacket(Packet start);
-		static inline void processUdpPacket(Packet start);
-		static inline void processTcpPacket(Packet start);
 		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:
+		struct Chunk;
+		class Fixup;
+		class PacketStream;
+		class PacketAssembler;
+		typedef BufferPool<Os, bufferCount, Block, txBufferLimit, rxBufferLimit> Pool;
+
 		static constexpr auto blockMaxPayload = Block::dataSize;
 		typedef typename Pool::Storage Buffers;
 		using Route = typename RoutingTable::Route;
 
-		class IpTransmitter;
+		class RawReceiver;
+		class RawTransmitter;
+
+		class UdpReceiver;
 		class UdpTransmitter;
 
-		class IpReceiver;
 		class IcmpReceiver;
-		class UdpReceiver;
 
 		class TcpListener;
 		class TcpSocket;
@@ -207,29 +169,9 @@ struct NetworkOptions {
 template<class S, class... Args>
 using Network = NetworkOptions::Configurable<S, Args...>;
 
-template<class S, class... Args>
-typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::state;
-
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 #define NET_ASSERT(x)	Os::assert((x), "Internal error at " __FILE__ "@" STR(__LINE__))
-
-#include "Misc.h"
-#include "Arp.h"
-#include "Tcp.h"
-#include "Udp.h"
-#include "Icmp.h"
-#include "Fixup.h"
-#include "Endian.h"
-#include "Ethernet.h"
-#include "Interfaces.h"
-#include "IpReplyJob.h"
-#include "IpReception.h"
-#include "TcpListener.h"
-#include "TcpReplyJobs.h"
-#include "IpTransmission.h"
-#include "PacketProcessor.h"
-#include "PacketInputChannel.h"
 
 #include "buffer/Block.h"
 #include "buffer/Packet.h"
@@ -239,7 +181,45 @@ typename Network<S, Args...>::State NetworkOptions::Configurable<S, Args...>::st
 #include "buffer/PacketBuilder.h"
 #include "buffer/PacketAssembler.h"
 #include "buffer/PacketStreamBase.h"
+#include "buffer/PacketWriterBase.h"
 #include "buffer/SummedPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"
+
+#include "ethernet/Arp.h"
+#include "ethernet/Ethernet.h"
+
+#include "icmp/IcmpCore.h"
+#include "icmp/IcmpEchoReplyJob.h"
+#include "icmp/IcmpReceiver.h"
+
+#include "internal/Misc.h"
+#include "internal/State.h"
+#include "internal/Fixup.h"
+#include "internal/Endian.h"
+#include "internal/Interface.h"
+#include "internal/Interfaces.h"
+#include "internal/PacketProcessor.h"
+#include "internal/PacketInputChannel.h"
+
+#include "ip/IpRxJob.h"
+#include "ip/IpTxJob.h"
+#include "ip/IpReplyJob.h"
+#include "ip/IpReception.h"
+#include "ip/IpTransmitterBase.h"
+
+#include "raw/RawCore.h"
+#include "raw/RawReceiver.h"
+#include "raw/RawTransmitter.h"
+
+#include "tcp/TcpCore.h"
+#include "tcp/TcpRstJob.h"
+#include "tcp/TcpSocket.h"
+#include "tcp/TcpListener.h"
+#include "tcp/TcpInputChannel.h"
+#include "tcp/TcpRetransmitJob.h"
+
+#include "udp/UdpCore.h"
+#include "udp/UdpTransmitter.h"
+#include "udp/UdpReceiver.h"
 
 #endif /* NETWORK_H_ */
