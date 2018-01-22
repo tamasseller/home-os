@@ -8,43 +8,30 @@
 #define ETHERNET_H_
 
 template<class S, class... Args>
-struct Network<S, Args...>::ArpReplyJob: public Os::IoJob {};
-
-template<class S, class... Args>
 template<class Driver>
 class Network<S, Args...>::Ethernet:
 	public Os::template IoChannelBase<Ethernet<Driver>, Interface>,
-	public ArpReplyJob,	// TODO move into ArpCore
-	private PacketProcessor, // TODO move into ArpCore
+	public ArpCore<Driver>,
 	public Driver
 {
     friend class Ethernet::IoChannelBase;
     friend class Network<S, Args...>;
     friend Driver;
 
-    using PacketBuilder = Network<S, Args...>::PacketBuilder;
-    struct Resolver;
-
-    Resolver resolver;
     PacketTransmissionRequest *currentPacket, *nextPacket;
     pet::LinkedList<PacketTransmissionRequest> items;
-    PacketChain arpRequestQueue;
-    union {
-    	typename Pool::IoData poolParams;
-    	PacketTransmissionRequest txReq;
-    };
 
     /*
      * Interface towards the network interface (called _Interface_ :) )
      */
     inline void init() {
         Ethernet::IoChannelBase::init();
-        resolver.init();
+        Ethernet::ArpCore::init();
         Driver::init();
     }
 
     inline void ageContent() {
-    	resolver.ageContent();
+    	Ethernet::ArpCore::ageContent();
     }
 
     virtual void takeRxBuffers(typename Pool::Allocator allocator) override final {
@@ -98,9 +85,6 @@ class Network<S, Args...>::Ethernet:
     /*
      * Interface towards the driver.
      */
-
-    inline void arpPacketReceived(Packet packet);
-
     inline PacketTransmissionRequest* getCurrentTxPacket() {
         return currentPacket;
     }
@@ -121,26 +105,12 @@ class Network<S, Args...>::Ethernet:
         this->jobDone(p);
     }
 
-    /*
-     * Internal
-     */
-	using IoJob = typename Os::IoJob;
-	using Result = typename IoJob::Result;
-	using Launcher = typename IoJob::Launcher;
-	using Callback = typename IoJob::Callback;
-
-	inline void processArpReplyPacket(Packet chain); // TODO move into ArpCore::ArpReplyJob
-    static inline bool replySent(Launcher *launcher, IoJob* item, Result result); // TODO move into ArpCore::ArpReplyJob
-	static inline bool assembleReply(Launcher *launcher, IoJob* item, Result result); // TODO move into ArpCore::ArpReplyJob
-    static inline bool startReplySequence(Launcher *launcher, IoJob* item); // TODO move into ArpCore::ArpReplyJob
-
 public:
     inline Ethernet():
-    	Ethernet::IoChannelBase((uint16_t)14, &resolver),
-    	PacketProcessor(PacketProcessor::template make<Ethernet, &Ethernet::processArpReplyPacket>()) {}
+    	Ethernet::IoChannelBase((uint16_t)14, &this->Ethernet::ArpCore::resolver) {}
 
-    decltype(resolver) *getArpCache() {
-        return &resolver;
+    typename Ethernet::ArpCore::Resolver *getArpCache() {
+        return &this->Ethernet::ArpCore::resolver;
     }
 };
 

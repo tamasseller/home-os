@@ -40,7 +40,6 @@ class Network<S, Args...>::Interfaces<blockMaxPayload, typename NetworkOptions::
 		static constexpr link value = &ageContent;
 	};
 
-
 public:
     inline void init() {
         (pet::ApplyToPack<link, Initializer, &Interfaces::nop, Input...>::value)(this);

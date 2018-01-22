@@ -111,7 +111,7 @@ struct NetworkOptions {
 		template<class, class = DummyDigester> class IpReplyJob;
 
 		class PacketProcessor;
-		class ArpReplyJob;
+		template<class> class ArpCore;
 
 		class RawCore;
 		class IcmpCore;
@@ -185,7 +185,9 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "buffer/SummedPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"
 
-#include "ethernet/Arp.h"
+#include "ethernet/ArpCore.h"
+#include "ethernet/ArpReplyJob.h"
+#include "ethernet/ArpResolver.h"
 #include "ethernet/Ethernet.h"
 
 #include "icmp/IcmpCore.h"

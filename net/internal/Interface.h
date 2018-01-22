@@ -16,45 +16,11 @@ class Network<S, Args...>::Interface: public Os::IoChannel, Pool::IoData, Os::Io
 	friend class Network<S, Args...>;
 
 public:
-	struct AddressResolver: Os::IoChannel {
+	struct LinkAddressingManager: Os::IoChannel {
 		virtual const AddressEthernet& getAddress() = 0;
 		virtual bool resolveAddress(AddressIp4 ip, AddressEthernet& mac) = 0;
 		virtual void fillHeader(PacketBuilder&, const AddressEthernet& dst, uint16_t etherType) = 0;
 	};
-
-    inline Interface(uint16_t headerSize, AddressResolver* resolver): resolver(resolver), headerSize(headerSize) {}
-
-	inline void ageContent() {}
-
-	inline AddressResolver *getResolver() {
-        return resolver;
-    }
-
-	inline typename Os::IoChannel *getSender() {
-        return static_cast<typename Os::IoChannel*>(this);
-    }
-
-    inline uint16_t getHeaderSize() {
-        return headerSize;
-    }
-
-    inline void requestRxBuffers(uint16_t n)
-    {
-        typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
-
-        if(!ret.hasMore()) {
-            this->nBuffersRequested.increment(n);
-            this->launch(&Interface::acquireBuffers);
-        } else {
-            this->takeRxBuffers(ret);
-        }
-	}
-
-    virtual void takeRxBuffers(typename Pool::Allocator allocator) = 0;
-
-    inline void ipPacketReceived(Packet packet) {
-    	Network<S, Args...>::ipPacketReceived(packet, this);
-    };
 
 private:
     using IoJob = typename Os::IoJob;
@@ -62,7 +28,7 @@ private:
 	using Launcher = typename IoJob::Launcher;
 	using Callback = typename IoJob::Callback;
 
-	AddressResolver* const resolver;
+	LinkAddressingManager* const resolver;
     typename Os::template Atomic<uint16_t> nBuffersRequested;
 	uint16_t headerSize;
 
@@ -93,6 +59,41 @@ private:
    		launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
    		return true;
     }
+
+public:
+    inline Interface(uint16_t headerSize, LinkAddressingManager* resolver): resolver(resolver), headerSize(headerSize) {}
+
+	inline void ageContent() {}
+
+    virtual void takeRxBuffers(typename Pool::Allocator allocator) = 0;
+
+	inline LinkAddressingManager *getResolver() {
+        return resolver;
+    }
+
+	inline typename Os::IoChannel *getSender() {
+        return static_cast<typename Os::IoChannel*>(this);
+    }
+
+    inline uint16_t getHeaderSize() {
+        return headerSize;
+    }
+
+    inline void requestRxBuffers(uint16_t n)
+    {
+        typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
+
+        if(!ret.hasMore()) {
+            this->nBuffersRequested.increment(n);
+            this->launch(&Interface::acquireBuffers);
+        } else {
+            this->takeRxBuffers(ret);
+        }
+	}
+
+    inline void ipPacketReceived(Packet packet) {
+    	Network<S, Args...>::ipPacketReceived(packet, this);
+    };
 };
 
 #endif /* INTERFACE_H_ */

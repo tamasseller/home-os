@@ -38,8 +38,7 @@ struct Network<S, Args...>::ChecksumObserver: InetChecksumDigester
 			remainingLength = 0;
 		}
 
-		if(chunk.length & 1)
-			offsetOdd = !offsetOdd; // TODO rewrite as XOR to motivate that it is compiled like that.
+		offsetOdd ^= (chunk.length & 1);
 	}
 
 	inline void observeBlockAtLeave() {

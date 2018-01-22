@@ -22,8 +22,6 @@
 
 #include "DataContainer.h"
 
-// TODO move classes into separate files.
-
 template<class Os, size_t nBlocks, class Data, size_t txQuota = nBlocks, size_t rxQuota = nBlocks>
 class BufferPool: public Os::template SynchronousIoChannelBase<BufferPool<Os, nBlocks, Data, txQuota, rxQuota>>, Os::Event
 {

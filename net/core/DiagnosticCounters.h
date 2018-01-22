@@ -8,7 +8,7 @@
 #ifndef DIGNOSTICCOUNTERS_H_
 #define DIGNOSTICCOUNTERS_H_
 
-struct DiagnosticCounters {	// TODO make counters atomic.
+struct DiagnosticCounters {
 	/**
 	 * Protocol agnostic fields.
 	 */

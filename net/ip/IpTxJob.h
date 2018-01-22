@@ -393,7 +393,6 @@ public:
 		uint16_t length = Fixup::headerFixupStepOne(
 				self->packet.stage3,
 				self->device->getHeaderSize(),
-				ipHeaderSize,
 				headerChecksum,
 				payloadChecksum,
 				ttl,

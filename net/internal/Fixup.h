@@ -37,7 +37,6 @@ struct Network<S, Args...>::Fixup {
 	static inline uint16_t headerFixupStepOne(
 			Packet packet,
 			size_t l2headerLength,
-			size_t _, // TODO
 			HeaderDigester &headerChecksum,
 			PayloadDigester &payloadChecksum,
 			uint8_t ttl,
