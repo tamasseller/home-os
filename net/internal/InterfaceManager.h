@@ -1,12 +1,12 @@
 /*
- * Interfaces.h
+ * InterfaceManager.h
  *
  *  Created on: 2017.11.21.
  *      Author: tooma
  */
 
-#ifndef INTERFACES_H_
-#define INTERFACES_H_
+#ifndef INTERFACEMANAGER_H_
+#define INTERFACEMANAGER_H_
 
 #include "Network.h"
 
@@ -14,15 +14,15 @@
 
 template<class S, class... Args>
 template<uint16_t blockMaxPayload, class... Input>
-class Network<S, Args...>::Interfaces<blockMaxPayload, typename NetworkOptions::Set<Input...>, void>:
+class Network<S, Args...>::InterfaceManager<blockMaxPayload, typename NetworkOptions::Set<Input...>, void>:
 		public Input::template Wrapped<Network<S, Args...>, blockMaxPayload>...
 {
-    typedef void (*link)(Interfaces* const ifs);
-    static void nop(Interfaces* const ifs) {}
+    typedef void (*link)(InterfaceManager* const ifs);
+    static void nop(InterfaceManager* const ifs) {}
 
     template<link rest, class C, class...>
 	struct Initializer {
-		static inline void init(Interfaces* const ifs) {
+		static inline void init(InterfaceManager* const ifs) {
 			static_cast<typename C::template Wrapped<Network<S, Args...>, blockMaxPayload>*>(ifs)->init();
 			rest(ifs);
 		}
@@ -32,7 +32,7 @@ class Network<S, Args...>::Interfaces<blockMaxPayload, typename NetworkOptions::
 
     template<link rest, class C, class...>
 	struct Ager {
-		static inline void ageContent(Interfaces* const ifs) {
+		static inline void ageContent(InterfaceManager* const ifs) {
 			static_cast<typename C::template Wrapped<Network<S, Args...>, blockMaxPayload>*>(ifs)->ageContent();
 			rest(ifs);
 		}
@@ -42,11 +42,11 @@ class Network<S, Args...>::Interfaces<blockMaxPayload, typename NetworkOptions::
 
 public:
     inline void init() {
-        (pet::ApplyToPack<link, Initializer, &Interfaces::nop, Input...>::value)(this);
+        (pet::ApplyToPack<link, Initializer, &InterfaceManager::nop, Input...>::value)(this);
 	}
 
 	inline void ageContent() {
-        (pet::ApplyToPack<link, Ager, &Interfaces::nop, Input...>::value)(this);
+        (pet::ApplyToPack<link, Ager, &InterfaceManager::nop, Input...>::value)(this);
 	}
 };
 
@@ -56,4 +56,4 @@ constexpr inline auto* Network<S, Args...>::getEthernetInterface() {
 	return static_cast<Ethernet<Driver<Network<S, Args...>, blockMaxPayload>>*>(&state.interfaces);
 }
 
-#endif /* INTERFACES_H_ */
+#endif /* INTERFACEMANAGER_H_ */

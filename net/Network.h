@@ -78,7 +78,7 @@ struct NetworkOptions {
 		using Callback = typename IoJob::Callback;
 
 		template<class> class Ethernet;
-		template<uint16_t, class, class = void> struct Interfaces; // TODO rename
+		template<uint16_t, class, class = void> struct InterfaceManager;
 
 		class Block;
 		class DataChain;
@@ -103,7 +103,7 @@ struct NetworkOptions {
 
 		class DummyDigester;
 
-		class RxPacketHandler; // TODO eliminate
+		class RxPacketHandler;
 
 		template<class> class IpTxJob;
 		template<class> class IpTransmitterBase;
@@ -113,6 +113,7 @@ struct NetworkOptions {
 		class PacketProcessor;
 		template<class> class ArpCore;
 
+		class IpCore;
 		class RawCore;
 		class IcmpCore;
 		class UdpCore;
@@ -122,8 +123,6 @@ struct NetworkOptions {
 		static State state;
 
 		inline static constexpr uint16_t bytesToBlocks(size_t);
-		static inline void processReceivedPacket(Packet start);
-		static inline void ipPacketReceived(Packet packet, Interface* dev);
 
 	public:
 		struct Chunk;
@@ -199,14 +198,14 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "internal/Fixup.h"
 #include "internal/Endian.h"
 #include "internal/Interface.h"
-#include "internal/Interfaces.h"
+#include "internal/InterfaceManager.h"
 #include "internal/PacketProcessor.h"
 #include "internal/PacketInputChannel.h"
 
+#include "ip/IpCore.h"
 #include "ip/IpRxJob.h"
 #include "ip/IpTxJob.h"
 #include "ip/IpReplyJob.h"
-#include "ip/IpReception.h"
 #include "ip/IpTransmitterBase.h"
 
 #include "raw/RawCore.h"

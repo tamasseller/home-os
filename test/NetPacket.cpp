@@ -437,21 +437,21 @@ TEST(NetPacket, OffsetDropSimple) {
             if(!checkFrom(p, 0)) return Task::bad;
 
             for(uint8_t i=1; i<Net::blockMaxPayload; i++) {
-                p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+            	if(!p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1)) return Task::bad;
                 if(Accessor::pool.statTxUsed() != 3) return Task::bad;
                 if(!checkFrom(p, i)) return Task::bad;
             }
 
-            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+            if(!p.dropInitialBytes<Accessor::Pool::Quota::Tx>(1)) return Task::bad;
             if(Accessor::pool.statTxUsed() != 2) return Task::bad;
             if(!checkFrom(p, Net::blockMaxPayload)) return Task::bad;
 
-            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload + 1);
+            if(!p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload + 1)) return Task::bad;
             if(Accessor::pool.statTxUsed() != 1) return Task::bad;
 
             if(!checkFrom(p, 2 * Net::blockMaxPayload + 1)) return Task::bad;
 
-            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100);
+            if(p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100)) return Task::bad;
             if(Accessor::pool.statTxUsed() != 0) return Task::bad;
 
             return ok;
@@ -473,7 +473,7 @@ TEST(NetPacket, OffsetDropAtOnce) {
             if(Accessor::pool.statTxUsed() != 3) return Task::bad;
             Net::Packet p = builder;
 
-            p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100);
+            if(p.dropInitialBytes<Accessor::Pool::Quota::Tx>(Net::blockMaxPayload * 100)) return Task::bad;
             if(Accessor::pool.statTxUsed() != 0) return Task::bad;
 
             return ok;
@@ -505,23 +505,23 @@ TEST(NetPacket, OffsetIndirect) {
             if(!builder.write8('|')) return bad;
             builder.done();
 
-            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3);
+            if(!builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3)) return Task::bad;
 
             if(helloDestroyed || worldDestroyed) return bad;
             if(checkStreamContent("llo|world|") != ok) return bad;
 
-            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3);
+            if(!builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(3)) return Task::bad;
             if(!helloDestroyed || worldDestroyed) return bad;
             if(checkStreamContent("|world|") != ok) return bad;
 
-            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(2);
+            if(!builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(2)) return Task::bad;
             if(!helloDestroyed || worldDestroyed) return bad;
             if(checkStreamContent("orld|") != ok) return bad;
 
-            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(4);
+            if(!builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(4)) return Task::bad;
             if(!helloDestroyed || !worldDestroyed) return bad;
 
-            builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(1);
+            if(builder.dropInitialBytes<Accessor::Pool::Quota::Tx>(1)) return Task::bad;
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
 

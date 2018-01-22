@@ -92,7 +92,7 @@ public:
 	}
 
     inline void ipPacketReceived(Packet packet) {
-    	Network<S, Args...>::ipPacketReceived(packet, this);
+    	state.ipCore.ipPacketReceived(packet, this);
     };
 };
 

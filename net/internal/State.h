@@ -25,19 +25,15 @@ struct Network<S, Args...>::State: DiagnosticCounterStorage<useDiagnosticCounter
 
     inline void* operator new(size_t, void* x) { return x; }
 
-    PacketProcessor rxProcessor;
-
+    IpCore ipCore;
     RawCore rawCore;
     IcmpCore icmpCore;
     UdpCore udpCore;
     TcpCore tcpCore;
 
-	Interfaces<Block::dataSize, IfsToBeUsed> interfaces;
+	InterfaceManager<Block::dataSize, IfsToBeUsed> interfaces;
 	RoutingTable routingTable;
 	Pool pool;
-
-	inline State():
-		rxProcessor(PacketProcessor::template makeStatic<&Network<S, Args...>::processReceivedPacket>()) {}
 };
 
 #endif /* STATE_H_ */

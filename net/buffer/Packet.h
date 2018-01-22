@@ -63,12 +63,12 @@ public:
      * If block becomes empty it is dropped.
      */
 	template<typename Pool::Quota quota>
-    void dropInitialBytes(size_t n) {
+    bool dropInitialBytes(size_t n) {
         while(n) {
         	auto size = first->getSize();
             if(n < size) {
             	first->increaseOffset(n);
-                break;
+                return true;
             } else {
                 Block* current = first->getNext();
                 n -= size;
@@ -93,9 +93,11 @@ public:
                 deallocator.template deallocate<quota>(&state.pool);
 
                 if((first = current) == nullptr)
-                    break;
+                    return false;
             }
         }
+
+        return true;
     }
 
 	bool operator ==(const Packet& other) {
