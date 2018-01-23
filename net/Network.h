@@ -190,8 +190,9 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "ethernet/Ethernet.h"
 
 #include "icmp/IcmpCore.h"
-#include "icmp/IcmpEchoReplyJob.h"
 #include "icmp/IcmpReceiver.h"
+#include "icmp/IcmpDurPurReplyJob.h"
+#include "icmp/IcmpEchoReplyJob.h"
 
 #include "internal/Misc.h"
 #include "internal/State.h"

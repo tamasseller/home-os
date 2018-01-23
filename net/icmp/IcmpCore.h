@@ -13,9 +13,11 @@
 template<class S, class... Args>
 struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
 	class EchoReplyJob;
+	class DurPurReplyJob;
 	typedef PacketInputChannel<NullTag> InputChannel;
 
     EchoReplyJob replyJob;
+    DurPurReplyJob durPurJob;
     InputChannel inputChannel;
 
 	void init() {
@@ -79,6 +81,10 @@ struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
 
 			if(!inputChannel.takePacket(packet))
 				packet.template dispose<Pool::Quota::Rx>();
+
+	}
+
+	void replyDurPur(Packet packet) {
 
 	}
 };
