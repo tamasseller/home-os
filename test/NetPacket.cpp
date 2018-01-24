@@ -22,7 +22,8 @@ TEST_GROUP(NetPacket) {
 			builder.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(n));
 		}
 
-		bool readAndCheck(Accessor::PacketStream &reader, const char* str) {
+		template<class Reader>
+		bool readAndCheck(Reader &reader, const char* str) {
 			while(*str) {
 				if(reader.atEop()) return TaskBase::TestTask::bad;
 				uint8_t ret;
@@ -885,11 +886,13 @@ TEST(NetPacket, CopyFrom) {
                 if(copy.copyFrom(reader, totalLength) != totalLength) return bad;
                 copy.done();
 
-                if(!readAndCheck(reader, helloWorld)) return bad;
-                if(!readAndCheck(reader, "\n")) return bad;
-                if(!readAndCheck(reader, lipsum)) return bad;
-                if(!readAndCheck(reader, "\n")) return bad;
-                if(!readAndCheck(reader, foobar)) return bad;
+                Accessor::PacketStream checker(copy);
+
+                if(readAndCheck(checker, helloWorld) != ok) return bad;
+                if(readAndCheck(checker, "\n") != ok) return bad;
+                if(readAndCheck(checker, lipsum) != ok) return bad;
+                if(readAndCheck(checker, "\n") != ok) return bad;
+                if(readAndCheck(checker, foobar) != ok) return bad;
 
                 return ok;
             }
@@ -934,3 +937,133 @@ TEST(NetPacket, CopySizeError) {
     work(task);
 }
 
+TEST(NetPacket, StructuredAccessor) {
+    struct Task: TaskBase<Task> {
+    	struct X: Field8<0> {};
+    	struct Y: Field16<1> {};
+    	struct Z: Field32<3> {};
+    	struct W: Field8<7> {};
+
+    	bool run() {
+			const uint8_t header[] = {0x50, 0x3e, 0xba, 0xad, 0x30, 0xda, 0xfa, 0xca};
+
+			init(1);
+			if(!builder.copyIn((const char*)header, sizeof(header))) return bad;
+            builder.done();
+
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<X, Y, Z, W> data;
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<X>() != 0x50) return bad;
+            	if(data.get<Y>() != 0x3eba) return bad;
+            	if(data.get<Z>() != 0xad30dafa) return bad;
+            	if(data.get<W>() != 0xca) return bad;
+            }
+
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<X, Z, W> data;
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<X>() != 0x50) return bad;
+            	if(data.get<Z>() != 0xad30dafa) return bad;
+            	if(data.get<W>() != 0xca) return bad;
+            }
+
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<Y, W> data;
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<Y>() != 0x3eba) return bad;
+            	if(data.get<W>() != 0xca) return bad;
+            }
+
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<X, Z> data;
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<X>() != 0x50) return bad;
+            	if(data.get<Z>() != 0xad30dafa) return bad;
+            }
+
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<X> data1, data2, data3;
+            	if(!data1.extract(reader)) return bad;
+            	if(!data2.extract(reader)) return bad;
+            	if(!data3.extract(reader)) return bad;
+            	if(data1.get<X>() != 0x50) return bad;
+            	if(data2.get<X>() != 0x3e) return bad;
+            	if(data3.get<X>() != 0xba) return bad;
+            }
+
+			return ok;
+		}
+	} task;
+
+	work(task);
+}
+
+namespace detailsOfStructuredAccessorReal {
+	struct HeaderInfo: 	Field16<0> {
+		template<class Stream> inline bool read(Stream& s) {
+			if(!HeaderInfo::Field16::read(s))
+				return false;
+
+			if((data & 0xf000) != 0x4000)
+				return false;
+
+			s.start(((data & 0x0f00) >> 6) - 2);
+			s.patch(Accessor::correctEndian(data));
+			return true;
+		}
+	};
+}
+
+TEST(NetPacket, StructuredAccessorReal) {
+	struct Task: TaskBase<Task> {
+    	struct Length: 		Field16<2> {};
+    	struct FragId: 		Field16<4> {};
+    	struct FlagOff: 	Field16<6> {};
+    	struct Ttl: 		Field8<8> {};
+    	struct Proto: 		Field8<9> {};
+    	struct Sum: 		Field16<10> {};
+    	struct Src: 		Field32<12> {};
+    	struct Dst: 		Field32<16> {};
+    	using HeaderInfo = detailsOfStructuredAccessorReal::HeaderInfo;
+
+    	bool run() {
+			const uint8_t header[] = {
+		            /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+		            0x45, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x40, 0x00, 0x40, 0xfe, 0x11, 0xc8,
+		            /* source IP address  | destination IP address */
+		            0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+		            /* data */
+		            'f', 'o', 'o', 'b', 'a', 'r'
+			};
+
+			init(1);
+			if(!builder.copyIn((const char*)header, sizeof(header))) return bad;
+            builder.done();
+
+            {
+            	Accessor::SummedPacketStream reader(builder);
+            	StructuredAccessor<HeaderInfo, Length, Proto, Src> data;
+
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<Length>() != 0x1a) return bad;
+            	if(data.get<Proto>() != 0xfe) return bad;
+            	if(data.get<Src>() != 0x0a0a0a01) return bad;
+
+            	reader.finish();
+            	if(reader.result()) return bad;
+
+            	if(readAndCheck(reader, "foobar") != ok) return bad;
+            }
+
+			return ok;
+		}
+	} task;
+
+	work(task);
+}

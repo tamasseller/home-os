@@ -181,6 +181,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "buffer/PacketAssembler.h"
 #include "buffer/PacketStreamBase.h"
 #include "buffer/PacketWriterBase.h"
+#include "buffer/StructuredAccessor.h"
 #include "buffer/SummedPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"
 
