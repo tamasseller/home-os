@@ -174,8 +174,9 @@ using Ifs = NetworkOptions::Interfaces<
     >
 >;
 
-using Net64 = Network<OsRr, Ifs, NetworkOptions::BufferSize<64>,
-		NetworkOptions::TicksPerSecond<20>, NetworkOptions::UseDiagnosticCounters<true>>;
+using Net64 = Network<
+        OsRr, Ifs, NetworkOptions::BufferSize<64>, NetworkOptions::TicksPerSecond<20>,
+        NetworkOptions::UseDiagnosticCounters<true>/*, NetworkOptions::PacketProcessorRoundRobin<false>*/>;
 
 using Net43 = Network<OsRr, Ifs, NetworkOptions::BufferSize<43>,
 		NetworkOptions::TicksPerSecond<20>, NetworkOptions::UseDiagnosticCounters<true>>;
@@ -200,6 +201,7 @@ struct NetworkTestAccessor: Net {
 	using Net::PacketBuilder;
 	using Net::PacketAssembler;
 	using Net::SummedPacketStream;
+	using Net::bytesToBlocks;
 
 	static void overrideHeaderSize(typename Net::Interface* interface, uint16_t headerSize) {
 		interface->headerSize = headerSize;

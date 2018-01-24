@@ -102,7 +102,10 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	 * Constant packet pieces and parameters for well-known management protocols.
 	 */
 
+protected:
 	static constexpr size_t ipHeaderSize = 20;
+
+private:
 	static const size_t arpReqSize = 28;
 
 	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);

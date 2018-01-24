@@ -71,8 +71,8 @@ struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
 		NET_ASSERT(reader.read16net(port));
 
 		if(!inputChannel.takePacket(packet, DstPortTag(port))) {
-			packet.template dispose<Pool::Quota::Rx>(); // TODO reply ICMP DUR PUR
-			state.increment(&DiagnosticCounters::Udp::inputNoPort);
+            state.increment(&DiagnosticCounters::Udp::inputNoPort);
+		    state.icmpCore.durPurJob.handlePacket(packet);
 		}
 	}
 };

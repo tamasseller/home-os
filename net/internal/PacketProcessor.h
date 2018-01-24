@@ -14,23 +14,14 @@ template<class S, class... Args>
 class Network<S, Args...>::PacketProcessor: Os::Event {
 	using PacketReader = Network<S, Args...>::PacketStream;
 
-	PacketChain chain;
-
 	template<class C>
-	inline void process(uintptr_t arg, C&& c) {
-		if(chain.isEmpty())
-			chain = PacketChain::flip(reinterpret_cast<Block*>(arg));
-
-		Packet p;
-		chain.take(p);
-		c(p);
-
-		if(!chain.isEmpty()) {
-			Os::submitEvent(this, [](uintptr_t old, uintptr_t& result){
-				result = old;
-				return true;
-			});
-		}
+	inline void process(uintptr_t arg, C&& c)
+	{
+        for(PacketChain chain = PacketChain::flip(reinterpret_cast<Block*>(arg)); !chain.isEmpty();) {
+            Packet p;
+            chain.take(p);
+            c(p);
+        };
 	}
 
 	template<class T, void (T::*worker)(Packet)>

@@ -36,6 +36,36 @@ public:
 		return done;
 	}
 
+	uint16_t copyFrom(PacketStream& stream, uint16_t inputLength)
+    {
+        auto* self = static_cast<Child*>(this);
+
+        uint16_t done = 0;
+
+        while(inputLength) {
+            Chunk chunk = stream.getChunk();
+
+            if(!chunk.length)
+                break;
+
+            uint16_t run = inputLength;
+
+            if(run > chunk.length)
+                run = static_cast<uint16_t>(chunk.length);
+
+            auto actualRunLength = this->copyIn(chunk.start, run);
+
+            if(actualRunLength != run)
+                run = inputLength = actualRunLength;
+
+            stream.advance(run);
+            inputLength = static_cast<uint16_t>(inputLength - run);
+            done = static_cast<uint16_t>(done + run);
+        }
+
+        return done;
+    }
+
     inline bool write8(uint16_t data) {
         return copyIn((const char*)&data, 1) == 1; // TODO optimize
     }

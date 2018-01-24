@@ -863,3 +863,74 @@ TEST(NetPacket, GeneratorSimple) {
 
     work(task);
 }
+
+TEST(NetPacket, CopyFrom) {
+    struct Task: TaskBase<Task> {
+            bool run() {
+                init(4);
+
+                if(!builder.addByReference(helloWorld, strlen(helloWorld))) return bad;
+                if(!builder.write8('\n')) return bad;
+                if(!builder.copyIn(lipsum, strlen(lipsum))) return bad;
+                if(!builder.write8('\n')) return bad;
+                if(!builder.addByReference(foobar, strlen(foobar))) return bad;
+
+                builder.done();
+                Accessor::PacketStream reader(builder);
+
+                Accessor::PacketBuilder copy;
+                copy.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(4));
+
+                static constexpr auto totalLength = strlen(helloWorld) + strlen(lipsum) + strlen(foobar) + 2;
+                if(copy.copyFrom(reader, totalLength) != totalLength) return bad;
+                copy.done();
+
+                if(!readAndCheck(reader, helloWorld)) return bad;
+                if(!readAndCheck(reader, "\n")) return bad;
+                if(!readAndCheck(reader, lipsum)) return bad;
+                if(!readAndCheck(reader, "\n")) return bad;
+                if(!readAndCheck(reader, foobar)) return bad;
+
+                return ok;
+            }
+    } task;
+
+    work(task);
+}
+
+TEST(NetPacket, CopySizeError) {
+    struct Task: TaskBase<Task> {
+            bool run() {
+                init(3);
+
+                if(!builder.copyIn(lipsum, strlen(lipsum))) return bad;
+                builder.done();
+
+                {
+                    Accessor::PacketStream reader(builder);
+                    Accessor::PacketBuilder copy;
+                    copy.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(Accessor::bytesToBlocks(strlen(lipsum))));
+                    if(copy.copyFrom(reader, strlen(lipsum) + 1) != strlen(lipsum)) return bad;
+                }
+
+                {
+                    Accessor::PacketStream reader(builder);
+                    Accessor::PacketBuilder copy;
+                    copy.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(Accessor::bytesToBlocks(strlen(lipsum))));
+                    if(copy.copyFrom(reader, strlen(lipsum) + 10) != strlen(lipsum)) return bad;
+                }
+
+                {
+                    Accessor::PacketStream reader(builder);
+                    Accessor::PacketBuilder copy;
+                    copy.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(1));
+                    if(copy.copyFrom(reader, strlen(lipsum)) != Accessor::blockMaxPayload) return bad;
+                }
+
+                return ok;
+            }
+    } task;
+
+    work(task);
+}
+

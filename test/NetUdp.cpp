@@ -55,6 +55,26 @@ TEST_GROUP(NetUdp)
         );
     }
 
+    static inline void expectDurPur(int n=1) {
+        Net::template getEthernetInterface<DummyIf>()->expectN(n,
+            /*            dst                 |                src                | etherType */
+            0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+            /* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+            0x45, 0x00, 0x00, 0x38, 0x00, 0x00, 0x40, 0x00, 0xff, 0x1, 0x53, 0xa6,
+            /* source IP address  | destination IP address */
+            0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
+            /* typcod | checksum | rest of header */
+            0x03, 0x03, 0xfc, 0xfc, 0x00, 0x00, 0x00, 0x00,
+
+            /* Original datagram */
+            0x45, 0x00, 0x00, 0x22, 0x84, 0x65, 0x40, 0x00, 0x40, 0x11, 0x8e, 0x47,
+            /* source IP address  | destination IP address */
+            0x0a, 0x0a, 0x0a, 0x1, 0x0a, 0x0a, 0x0a, 0x0a,
+            /* srcport|  dstport  | udplength | checksum */
+            0x82, 0x3b, 0x04, 0xd2, 0x00, 0x0e, 0x19, 0x62
+        );
+    }
+
     static inline void expectLong() {
     	Net::template getEthernetInterface<DummyIf>()->expectN(1,
     		/*            dst                 |                src                | etherType */
@@ -130,6 +150,7 @@ TEST(NetUdp, DropRawNoListenerAtAll) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
+            expectDurPur();
             receiveSimple();
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
@@ -159,7 +180,12 @@ TEST(NetUdp, DropNoMatchingListener) {
             r.init();
             r.receive(0xf001);
 
-            receiveSimple();
+            expectDurPur(2);
+
+            doIndirect([](){
+                for(int i=0; i<2; i++)
+                    receiveSimple();
+            });
 
             if(r.wait(1)) return Task::bad;
 
@@ -168,10 +194,10 @@ TEST(NetUdp, DropNoMatchingListener) {
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
 
-            if(Net::getCounterStats().udp.inputReceived != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputReceived != 2) return Task::bad;
             if(Net::getCounterStats().udp.inputProcessed != 0) return Task::bad;
             if(Net::getCounterStats().udp.inputFormatError != 0) return Task::bad;
-            if(Net::getCounterStats().udp.inputNoPort != 1) return Task::bad;
+            if(Net::getCounterStats().udp.inputNoPort != 2) return Task::bad;
             if(Net::getCounterStats().udp.outputQueued != 0) return Task::bad;
             if(Net::getCounterStats().udp.outputSent != 0) return Task::bad;
 

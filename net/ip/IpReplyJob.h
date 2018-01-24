@@ -12,7 +12,7 @@
 
 template<class S, class... Args>
 template<class Child, class PayloadDigester>
-class Network<S, Args...>::IpReplyJob: IpTxJob<Child>, public RxPacketHandler
+class Network<S, Args...>::IpReplyJob: protected IpTxJob<Child>, public RxPacketHandler
 {
 	friend class IpReplyJob::IpTxJob;
 
