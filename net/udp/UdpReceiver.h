@@ -28,22 +28,20 @@ class Network<S, Args...>::UdpReceiver:
     }
 
     inline void preprocess(Packet) {
-        uint8_t ihl;
-        NET_ASSERT(this->read8(ihl));
+        StructuredAccessor<IpPacket::Meta, IpPacket::SourceAddress> ipAccessor;// TODO Move blocks like this into utility functions.
+        NET_ASSERT(ipAccessor.extract(*this));
 
-        NET_ASSERT(this->skipAhead(11));
-        NET_ASSERT(this->read32net(this->peerAddress.addr));
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(
+            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
+            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
+        )));
 
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
+        StructuredAccessor<UdpPacket::SourcePort, UdpPacket::Length, UdpPacket::End> udpAccessor;
+        NET_ASSERT(udpAccessor.extract(*this));
 
-        NET_ASSERT(this->read16net(this->peerPort));
-
-        NET_ASSERT(this->skipAhead(2));
-
-        NET_ASSERT(this->read16net(this->length));
-        this->length = static_cast<uint16_t>(this->length - 8);
-
-        NET_ASSERT(this->skipAhead(2));
+        this->peerAddress = ipAccessor.get<IpPacket::SourceAddress>();
+        this->peerPort = udpAccessor.get<UdpPacket::SourcePort>();
+        this->length = static_cast<uint16_t>(udpAccessor.get<UdpPacket::Length>() - UdpPacket::End::offset);
 
         state.increment(&DiagnosticCounters::Udp::inputProcessed);
     }

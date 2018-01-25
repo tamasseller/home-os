@@ -46,13 +46,9 @@ struct Network<S, Args...>::Fixup {
 
 		stream.skipAhead(static_cast<uint16_t >(l2headerLength));
 
-        uint16_t ret;
-        NET_ASSERT(stream.read16net(ret));
-        NET_ASSERT((ret & 0xf000) == 0x4000); // IPv4 only for now
-        uint16_t ipHeaderLength = static_cast<uint16_t>((ret & 0x0f00) >> 6);
+        StructuredAccessor<IpPacket::Meta> accessor;
 
-        stream.start(ipHeaderLength - 2);
-        stream.patchNet(static_cast<uint16_t>(ret));
+        NET_ASSERT(accessor.extract(stream));
 
 		stream.skipAhead(static_cast<uint16_t>(6));
 		stream.write8(ttl);

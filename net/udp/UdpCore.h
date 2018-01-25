@@ -9,6 +9,7 @@
 #define UDPCORE_H_
 
 #include "Network.h"
+#include "UdpPacket.h"
 
 template<class S, class... Args>
 struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
@@ -22,17 +23,14 @@ struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
 	template<class Reader>
 	inline RxPacketHandler* check(Reader& reader, uint16_t length)
 	{
-		uint16_t cheksumField;
-
 		state.increment(&DiagnosticCounters::Udp::inputReceived);
 
 		if(length < 8)
 			goto formatError;
 
-		if(!reader.skipAhead(6))
-			goto formatError;
+		StructuredAccessor<UdpPacket::Checksum> accessor;
 
-		if(!reader.read16net(cheksumField))
+		if(!accessor.extract(reader))
 			goto formatError;
 
 		/*
@@ -41,7 +39,7 @@ struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
 		 * 		"An all zero transmitted checksum value means that the transmitter generated
 		 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
 		 */
-		if(cheksumField) {
+		if(accessor.get<UdpPacket::Checksum>() != 0) {
 			reader.patch(correctEndian(static_cast<uint16_t>(length)));
 			reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
 
@@ -61,16 +59,16 @@ struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
 	{
 	    PacketStream reader(packet);
 
-		uint8_t ihl;
+		StructuredAccessor<IpPacket::Meta> ipAccessor;
 
-		NET_ASSERT(reader.read8(ihl));
+		NET_ASSERT(ipAccessor.extract(reader));
+		NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(ipAccessor.get<IpPacket::Meta>().getHeaderLength() - 2)));
 
-		NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(((ihl & 0x0f) << 2) + 1)));
+		StructuredAccessor<UdpPacket::DestinationPort> udpAccessor;
 
-		uint16_t port;
-		NET_ASSERT(reader.read16net(port));
+		NET_ASSERT(udpAccessor.extract(reader));
 
-		if(!inputChannel.takePacket(packet, DstPortTag(port))) {
+		if(!inputChannel.takePacket(packet, DstPortTag(udpAccessor.get<UdpPacket::DestinationPort>()))) {
             state.increment(&DiagnosticCounters::Udp::inputNoPort);
 		    state.icmpCore.durPurJob.handlePacket(packet);
 		}

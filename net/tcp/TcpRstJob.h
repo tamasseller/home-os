@@ -27,57 +27,47 @@ class Network<S, Args...>::TcpCore::RstJob: public IpReplyJob<RstJob, InetChecks
 
 	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request)
 	{
-        AddressIp4 peerAddress;
-        uint8_t ihl;
+        PacketStream reader(request);
 
-		PacketStream reader(request);
-
-        NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40);
-
-        NET_ASSERT(reader.skipAhead(11));
-        NET_ASSERT(reader.read32net(peerAddress.addr));
+        StructuredAccessor<IpPacket::SourceAddress> ipAccessor;
+        NET_ASSERT(ipAccessor.extract(reader));
 
 		state.increment(&DiagnosticCounters::Tcp::rstPackets);
 
-		return typename Base::InitialReplyInfo{peerAddress, static_cast<uint16_t>(20)};
+		return typename Base::InitialReplyInfo{ipAccessor.get<IpPacket::SourceAddress>(), static_cast<uint16_t>(20)};
 	}
 
 	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply)
 	{
-		using namespace TcpConstants;
-    	uint32_t seqNum, ackNum;
-        uint16_t peerPort, localPort, payloadLength, flags;
-        uint8_t ihl;
+		using namespace TcpPacket;
 
-		PacketStream reader(request);
+        PacketStream reader(request);
 
-        NET_ASSERT(reader.read8(ihl));
-        NET_ASSERT(reader.skipAhead(1));
+        StructuredAccessor<IpPacket::Meta, IpPacket::Length> ipAccessor;         // TODO Move blocks like this into utility functions.
+        NET_ASSERT(ipAccessor.extract(reader));
 
-        NET_ASSERT(reader.read16net(payloadLength));
-        payloadLength = static_cast<uint16_t>(payloadLength - ((ihl & 0x0f) << 2));
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(
+            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
+            - (IpPacket::Length::offset + IpPacket::Length::length)
+        )));
 
-        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>((((ihl - 1) & 0x0f) << 2))));
+        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags> tcpAccessor;
 
-        NET_ASSERT(reader.read16net(peerPort));
-        NET_ASSERT(reader.read16net(localPort));
-        NET_ASSERT(reader.read32net(seqNum));
-        NET_ASSERT(reader.read32net(ackNum));
-        NET_ASSERT(reader.read16net(flags));
-        payloadLength = static_cast<uint16_t>(payloadLength - ((flags >> 10) & ~0x3));
+        NET_ASSERT(tcpAccessor.extract(reader));
 
-        if(flags & synMask) payloadLength++;
-        if(flags & finMask) payloadLength++;
+        auto payloadLength = static_cast<uint16_t>(ipAccessor.get<IpPacket::Length>()
+                          - (ipAccessor.get<IpPacket::Meta>().getHeaderLength() + tcpAccessor.get<Flags>().getDataOffset()));
 
-		NET_ASSERT(reply.write16net(localPort));
-		NET_ASSERT(reply.write16net(peerPort));
+        if(tcpAccessor.get<Flags>().hasSyn()) payloadLength++;
+        if(tcpAccessor.get<Flags>().hasFin()) payloadLength++;
 
-		NET_ASSERT(reply.write32net((flags & ackMask) ? ackNum : 0));		// seq number
-		NET_ASSERT(reply.write32net(seqNum + payloadLength));				// ack number
+		NET_ASSERT(reply.write16net(tcpAccessor.get<DestinationPort>()));
+		NET_ASSERT(reply.write16net(tcpAccessor.get<SourcePort>()));
 
-		NET_ASSERT(reply.write16net((flags & ackMask) ? 0x5004: 0x5014));	// Flags
+		NET_ASSERT(reply.write32net(tcpAccessor.get<Flags>().hasAck() ? tcpAccessor.get<AcknowledgementNumber>() : 0));		// seq number
+		NET_ASSERT(reply.write32net(tcpAccessor.get<SequenceNumber>() + payloadLength));				// ack number
+
+		NET_ASSERT(reply.write16net(tcpAccessor.get<Flags>().hasAck() ? 0x5004: 0x5014));	// Flags
 		NET_ASSERT(reply.write16net(0));		// Window size
 		NET_ASSERT(reply.write32net(0));		// Checksum and urgent pointer.
 

@@ -43,17 +43,6 @@ namespace ArpPacket {
 				return true;
 			}
 		};
-
-		template<size_t off>
-		struct EndMarker {
-			static constexpr auto offset = off;
-			static constexpr auto length = 0;
-
-			template<class Stream>
-			inline bool read(Stream& s) {
-				return true;
-			}
-		};
 	};
 
 	struct HType: Field16<0> {};
@@ -65,7 +54,7 @@ namespace ArpPacket {
 	struct SenderIp: IpPacket::SpecialFields::IpAddressField<14> {};
 	struct TargetMac: SpecialFields::MacField<18> {};
 	struct TargetIp: IpPacket::SpecialFields::IpAddressField<24> {};
-	struct End: SpecialFields::EndMarker<28> {};
+	struct End: EndMarker<28> {};
 }
 
 #endif /* ARPPACKET_H_ */

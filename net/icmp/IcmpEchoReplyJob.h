@@ -23,37 +23,30 @@ class Network<S, Args...>::IcmpCore::EchoReplyJob: public IpReplyJob<EchoReplyJo
 	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request) {
 		PacketStream reader(request);
 
-    	uint8_t headerLength;
-    	NET_ASSERT(reader.read8(headerLength));
-    	headerLength = static_cast<uint8_t>((headerLength & 0xf) << 2);
+		StructuredAccessor<IpPacket::Meta, IpPacket::Length, IpPacket::SourceAddress> accessor;
 
-    	NET_ASSERT(reader.skipAhead(1));	// skip version+ihl and dsp+ecn
+		NET_ASSERT(accessor.extract(reader));
 
-		uint16_t totalLength;
-		NET_ASSERT(reader.read16net(totalLength));
+		state.increment(&DiagnosticCounters::Icmp::pingRequests);
 
-		NET_ASSERT(reader.skipAhead(8));
-
-		AddressIp4 requesterIp;
-		NET_ASSERT(reader.read32net(requesterIp.addr));
-
-		state.increment(&DiagnosticCounters ::Icmp::pingRequests);
-
-		return typename Base::InitialReplyInfo{requesterIp, static_cast<uint16_t>(totalLength - headerLength)};
+		return typename Base::InitialReplyInfo{
+		    accessor.get<IpPacket::SourceAddress>(),
+		    static_cast<uint16_t>(accessor.get<IpPacket::Length>() - accessor.get<IpPacket::Meta>().getHeaderLength())
+		};
 	}
 
 	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply) {
 		PacketStream reader(request);
 
-    	uint8_t headerLength;
-    	reader.read8(headerLength);
-    	headerLength = static_cast<uint8_t>((headerLength & 0xf) << 2);
-    	reader.skipAhead(static_cast<uint16_t>(headerLength - 1));
+        StructuredAccessor<IpPacket::Meta> accessor;
+
+        NET_ASSERT(accessor.extract(reader));
+        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(accessor.get<IpPacket::Meta>().getHeaderLength() - 2)));
 
 		uint16_t typeCode;
 		reader.read16net(typeCode);
 
-		if(typeCode == 0x800) {
+		if(typeCode == echoRequestTypeCode) {
 			uint16_t checksum;
 			reader.read16net(checksum);
 			uint32_t temp = checksum + 0x800;

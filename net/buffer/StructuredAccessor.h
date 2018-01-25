@@ -80,5 +80,15 @@ struct Field32 {
 	}
 };
 
+template<size_t off>
+struct EndMarker {
+    static constexpr auto offset = off;
+    static constexpr auto length = 0;
+
+    template<class Stream>
+    inline bool read(Stream& s) {
+        return true;
+    }
+};
 
 #endif /* STRUCTUREDACCESSOR_H_ */

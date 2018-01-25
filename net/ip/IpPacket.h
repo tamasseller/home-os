@@ -93,12 +93,10 @@ namespace IpPacket {
 	struct Identification: Field16<4> {};
 	struct Fragmentation: SpecialFields::FragmentInfo<6> {};
 	struct Ttl: Field8<8> {};
-	struct ProtocolId: Field8<9> {};
-	struct Checksum: Field8<10> {};
+	struct Protocol: Field8<9> {};
+	struct Checksum: Field16<10> {};
 	struct SourceAddress: SpecialFields::IpAddressField<12> {};
 	struct DestinationAddress: SpecialFields::IpAddressField<16> {};
 }
-
-
 
 #endif /* IPPACKET_H_ */

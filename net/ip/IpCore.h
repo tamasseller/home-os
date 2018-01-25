@@ -29,7 +29,7 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 
 	    SummedPacketStream reader(packet);
 
-	    StructuredAccessor<Meta, Length, Fragmentation, ProtocolId, SourceAddress, DestinationAddress> accessor;
+	    StructuredAccessor<Meta, Length, Fragmentation, Protocol, SourceAddress, DestinationAddress> accessor;
 
 	    NET_ASSERT(accessor.extract(reader));
 
@@ -44,7 +44,7 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 		if(!reader.finish() || reader.result())
 	        goto formatError;
 
-	    switch(accessor.get<ProtocolId>()) {
+	    switch(accessor.get<Protocol>()) {
 	    case IpProtocolNumbers::icmp:
 	        handler = state.icmpCore.check(reader);
 	        break;
@@ -57,7 +57,7 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 	            reader.patchNet(static_cast<uint16_t>(accessor.get<DestinationAddress>().addr >> 16));
 	            reader.patchNet(static_cast<uint16_t>(accessor.get<DestinationAddress>().addr & 0xffff));
 
-	            if(accessor.get<ProtocolId>() == 6) {
+	            if(accessor.get<Protocol>() == 6) {
 	                handler = state.tcpCore.check(reader, payloadLength);
 	            } else {
 	                handler = state.udpCore.check(reader, payloadLength);

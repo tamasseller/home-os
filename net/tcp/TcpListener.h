@@ -35,20 +35,25 @@ class Network<S, Args...>::TcpListener:
     	}
     }
 
-    inline void preprocess(Packet packet) {
-    	this->packet = packet;
-        uint8_t ihl;
-        NET_ASSERT(this->read8(ihl));
-        NET_ASSERT((ihl & 0xf0) == 0x40); // IPv4 only for now.
+    inline void preprocess(Packet packet)
+    {
+        using namespace TcpPacket;
 
-        NET_ASSERT(this->skipAhead(11));
-        NET_ASSERT(this->read32net(this->peerAddress.addr));
+        StructuredAccessor<IpPacket::Meta, IpPacket::SourceAddress> ipAccessor;         // TODO Move blocks like this into utility functions.
+        NET_ASSERT(ipAccessor.extract(*static_cast<PacketStream*>(this)));
 
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(
+            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
+            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
+        )));
 
-        NET_ASSERT(this->read16net(peerPort));
-        NET_ASSERT(this->skipAhead(2));
-        NET_ASSERT(this->read32net(initialReceivedSequenceNumber));
+        StructuredAccessor<SourcePort, SequenceNumber> tcpAccessor;
+        NET_ASSERT(tcpAccessor.extract(*static_cast<PacketStream*>(this)));
+
+        this->peerPort = tcpAccessor.get<SourcePort>();
+        this->initialReceivedSequenceNumber = tcpAccessor.get<SequenceNumber>();
+        this->peerAddress = ipAccessor.get<IpPacket::SourceAddress>();
+        this->packet = packet;
 
         state.increment(&DiagnosticCounters::Tcp::inputProcessed);
     }

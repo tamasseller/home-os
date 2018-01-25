@@ -12,6 +12,10 @@
 
 template<class S, class... Args>
 struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
+    static constexpr uint16_t echoRequestTypeCode = 0x0800;
+    static constexpr uint16_t echoReplyTypeCode = 0x0000;
+    static constexpr uint16_t durPurTypeCode = 0x0303;
+
 	class EchoReplyJob;
 	class DurPurReplyJob;
 	typedef PacketInputChannel<NullTag> InputChannel;
@@ -38,10 +42,10 @@ struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
 			goto formatError;
 
 		switch(typeCode) {
-			case 0x0000: // Echo reply.
+			case echoReplyTypeCode:
 				ret = this;
 				break;
-			case 0x0800: // Echo request.
+			case echoRequestTypeCode:
 				ret = &replyJob;
 				break;
 			default:
@@ -69,23 +73,8 @@ struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
 	}
 
 	virtual void handlePacket(Packet packet) {
-		    PacketStream reader(packet);
-
-			/*
-			 * Skip initial fields of the IP header payload all the way to the source address.
-			 */
-			NET_ASSERT(reader.skipAhead(12));
-
-			AddressIp4 src;
-			NET_ASSERT(reader.read32net(src.addr));
-
-			if(!inputChannel.takePacket(packet))
-				packet.template dispose<Pool::Quota::Rx>();
-
-	}
-
-	void replyDurPur(Packet packet) {
-
+		if(!inputChannel.takePacket(packet))
+			packet.template dispose<Pool::Quota::Rx>();
 	}
 };
 

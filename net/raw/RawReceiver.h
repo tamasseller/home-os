@@ -26,13 +26,16 @@ class Network<S, Args...>::RawReceiver: public Os::template IoRequest<
     }
 
     inline void preprocess(Packet) {
-        uint8_t ihl;
-        NET_ASSERT(this->read8(ihl));
-        NET_ASSERT(this->skipAhead(8));
-        NET_ASSERT(this->read8(this->protocol));
-        NET_ASSERT(this->skipAhead(2));
-        NET_ASSERT(this->read32net(this->peerAddress.addr));
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(((ihl - 4) & 0x0f) << 2)));
+        StructuredAccessor<IpPacket::Meta, IpPacket::Protocol, IpPacket::SourceAddress> accessor;
+        NET_ASSERT(accessor.extract(*this));
+
+        this->protocol = accessor.get<IpPacket::Protocol>();
+        this->peerAddress = accessor.get<IpPacket::SourceAddress>();
+
+        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(
+            accessor.get<IpPacket::Meta>().getHeaderLength()
+            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
+        )));
     }
 
 public:

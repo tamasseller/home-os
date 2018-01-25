@@ -21,41 +21,36 @@ class Network<S, Args...>::IcmpCore::DurPurReplyJob: public IpReplyJob<DurPurRep
 		state.increment(&DiagnosticCounters::Icmp::outputSent);
 	}
 
-	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request) {
+	inline typename Base::InitialReplyInfo getReplyInfo(Packet& request)
+	{
 		PacketStream reader(request);
 
-    	uint8_t headerLength;
-    	NET_ASSERT(reader.read8(headerLength));
-    	headerLength = static_cast<uint8_t>((headerLength & 0xf) << 2);
+		StructuredAccessor<IpPacket::Meta, IpPacket::Length, IpPacket::SourceAddress> accessor;
 
-		NET_ASSERT(reader.skipAhead(11));
+        NET_ASSERT(accessor.extract(reader));
 
-		AddressIp4 requesterIp;
-		NET_ASSERT(reader.read32net(requesterIp.addr));
+  		state.increment(&DiagnosticCounters::Icmp::pingRequests);
 
-		state.increment(&DiagnosticCounters ::Icmp::pingRequests);
-
-		auto length = headerLength + 8 + icmpHeaderSize;
-
-		return typename Base::InitialReplyInfo{requesterIp, static_cast<uint16_t>(length)};
+		return typename Base::InitialReplyInfo {
+		    accessor.get<IpPacket::SourceAddress>(),
+            static_cast<uint16_t>(accessor.get<IpPacket::Meta>().getHeaderLength() + 8 + icmpHeaderSize)
+		};
 	}
 
-	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply) {
+	inline typename Base::FinalReplyInfo generateReply(Packet& request, PacketBuilder& reply)
+	{
 		PacketStream reader(request);
 
-		static constexpr auto icmpDurPurTypeCode = 0x0303;
+        reply.write16net(durPurTypeCode);   // type and code
+        reply.write16net(~durPurTypeCode);  // checksum
+        reply.write32raw(0);                // rest of header
 
-        reply.write16net(icmpDurPurTypeCode);   // type and code
-        reply.write16net(~icmpDurPurTypeCode);  // checksum
-        reply.write32raw(0);                    // rest of header
+        StructuredAccessor<IpPacket::Meta> accessor;
 
-    	uint8_t headerLength;
-    	reader.read8(headerLength);
-    	reply.write8(headerLength);
+        NET_ASSERT(accessor.extract(reader));
+        NET_ASSERT(reply.write16net(accessor.get<IpPacket::Meta>().data));
 
-    	headerLength = static_cast<uint8_t>((headerLength & 0xf) << 2);
-
-    	reply.copyFrom(reader, static_cast<uint16_t>(headerLength + 8 - 1));
+    	reply.copyFrom(reader, static_cast<uint16_t>(accessor.get<IpPacket::Meta>().getHeaderLength() + 8 - 2));
 
 		state.increment(&DiagnosticCounters::Icmp::outputQueued);
 
