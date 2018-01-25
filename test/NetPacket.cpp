@@ -839,7 +839,7 @@ TEST(NetPacket, GeneratorSimple) {
 	            if(ret != 0x4200) return bad;
 	            stream.start(6);						// set to check rest of header
 
-	            stream.patch(Accessor::correctEndian(static_cast<uint16_t>(0x4200)));
+	            stream.patchNet(static_cast<uint16_t>(0x4200));
 	            	//update digester with already read data.
 
 	            stream.finish();						// go through the rest of the header
@@ -937,12 +937,24 @@ TEST(NetPacket, CopySizeError) {
     work(task);
 }
 
+namespace detailsOfStructuredAccessor {
+	struct End {
+		static constexpr auto offset = 8;
+		static constexpr auto length = 0;
+
+		template<class Stream> inline bool read(Stream& s) {
+			return true;
+		}
+	};
+}
+
 TEST(NetPacket, StructuredAccessor) {
     struct Task: TaskBase<Task> {
     	struct X: Field8<0> {};
     	struct Y: Field16<1> {};
     	struct Z: Field32<3> {};
     	struct W: Field8<7> {};
+    	using End = detailsOfStructuredAccessor::End;
 
     	bool run() {
 			const uint8_t header[] = {0x50, 0x3e, 0xba, 0xad, 0x30, 0xda, 0xfa, 0xca};
@@ -997,6 +1009,16 @@ TEST(NetPacket, StructuredAccessor) {
             	if(data3.get<X>() != 0xba) return bad;
             }
 
+            {
+            	Accessor::PacketStream reader(builder);
+            	StructuredAccessor<Y, End> data;
+            	if(!data.extract(reader)) return bad;
+            	if(data.get<Y>() != 0x3eba) return bad;
+
+            	uint8_t temp;
+            	if(reader.read8(temp)) return bad;
+            }
+
 			return ok;
 		}
 	} task;
@@ -1014,7 +1036,7 @@ namespace detailsOfStructuredAccessorReal {
 				return false;
 
 			s.start(((data & 0x0f00) >> 6) - 2);
-			s.patch(Accessor::correctEndian(data));
+			s.patchNet(data);
 			return true;
 		}
 	};

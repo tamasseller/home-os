@@ -52,7 +52,7 @@ struct Network<S, Args...>::Fixup {
         uint16_t ipHeaderLength = static_cast<uint16_t>((ret & 0x0f00) >> 6);
 
         stream.start(ipHeaderLength - 2);
-        stream.patch(correctEndian(static_cast<uint16_t>(ret)));
+        stream.patchNet(static_cast<uint16_t>(ret));
 
 		stream.skipAhead(static_cast<uint16_t>(6));
 		stream.write8(ttl);

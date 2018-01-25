@@ -10,12 +10,16 @@
 
 #include "Network.h"
 
+#include "IpPacket.h"
+
 template<class S, class... Args>
 class Network<S, Args...>::IpCore: PacketProcessor {
 	friend PacketProcessor;
 
 	inline void processReceivedPacket(Packet packet)
 	{
+		using namespace IpPacket;
+
 	    static constexpr uint16_t offsetAndMoreFragsMask = 0x3fff;
 
 	    RxPacketHandler* handler = &state.rawCore;
@@ -25,22 +29,11 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 
 	    SummedPacketStream reader(packet);
 
-	    NET_ASSERT(reader.read16net(ret));
+	    StructuredAccessor<Meta, Length, Fragmentation, ProtocolId, SourceAddress, DestinationAddress> accessor;
 
-	    NET_ASSERT((ret & 0xf000) == 0x4000); // IPv4 only for now.
-	    ihl = static_cast<uint16_t>((ret & 0x0f00) >> 6);
+	    NET_ASSERT(accessor.extract(reader));
 
-	    if(ihl < 20)
-	            goto formatError;
-
-	    reader.start(ihl - 2);
-	    reader.patch(correctEndian(ret));
-
-	    NET_ASSERT(reader.read16net(ipLength));
-	    NET_ASSERT(reader.read16net(id));
-		NET_ASSERT(reader.read16net(fragmentOffsetAndFlags));
-
-	    if(fragmentOffsetAndFlags & offsetAndMoreFragsMask) {
+	    if(accessor.get<Fragmentation>().isFragmented()) {
 	        /*
 	         * IP defragmentation could be done here.
 	         */
@@ -48,31 +41,23 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 	        goto error;
 	    }
 
-	    /*
-	     * Skip TTL.
-	     */
-	    NET_ASSERT(reader.skipAhead(1));
-	    NET_ASSERT(reader.read8(protocol));
-	    NET_ASSERT(reader.skipAhead(2));
-	    NET_ASSERT(reader.read32net(srcIp.addr) && reader.read32net(dstIp.addr));
-
 		if(!reader.finish() || reader.result())
 	        goto formatError;
 
-	    switch(protocol) {
+	    switch(accessor.get<ProtocolId>()) {
 	    case IpProtocolNumbers::icmp:
 	        handler = state.icmpCore.check(reader);
 	        break;
 	    case IpProtocolNumbers::tcp:
 	    case IpProtocolNumbers::udp: {
-	            auto payloadLength = static_cast<uint16_t>(ipLength - ihl);
+	            auto payloadLength = static_cast<uint16_t>(accessor.get<Length>() - accessor.get<Meta>().getHeaderLength());
 	            reader.start(payloadLength);
-	            reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr >> 16)));
-	            reader.patch(correctEndian(static_cast<uint16_t>(srcIp.addr & 0xffff)));
-	            reader.patch(correctEndian(static_cast<uint16_t>(dstIp.addr >> 16)));
-	            reader.patch(correctEndian(static_cast<uint16_t>(dstIp.addr & 0xffff)));
+	            reader.patchNet(static_cast<uint16_t>(accessor.get<SourceAddress>().addr >> 16));
+	            reader.patchNet(static_cast<uint16_t>(accessor.get<SourceAddress>().addr & 0xffff));
+	            reader.patchNet(static_cast<uint16_t>(accessor.get<DestinationAddress>().addr >> 16));
+	            reader.patchNet(static_cast<uint16_t>(accessor.get<DestinationAddress>().addr & 0xffff));
 
-	            if(protocol == 6) {
+	            if(accessor.get<ProtocolId>() == 6) {
 	                handler = state.tcpCore.check(reader, payloadLength);
 	            } else {
 	                handler = state.udpCore.check(reader, payloadLength);
@@ -83,7 +68,7 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 	    }
 
 	    if(handler) {
-	    	if(!reader.goToEnd() || (reader.getLength() != ipLength))
+	    	if(!reader.goToEnd() || (reader.getLength() != accessor.get<Length>()))
 	            goto formatError;
 
 	        handler->handlePacket(packet);
@@ -100,42 +85,31 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 public:
 	inline void ipPacketReceived(Packet packet, Interface* dev)
 	{
+		using namespace IpPacket;
+
 	    if(packet.template dropInitialBytes<Pool::Quota::Rx>(dev->getHeaderSize())) {
 			state.increment(&DiagnosticCounters::Ip::inputReceived);
 
 			PacketStream reader(packet);
 
-			uint8_t versionAndHeaderLength;
-			if(!reader.read8(versionAndHeaderLength))
-				goto formatError;
-			if((versionAndHeaderLength & 0xf0) == 0x40) {
-				if(!reader.skipAhead(15))
-					goto formatError;
+			StructuredAccessor<Meta, DestinationAddress> accessor;
 
-				AddressIp4 dstIp;
-				if(!reader.read32net(dstIp.addr))
-					goto formatError;
+			if(!accessor.extract(reader))
+				goto formatError;
+
+			if(Route* route = state.routingTable.findRouteWithSource(dev, accessor.get<DestinationAddress>())) {
+				state.routingTable.releaseRoute(route);
+			} else {
+				// TODO allow broadcast.
 
 				/*
-				 * Check if the packet is for us.
+				 * If this host is not the final destination then, routing could be done here.
 				 */
-				if(Route* route = state.routingTable.findRouteWithSource(dev, dstIp)) {
-					state.routingTable.releaseRoute(route);
-				} else {
-					// TODO allow broadcast.
-
-					/*
-					 * If this host is not the final destination then, routing could be done here.
-					 */
-					state.increment(&DiagnosticCounters::Ip::inputForwardingRequired);
-					goto error;
-				}
-
-				this->process(packet);
-			} else {
-				// IPv4 only for now.
-				goto formatError;
+				state.increment(&DiagnosticCounters::Ip::inputForwardingRequired);
+				goto error;
 			}
+
+			this->process(packet);
 
 			return;
 	    }

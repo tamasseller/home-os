@@ -48,7 +48,7 @@ struct Network<S, Args...>::ChecksumObserver: InetChecksumDigester
 	}
 
 public:
-	using InetChecksumDigester::patch;
+	//using InetChecksumDigester::patch;
 	using InetChecksumDigester::getReducedState;
 	using InetChecksumDigester::result;
 
@@ -81,6 +81,10 @@ public:
 
 		auto stream = static_cast<Child*>(this);
 		skip += getOffset();
+	}
+
+	void patchNet(uint16_t n) {
+		this->patch(Network<S, Args...>::correctEndian(n));
 	}
 };
 

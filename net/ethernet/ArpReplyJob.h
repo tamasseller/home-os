@@ -42,6 +42,8 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 
 	static inline bool assembleReply(Launcher *launcher, IoJob* item, Result result)
 	{
+		using namespace ArpPacket;
+
 		auto self = static_cast<ReplyJob*>(item);
 		auto interface = ArpCore::getInteface();
 
@@ -53,39 +55,19 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 		while(self->arpRequestQueue.take(requestPacket)) {
 			PacketStream reader(requestPacket);
 
-			/*
-			 * Skip destination ethernet header and initial fields of the ARP payload all the
-			 * way to the sender hardware address, the initial fields are already processed at
-			 * this point and are known to describe an adequate request. The packet is already
-			 * checked for having enough payload content to do this, so this must not fail.
-			 */
-	        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(interface->getHeaderSize() + 8)));
+	        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(interface->getHeaderSize())));
+
+			StructuredAccessor<SenderMac, SenderIp, TargetIp> accessor;
+
+			NET_ASSERT(accessor.extract(reader));
+
+			requestPacket.template dispose<Pool::Quota::Rx>();
 
 			/*
-			 * Save the source address of the request for later use as the destination of the reply.
+			 * Check if the requested IP is associated with any routes out of this interface.
 			 */
-			AddressEthernet requesterMac;
-			NET_ASSERT(reader.copyOut(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6);
-
-			/*
-			 * Read sender IP address.
-			 */
-			char requesterIp[4];
-			NET_ASSERT(reader.copyOut(requesterIp, 4) == 4);
-			NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(6)));
-
-			/*
-			 * Read sender IP address.
-			 */
-			AddressIp4 queriedIp;
-			NET_ASSERT(reader.read32net(queriedIp.addr));
-
-			/*
-			 * Check if the requested
-			 */
-			Route* route = state.routingTable.findRouteWithSource(interface, queriedIp);
+			Route* route = state.routingTable.findRouteWithSource(interface, accessor.get<TargetIp>());
 			if(!route) {
-				requestPacket.template dispose<Pool::Quota::Rx>();
 				continue;
 			} else
 				state.routingTable.releaseRoute(route);
@@ -93,7 +75,7 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 			/*
 			 * Fill ethernet header with the requester as the destination and write the ARP boilerplate.
 			 */
-			interface->ArpCore::resolver.fillHeader(builder, requesterMac, 0x0806);
+			interface->ArpCore::resolver.fillHeader(builder, accessor.get<SenderMac>(), 0x0806);
 
 			static constexpr const char replyBoilerplate[] = {
 				0x00, 0x01, // hwType
@@ -104,28 +86,10 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 			};
 
 			NET_ASSERT(builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate));
-
-			/*
-			 * Write source address again.
-			 */
 			NET_ASSERT(builder.copyIn(reinterpret_cast<const char*>(interface->ArpCore::resolver.getAddress().bytes), 6) == 6);
-
-			/*
-			 * Write source IP address.
-			 */
-			NET_ASSERT(builder.write32net(queriedIp.addr));
-
-			/*
-			 * Write destination address again.
-			 */
-			NET_ASSERT(builder.copyIn(reinterpret_cast<char*>(requesterMac.bytes), 6) == 6);
-
-			/*
-			 * Write destination IP address.
-			 */
-			NET_ASSERT(builder.copyIn(requesterIp, 4) == 4);
-
-			requestPacket.template dispose<Pool::Quota::Rx>();
+			NET_ASSERT(builder.write32net(accessor.get<TargetIp>().addr));
+			NET_ASSERT(builder.copyIn(reinterpret_cast<char*>(accessor.get<SenderMac>().bytes), 6) == 6);
+			NET_ASSERT(builder.write32net(accessor.get<SenderIp>().addr));
 
 			builder.done();
 			self->txReq.init(builder);

@@ -186,9 +186,9 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "buffer/PacketTransmissionRequest.h"
 
 #include "ethernet/ArpCore.h"
+#include "ethernet/Ethernet.h"
 #include "ethernet/ArpReplyJob.h"
 #include "ethernet/ArpResolver.h"
-#include "ethernet/Ethernet.h"
 
 #include "icmp/IcmpCore.h"
 #include "icmp/IcmpReceiver.h"

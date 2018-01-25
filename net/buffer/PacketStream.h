@@ -23,6 +23,9 @@ public:
 	inline PacketStream(const Packet& p) {
 		this->init(p);
 	}
+
+	inline void start(...) {}
+	inline void patchNet(...) {}
 };
 
 #endif /* PACKETSTREAM_H_ */
