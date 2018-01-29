@@ -21,6 +21,10 @@ template<class S, class... Args>
 class Network<S, Args...>:: DstPortTag {
 	uint16_t n;
 public:
+	inline uint16_t getPortNumber() {
+	    return n;
+	}
+
 	bool operator ==(const DstPortTag& other) {
 		return n == other.n;
 	}
@@ -34,6 +38,18 @@ class Network<S, Args...>:: ConnectionTag {
 	AddressIp4 peerAddress;
 	uint16_t peerPort, localPort;
 public:
+	inline AddressIp4 getPeerAddress() {
+	    return peerAddress;
+	}
+
+    inline uint16_t getPeerPort() {
+        return peerPort;
+    }
+
+    inline uint16_t getLocalPort() {
+        return localPort;
+    }
+
 	bool operator ==(const ConnectionTag& other) {
 		return 	(peerAddress == other.peerAddress) &&
 				(peerPort == other.peerPort) &&

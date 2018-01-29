@@ -92,7 +92,7 @@ public:
 
 	bool accept(TcpSocket& socket)
 	{
-		if(socket.data.state != TcpCore::InputChannel::SocketData::State::Closed) {
+		if(socket.state != TcpSocket::State::Closed) {
 			error = NetErrorStrings::alreadyConnected;
 			return false;
 		}
@@ -101,16 +101,18 @@ public:
 
 		uint32_t initialSendSequenceNumber = 0; // TODO time based generator.
 
-		socket.data.state = TcpCore::InputChannel::SocketData::State::SynReceived;
+		socket.accessTag() = ConnectionTag(peerAddress, peerPort, this->data.accessTag().getPortNumber());
+
+		socket.state = TcpSocket::State::SynReceived;
 
 		// Receive sequence space parameters.
-		socket.data.expectedSequenceNumber = initialReceivedSequenceNumber + 1;
-		socket.data.receiveWindow = 1024; // TODO add magic here.
+		socket.expectedSequenceNumber = initialReceivedSequenceNumber + 1;
+		socket.receiveWindow = 1024; // TODO add magic here.
 
 		// Send sequence space parameters.
-		socket.data.lastReceivedAckNumber = initialSendSequenceNumber;
-		socket.data.nextSequenceNumber = initialSendSequenceNumber + 1;
-		socket.data.peerWindowSize = 0;
+		socket.lastReceivedAckNumber = initialSendSequenceNumber;
+		socket.nextSequenceNumber = initialSendSequenceNumber + 1;
+		socket.peerWindowSize = 0;
 
 		state.tcpCore.retransmitJob.handle(socket);
 

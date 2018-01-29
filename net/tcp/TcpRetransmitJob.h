@@ -42,7 +42,32 @@ class Network<S, Args...>::TcpCore::RetransmitJob: public IpTxJob<RetransmitJob>
 
 	inline bool onPreparationDone(Launcher *launcher, IoJob* item)
 	{
-		// TODO
+	    using namespace TcpPacket;
+
+        auto socket = sockets.iterator().current();
+
+        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags, WindowSize, Checksum, UrgentPointer> replyAccessor;
+        replyAccessor.get<SourcePort>() =               socket->accessTag().getLocalPort();
+        replyAccessor.get<DestinationPort>() =          socket->accessTag().getPeerPort();
+        replyAccessor.get<SequenceNumber>() =           0; // TODO
+        replyAccessor.get<AcknowledgementNumber>() =    0; // TODO
+        replyAccessor.get<WindowSize>() =               0; // TODO
+        replyAccessor.get<Checksum>() =                 0;
+        replyAccessor.get<UrgentPointer>() =            0; // TODO
+        replyAccessor.get<Flags>().clear();
+
+        NET_ASSERT(replyAccessor.fill(this->accessPacket()));
+
+	    switch(socket->state) {
+            case TcpSocket::State::SynReceived:
+                replyAccessor.get<Flags>().setDataOffset(20); // TODO mss option
+                replyAccessor.get<Flags>().setSyn(true);
+                replyAccessor.get<Flags>().setAck(true);
+                break;
+            default:
+                break;
+	    }
+
 		return RetransmitJob::IpTxJob::template startTransmission<InetChecksumDigester>(
 				launcher, item, IpProtocolNumbers::tcp, 0x40 /* TODO */);
 	}
@@ -72,10 +97,16 @@ class Network<S, Args...>::TcpCore::RetransmitJob: public IpTxJob<RetransmitJob>
     	auto self = static_cast<RetransmitJob*>(item);
     	auto socket = self->sockets.iterator().current();
 
-    	// TODO
-    	uint16_t length = 123;
+        uint16_t length = 20;
+    	switch(socket->state) {
+    	    case TcpSocket::State::SynReceived:
+    	        // TODO mss option
+    	        break;
+    	    default:
+    	        break;
+    	}
 
-		return RetransmitJob::IpTxJob::startPreparation(launcher, item, socket->data.peerAddress, length, 0, 0);
+		return RetransmitJob::IpTxJob::startPreparation(launcher, item, socket->accessTag().getPeerAddress(), length, 0, 0);
     }
 
 	/* TODO:

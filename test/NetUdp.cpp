@@ -548,6 +548,8 @@ TEST(NetUdp, Echo) {
 
     	        tx.wait();
 
+    	        rx.close();
+
     	        this->error = ok;
     	        sem.notifyFromTask();
     	        return ok;

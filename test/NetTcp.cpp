@@ -205,7 +205,7 @@ TEST(NetTcp, DenyConnection) {
     work(task);
 }
 
-#if 0
+#if 1
 TEST(NetTcp, AcceptConnection) {
     struct Task: public TestTask<Task> {
         bool run() {
