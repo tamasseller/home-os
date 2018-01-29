@@ -29,16 +29,14 @@ class Network<S, Args...>::TcpCore::InputChannel:
 	struct RetransmissionTimer: TcpTimer{};
 
 public:
-	class SocketData;
-
-	class WindowWaiterData: public Os::IoJob::Data {
-		friend RxChannel;
+	struct WindowWaiter: public Os::IoJob::Data {
 		uint16_t requestedWindowSize;
-
-		inline SocketData* getSocketData();
+		inline TcpSocket* getSocket();
 	};
 
-	class SocketData: public RxChannel::IoData, WindowWaiterData {};
+	struct DataWaiter: public RxChannel::IoData {
+		inline TcpSocket* getSocket();
+	};
 
 private:
 	/**
@@ -97,9 +95,15 @@ public:
 };
 
 template<class S, class... Args>
-inline typename Network<S, Args...>::TcpCore::InputChannel::SocketData*
-Network<S, Args...>::TcpCore::InputChannel::WindowWaiterData::getSocketData() {
-	return static_cast<SocketData*>(this);
+inline typename Network<S, Args...>::TcpSocket*
+Network<S, Args...>::TcpCore::InputChannel::WindowWaiter::getSocket() {
+	return static_cast<TcpSocket*>(this);
+}
+
+template<class S, class... Args>
+inline typename Network<S, Args...>::TcpSocket*
+Network<S, Args...>::TcpCore::InputChannel::DataWaiter::getSocket() {
+	return static_cast<TcpSocket*>(this);
 }
 
 #endif /* TCPINPUTCHANNEL_H_ */

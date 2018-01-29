@@ -45,31 +45,9 @@ class Network<S, Args...>::TcpCore::RetransmitJob: public IpTxJob<RetransmitJob>
 	    using namespace TcpPacket;
 
         auto socket = sockets.iterator().current();
+        auto accessor = socket->getTxHeader();
 
-        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags, WindowSize, Checksum, UrgentPointer> replyAccessor;
-        replyAccessor.get<SourcePort>() =               socket->accessTag().getLocalPort();
-        replyAccessor.get<DestinationPort>() =          socket->accessTag().getPeerPort();
-        replyAccessor.get<SequenceNumber>() =           0; // TODO
-        replyAccessor.get<AcknowledgementNumber>() =    0; // TODO
-        replyAccessor.get<WindowSize>() =               0; // TODO
-        replyAccessor.get<Checksum>() =                 0;
-        replyAccessor.get<UrgentPointer>() =            0; // TODO
-        replyAccessor.get<Flags>().clear();
-
-        NET_ASSERT(replyAccessor.fill(this->accessPacket()));
-
-	    switch(socket->state) {
-            case TcpSocket::State::SynReceived:
-                replyAccessor.get<Flags>().setDataOffset(20); // TODO mss option
-                replyAccessor.get<Flags>().setSyn(true);
-                replyAccessor.get<Flags>().setAck(true);
-                break;
-            default:
-                break;
-	    }
-
-		return RetransmitJob::IpTxJob::template startTransmission<InetChecksumDigester>(
-				launcher, item, IpProtocolNumbers::tcp, 0x40 /* TODO */);
+        return false;
 	}
 
     inline bool onNoRoute(Launcher *launcher, IoJob* item) {

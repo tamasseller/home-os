@@ -16,12 +16,12 @@ class Network<S, Args...>::TcpListener:
 {
 	friend class TcpListener::IpRxJob;
 
-	AddressIp4 peerAddress;
-	Packet packet;
+    const char* error;
+
+    AddressIp4 peerAddress;
+    Packet packet;
     uint32_t initialReceivedSequenceNumber;
     uint16_t peerPort;
-
-    const char* error;
 
     inline void reset() {
         peerAddress = AddressIp4::allZero;
@@ -83,10 +83,11 @@ public:
 	void deny()
 	{
 		state.increment(&DiagnosticCounters::Tcp::inputConnectionDenied);
-		Packet packet = this->packet;
-		this->packet.init(nullptr);
 
+		Packet packet = this->packet;
+    	this->packet.init(nullptr);
 		this->invalidateAllStates();
+
 		state.tcpCore.rstJob.handlePacket(packet);
 	}
 
@@ -107,14 +108,16 @@ public:
 
 		// Receive sequence space parameters.
 		socket.expectedSequenceNumber = initialReceivedSequenceNumber + 1;
-		socket.receiveWindow = 1024; // TODO add magic here.
+		socket.lastAdvertisedReceiveWindow = socket.getReceiveWindow();
 
 		// Send sequence space parameters.
 		socket.lastReceivedAckNumber = initialSendSequenceNumber;
-		socket.nextSequenceNumber = initialSendSequenceNumber + 1;
+		socket.nextSequenceNumber = initialSendSequenceNumber;
 		socket.peerWindowSize = 0;
 
-		state.tcpCore.retransmitJob.handle(socket);
+		socket.sendSynAck();
+
+		this->invalidateAllStates();
 
 		return true;
 	}

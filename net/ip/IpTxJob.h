@@ -102,13 +102,13 @@ class Network<S, Args...>::IpTxJob: public Os::IoJob {
 	 */
 
 protected:
-	static constexpr size_t ipHeaderSize = 20;
+	static constexpr size_t ipHeaderSize = 20; // TODO find and separate well-known constants.
 
 private:
-	static const size_t arpReqSize = 28;
+	static const size_t arpReqSize = 28; // TODO find and separate well-known constants.
 
-	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800);
-	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806);
+	static const uint16_t etherTypeIp = static_cast<uint16_t>(0x0800); // TODO find and separate well-known constants.
+	static const uint16_t etherTypeArp = static_cast<uint16_t>(0x0806); // TODO find and separate well-known constants.
 
 	union {
 	        /**
@@ -128,7 +128,7 @@ private:
     /**
      * Destination IP address.
      */
-    AddressIp4 dst;
+    AddressIp4 dst; // TODO eliminate redundancy for TCP TX.
 
     /**
      * ARP resolution request and reply holder, provides the

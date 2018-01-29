@@ -214,6 +214,8 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "raw/RawReceiver.h"
 #include "raw/RawTransmitter.h"
 
+#include "tcp/TcpRx.h"
+#include "tcp/TcpTx.h"
 #include "tcp/TcpCore.h"
 #include "tcp/TcpRstJob.h"
 #include "tcp/TcpSocket.h"

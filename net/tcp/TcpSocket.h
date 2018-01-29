@@ -11,11 +11,17 @@
 #include "Network.h"
 
 template<class S, class... Args>
-class Network<S, Args...>::TcpSocket: TcpCore::InputChannel::SocketData {
-	friend TcpListener;
+class Network<S, Args...>::TcpSocket:
+	TcpCore::template TcpTx<TcpSocket>,
+	TcpCore::template TcpRx<TcpSocket>
+{
+	friend typename TcpCore::template TcpTx<TcpSocket>;
+	friend typename TcpCore::template TcpRx<TcpSocket>;
+	friend typename TcpCore::InputChannel::WindowWaiter;
+	friend typename TcpCore::InputChannel::DataWaiter;
 	friend typename TcpCore::RetransmitJob;
 	friend pet::LinkedList<TcpSocket>;
-//    friend RxChannel;
+	friend TcpListener;
 
     TcpSocket *next;
 
@@ -132,11 +138,56 @@ class Network<S, Args...>::TcpSocket: TcpCore::InputChannel::SocketData {
     uint32_t expectedSequenceNumber;
 
     /// RFC793 RCV.WND - receive window
-    uint16_t receiveWindow;
+    uint16_t lastAdvertisedReceiveWindow;
 
     State state = State::Closed;
 
     // TODO timers: retransmission, zero window probe
+
+    inline uint16_t getReceiveWindow() {
+    	return 1024; // TODO add magic here.
+    }
+
+    inline TcpPacket::FullHeaderAccessor getTxHeader()
+    {
+    	using namespace TcpPacket;
+    	FullHeaderAccessor accessor;
+
+    	auto window = getReceiveWindow();
+
+        accessor.get<SourcePort>()            = this->accessTag().getLocalPort();
+        accessor.get<DestinationPort>()       = this->accessTag().getPeerPort();
+        accessor.get<SequenceNumber>()        = nextSequenceNumber;
+        accessor.get<AcknowledgementNumber>() = expectedSequenceNumber;
+
+        accessor.get<WindowSize>()            = window;
+    	lastAdvertisedReceiveWindow           = window;
+
+        accessor.get<Checksum>()              = 0;
+        accessor.get<UrgentPointer>()         = 0;
+        accessor.get<Flags>().clear();
+
+        return accessor;
+    }
+
+public:
+    auto &getTx() {
+    	return *static_cast<typename TcpCore::template TcpTx<TcpSocket>*>(this);
+    }
+
+    auto &getRx() {
+    	return *static_cast<typename TcpCore::template TcpRx<TcpSocket>*>(this);
+    }
+
+    inline void init() {
+    	getTx().init();
+    	// getRx().init();
+    }
+
+    inline void abandon	() {
+    	getTx().abandon();
+    	// getRx().abandon();
+    }
 };
 
 #endif /* TCPSOCKET_H_ */

@@ -66,15 +66,15 @@ TEST_GROUP(NetTcp)
 			/*            dst                 |                src                | etherType */
 			0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
 			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
-			0x45, 0x00, 0x00, 0x28, 0x00, 0x00, 0x40, 0x00, 0xff, 0x06, 0x53, 0xb1,
+			0x45, 0x00, 0x00, 0x28, 0x00, 0x00, 0x40, 0x00, 0x40, 0x06, 0x12, 0xb2,
 			/* source IP address  | destination IP address */
 			0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
 			/* srcport|  dstport  |    Sequence number    */
 			0x56, 0x78, 0x12, 0x34, 0x00, 0x00, 0x00, 0x00,
 			/*     Ack number     | off+flags | wnd size */
-			0x00, 0x00, 0x00, 0x01, 0x05, 0x12, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x01, 0x50, 0x12, 0x04, 0x00,
 			/* checksum / urgent bs */
-			0x1f, 0x07, 0x00, 0x00
+			0x1b, 0x07, 0x00, 0x00
     	);
     }
 
@@ -193,6 +193,7 @@ TEST(NetTcp, DenyConnection) {
             if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputNoPort != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputConnectionDenied != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionAccepted != 0) return Task::bad;
             if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
             if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
 
@@ -225,8 +226,11 @@ TEST(NetTcp, AcceptConnection) {
             expectSynAck();
 
             Net::TcpSocket s;
+            s.init();
 
             if(!r.accept(s)) return Task::bad;
+
+            s.getTx().wait();
 
             if(Accessor::pool.statTxUsed()) return Task::bad;
             if(Accessor::pool.statRxUsed() != initialRxUsage) return Task::bad;
@@ -235,9 +239,12 @@ TEST(NetTcp, AcceptConnection) {
             if(Net::getCounterStats().tcp.inputProcessed != 1) return Task::bad;
             if(Net::getCounterStats().tcp.inputFormatError != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputNoPort != 0) return Task::bad;
-            if(Net::getCounterStats().tcp.inputConnectionDenied != 1) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionDenied != 0) return Task::bad;
+            if(Net::getCounterStats().tcp.inputConnectionAccepted != 1) return Task::bad;
             if(Net::getCounterStats().tcp.outputQueued != 1) return Task::bad;
             if(Net::getCounterStats().tcp.outputSent != 1) return Task::bad;
+
+            s.abandon();
 
             r.close();
 

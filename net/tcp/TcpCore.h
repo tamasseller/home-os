@@ -20,6 +20,9 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
 	class RetransmitJob;
 	class RstJob;
 
+	template<class> class TcpTx;
+	template<class> class TcpRx;
+
 	RetransmitJob retransmitJob;
 	RstJob rstJob;
 	ListenerChannel listenerChannel;
