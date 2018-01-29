@@ -9,6 +9,7 @@
 #define FIXUP_H_
 
 #include "Network.h"
+#include "tcp/TcpPacket.h"
 
 template<class S, class... Args>
 struct Network<S, Args...>::Fixup {
@@ -17,20 +18,20 @@ struct Network<S, Args...>::Fixup {
 			AddressIp4 srcIp,
 			AddressIp4 dstIp)
 	{
-		static constexpr const char initialIpPreamble[12] = {
-				0x45,			// ver + ihl
-				0x00,			// dscp + ecn
-				0x00, 0x00,		// length
-				0x00, 0x00,		// fragment identification
-				0x40, 0x00,		// flags + fragment offset
-				0x00,			// time-to-live
-				0x00,			// protocol
-				0x00, 0x00		// checksum
-		};
+	    using namespace IpPacket;
 
-		NET_ASSERT(packet.copyIn(initialIpPreamble, sizeof(initialIpPreamble)));
-		NET_ASSERT(packet.write32net(srcIp.addr));
-		NET_ASSERT(packet.write32net(dstIp.addr));
+	    StructuredAccessor<Meta, Length, Identification, Fragmentation, Ttl, Protocol, Checksum, SourceAddress, DestinationAddress> accessor;
+        accessor.get<Meta>().clear();
+        accessor.get<Meta>().setHeaderLength(20);
+
+        accessor.get<Identification>() = 0;
+
+        accessor.get<Fragmentation>().clear();
+        accessor.get<Fragmentation>().setDontFragment(true);
+
+        accessor.get<SourceAddress>() = srcIp;
+        accessor.get<DestinationAddress>() = dstIp;
+        NET_ASSERT(accessor.fill(packet));
 	}
 
 	template<class HeaderDigester, class PayloadDigester>
@@ -42,17 +43,22 @@ struct Network<S, Args...>::Fixup {
 			uint8_t ttl,
 			uint8_t protocol)
 	{
+        using namespace IpPacket;
+
 		SummedPacketStream stream(packet);
 
 		stream.skipAhead(static_cast<uint16_t >(l2headerLength));
 
-        StructuredAccessor<IpPacket::Meta> accessor;
+        StructuredAccessor<Meta> metaAccessor;
+        NET_ASSERT(metaAccessor.extract(stream));
 
-        NET_ASSERT(accessor.extract(stream));
+        StructuredAccessor<Length, Ttl, Protocol, Checksum> accessor;
+        accessor.get<Length>() = 0;
+        accessor.get<Ttl>() = ttl;
+        accessor.get<Protocol>() = protocol;
+        accessor.get<Checksum>() = 0;
+        NET_ASSERT(accessor.fillFrom<Meta>(stream));
 
-		stream.skipAhead(static_cast<uint16_t>(6));
-		stream.write8(ttl);
-		stream.write8(protocol);
 		stream.finish();
 		headerChecksum.patch(stream.getReducedState());
 
@@ -69,26 +75,30 @@ struct Network<S, Args...>::Fixup {
 
 	static inline void headerFixupStepTwo(
 			PacketStream &modifier,
-			size_t l2HeaderSize,
+			size_t l2headerLength,
 			uint16_t length,
 			uint16_t headerChecksum)
 	{
-		static constexpr size_t lengthOffset = 2;
-		static constexpr size_t skipBetweenLengthAndChecksum = 6;
+	    using namespace IpPacket;
 
-		NET_ASSERT(modifier.skipAhead(static_cast<uint16_t>(l2HeaderSize + lengthOffset)));
-		NET_ASSERT(modifier.write16net(static_cast<uint16_t>(length)));
-		NET_ASSERT(modifier.skipAhead(skipBetweenLengthAndChecksum));
-		NET_ASSERT(modifier.write16raw(headerChecksum));
+	    modifier.skipAhead(static_cast<uint16_t >(l2headerLength));
+
+        StructuredAccessor<Length, Checksum> accessor;
+        accessor.get<Length>() = static_cast<uint16_t>(length);
+        accessor.get<Checksum>() = headerChecksum;
+        NET_ASSERT(accessor.fill(modifier));
 	}
 
 	static inline void tcpTxPostProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload)
 	{
-		checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
+		using namespace TcpPacket;
+
+	    checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
 		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
 
-		NET_ASSERT(stream.skipAhead(16));
-		NET_ASSERT(stream.write16raw(checksum.result()));
+		StructuredAccessor<Checksum> accessor;
+		accessor.get<Checksum>() = checksum.result();
+		NET_ASSERT(accessor.fill(stream));
 
 		state.increment(&DiagnosticCounters::Tcp::outputQueued);
 	}

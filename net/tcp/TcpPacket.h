@@ -38,14 +38,43 @@ namespace TcpPacket {
                     return data & ackMask;
                 }
 
+                inline void setFin(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | finMask) : (data & ~finMask));
+                }
+
+                inline void setSyn(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | synMask) : (data & ~synMask));
+                }
+
+                inline void setRst(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | rstMask) : (data & ~rstMask));
+                }
+
+                inline void setAck(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | ackMask) : (data & ~ackMask));
+                }
+
+                inline void clear() {
+                    data = 0;
+                }
+
                 inline uint16_t getDataOffset() {
                     return static_cast<uint16_t>((data & 0xf000) >> 10);
+                }
+
+                inline uint16_t setDataOffset(uint16_t offset) {
+                    return data = static_cast<uint16_t>((data & ~0xf000) | ((offset & ~3) << 10));
                 }
             } data;
 
             template<class Stream>
             inline bool read(Stream& s) {
                 return s.read16net(data.data);
+            }
+
+            template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write16net(data.data);
             }
         };
     };
@@ -56,7 +85,7 @@ namespace TcpPacket {
     struct AcknowledgementNumber: Field32<8> {};
     struct Flags: SpecialFields::FlagsAndOffset<12> {};
     struct WindowSize: Field16<14> {};
-    struct Checksum: Field16<16> {};
+    struct Checksum: Field16raw<16> {};
     struct UrgentPointer: Field16<18> {};
 }
 

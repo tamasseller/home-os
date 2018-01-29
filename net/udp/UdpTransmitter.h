@@ -22,34 +22,40 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 	}
 
 	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) {
+	    using namespace UdpPacket;
 		auto self = static_cast<UdpTransmitter*>(item);
-		NET_ASSERT(self->accessPacket().write16net(self->srcPort));
-		NET_ASSERT(self->accessPacket().write16net(self->dstPort));
-		NET_ASSERT(self->accessPacket().write32raw(0));
+
+        StructuredAccessor<SourcePort, DestinationPort, End> accessor;
+        accessor.get<SourcePort>() = self->srcPort;
+        accessor.get<DestinationPort>() = self->dstPort;
+        NET_ASSERT(accessor.fill(self->accessPacket()));
 
 		return false;
 	}
 
-	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payload) {
-		NET_ASSERT(stream.skipAhead(4));
-		stream.write16net(static_cast<uint16_t>(payload));
+	inline void postProcess(PacketStream& stream, InetChecksumDigester& checksum, size_t payloadLength)
+	{
+	    using namespace UdpPacket;
 
 		checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
-		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
-		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
+		checksum.patch(correctEndian(static_cast<uint16_t>(payloadLength)));
+		checksum.patch(correctEndian(static_cast<uint16_t>(payloadLength)));
 
-		uint16_t result = checksum.result();
+        StructuredAccessor<Length, Checksum> accessor;
+        accessor.get<Length>() = static_cast<uint16_t>(payloadLength);
 
-		/*
-		 * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
-		 *
-		 * 		"If the computed checksum is zero, it is transmitted as all
-		 * 		 ones (the equivalent in one's complement arithmetic). An all
-		 * 		 zero transmitted checksum value means that the transmitter
-		 * 		 generated  no checksum  (for debugging or for higher level
-		 * 		 protocols that don't care)."
-		 */
-		NET_ASSERT(stream.write16raw(result ? result : 0xffff));
+        /*
+         * RFC768 User Datagram Protocol (https://tools.ietf.org/html/rfc768) says:
+         *
+         *      "If the computed checksum is zero, it is transmitted as all
+         *       ones (the equivalent in one's complement arithmetic). An all
+         *       zero transmitted checksum value means that the transmitter
+         *       generated  no checksum  (for debugging or for higher level
+         *       protocols that don't care)."
+         */
+        accessor.get<Checksum>() = checksum.result() ? checksum.result() : 0xffff;
+
+        NET_ASSERT(accessor.fill(stream));
 
 		state.increment(&DiagnosticCounters::Udp::outputQueued);
 	}

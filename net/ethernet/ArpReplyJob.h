@@ -57,16 +57,16 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 
 	        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(interface->getHeaderSize())));
 
-			StructuredAccessor<SenderMac, SenderIp, TargetIp> accessor;
+			StructuredAccessor<SenderMac, SenderIp, TargetIp> requestAccessor;
 
-			NET_ASSERT(accessor.extract(reader));
+			NET_ASSERT(requestAccessor.extract(reader));
 
 			requestPacket.template dispose<Pool::Quota::Rx>();
 
 			/*
 			 * Check if the requested IP is associated with any routes out of this interface.
 			 */
-			Route* route = state.routingTable.findRouteWithSource(interface, accessor.get<TargetIp>());
+			Route* route = state.routingTable.findRouteWithSource(interface, requestAccessor.get<TargetIp>());
 			if(!route) {
 				continue;
 			} else
@@ -75,21 +75,19 @@ struct Network<S, Args...>::ArpCore<Driver>::ReplyJob: public Os::IoJob {
 			/*
 			 * Fill ethernet header with the requester as the destination and write the ARP boilerplate.
 			 */
-			interface->ArpCore::resolver.fillHeader(builder, accessor.get<SenderMac>(), 0x0806);
+			interface->ArpCore::resolver.fillHeader(builder, requestAccessor.get<SenderMac>(), 0x0806);
 
-			static constexpr const char replyBoilerplate[] = {
-				0x00, 0x01, // hwType
-				0x08, 0x00, // protoType
-				0x06,		// hSize
-				0x04, 		// pSize
-				0x00, 0x02	// opCode
-			};
-
-			NET_ASSERT(builder.copyIn(replyBoilerplate, sizeof(replyBoilerplate)) == sizeof(replyBoilerplate));
-			NET_ASSERT(builder.copyIn(reinterpret_cast<const char*>(interface->ArpCore::resolver.getAddress().bytes), 6) == 6);
-			NET_ASSERT(builder.write32net(accessor.get<TargetIp>().addr));
-			NET_ASSERT(builder.copyIn(reinterpret_cast<char*>(accessor.get<SenderMac>().bytes), 6) == 6);
-			NET_ASSERT(builder.write32net(accessor.get<SenderIp>().addr));
+            StructuredAccessor<HType, PType, HLen, PLen, Operation, SenderMac, SenderIp, TargetMac, TargetIp> replyAccessor;
+            replyAccessor.get<HType>() =      uint16_t(0x0001);
+            replyAccessor.get<PType>() =      uint16_t(0x0800);
+            replyAccessor.get<HLen>() =       0x06;
+            replyAccessor.get<PLen>() =       0x04;
+            replyAccessor.get<Operation>() =  Operation::Type::Reply;
+            replyAccessor.get<SenderMac>() =  interface->ArpCore::resolver.getAddress();
+            replyAccessor.get<SenderIp>() =   requestAccessor.get<TargetIp>();
+            replyAccessor.get<TargetMac>() =  requestAccessor.get<SenderMac>();
+            replyAccessor.get<TargetIp>() =   requestAccessor.get<SenderIp>();
+            NET_ASSERT(replyAccessor.fill(builder));
 
 			builder.done();
 			self->txReq.init(builder);

@@ -10,7 +10,6 @@
 
 #include "Network.h"
 
-static constexpr const char arpRequestPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01};
 static constexpr const char arpReplyPreamble[8] = {0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x02};
 
 /**
@@ -269,24 +268,31 @@ private:
 	 */
 	static bool arpPacketAllocated(Launcher *launcher, IoJob* item, Result result)
 	{
+	    using namespace ArpPacket;
 		IpTxJob* self = static_cast<IpTxJob*>(item);
 
         auto route = self->route;
 
 		if(result == Result::Done) {
 			auto allocator = self->packet.stage1.allocator;
-			const uint32_t senderIp = route->getSource().addr;
-			const uint32_t targetIp = self->getDestinationIpForL2().addr;
-			const AddressEthernet &senderMac = route->getDevice()->getResolver()->getAddress();
 			auto &packet = self->packet.stage2;
 
 			packet.init(allocator);
+
 			route->getDevice()->getResolver()->fillHeader(packet, AddressEthernet::broadcast, etherTypeArp);
-			packet.copyIn(arpRequestPreamble, sizeof(arpRequestPreamble));
-			packet.copyIn(reinterpret_cast<const char*>(&senderMac.bytes[0]), 6);
-			packet.write32net(senderIp);
-			packet.copyIn(reinterpret_cast<const char*>(&AddressEthernet::allZero.bytes[0]), 6);
-			packet.write32net(targetIp);
+
+			StructuredAccessor<HType, PType, HLen, PLen, Operation, SenderMac, SenderIp, TargetMac, TargetIp> arpAccessor;
+			arpAccessor.get<HType>() =      uint16_t(0x0001);
+			arpAccessor.get<PType>() =      uint16_t(0x0800);
+			arpAccessor.get<HLen>() =       0x06;
+			arpAccessor.get<PLen>() =       0x04;
+			arpAccessor.get<Operation>() =  Operation::Type::Request;
+			arpAccessor.get<SenderMac>() =  route->getDevice()->getResolver()->getAddress();
+			arpAccessor.get<SenderIp>() =   route->getSource();
+			arpAccessor.get<TargetMac>() =  AddressEthernet::allZero;
+			arpAccessor.get<TargetIp>() =   self->getDestinationIpForL2();
+			NET_ASSERT(arpAccessor.fill(packet));
+
 			packet.done();
 
 			Packet copy = self->packet.stage2;

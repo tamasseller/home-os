@@ -511,7 +511,8 @@ TEST(NetUdp, SendSimple) {
 
     work(task);
 }
-#if 0
+
+#if 1
 TEST(NetUdp, Echo) {
     struct Task: public TestTask<Task> {
 
@@ -534,8 +535,8 @@ TEST(NetUdp, Echo) {
 
     	            while(!rx.atEop()) {
     	                Net::Chunk c = rx.getChunk();
-    	                rx.advance((uint16_t)c.length());
-    					if(tx.fill(c.start, (uint16_t)c.length()) != c.length())
+    	                rx.advance((uint16_t)c.length);
+    					if(tx.fill(c.start, (uint16_t)c.length) != c.length)
     						break;
     	            }
 

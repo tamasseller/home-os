@@ -66,6 +66,25 @@ public:
         return done;
     }
 
+    inline bool skipAhead(uint16_t length)
+    {
+        auto* self = static_cast<Child*>(this);
+
+        while (length) {
+            if(self->spaceLeft() >= length) {
+                self->data += length;
+                break;
+            } else {
+                length = static_cast<uint16_t>(length - self->spaceLeft());
+
+                if(!self->takeNext())
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
     inline bool write8(uint16_t data) {
         return copyIn((const char*)&data, 1) == 1; // TODO optimize
     }

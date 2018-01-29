@@ -9,39 +9,65 @@
 #define STRUCTUREDACCESSOR_H_
 
 
-template<class... Fields> struct StructuredReader {};
+template<template<class> class Work, class... Fields> struct StructuredWorker {};
 
-template<class F, class... Rest> struct StructuredReader<F, Rest...> {
+template<template<class> class Work, class F, class... Rest> struct StructuredWorker<Work, F, Rest...> {
 	template<size_t at, class S, class Ret>
-	static bool read(S& s, Ret& ret)
+	static bool work(S& s, Ret& ret)
 	{
+        static_assert(at <= F::offset, "Wrong field order");
+
 		if(at < F::offset)
 			if(!s.skipAhead(F::offset - at))
 				return false;
 
-		if(!ret.F::read(s))
+		if(!Work<F>::work(ret, s))
 			return false;
 
-		return StructuredReader<Rest...>::template read<F::offset + F::length>(s, ret);
+		return StructuredWorker<Work, Rest...>::template work<F::offset + F::length>(s, ret);
 	}
 };
 
-template<> struct StructuredReader<> {
+template<template<class> class Work> struct StructuredWorker<Work> {
 	template<size_t, class S, class Ret>
-	static inline bool read(S& s, Ret& ret) {
+	static inline bool work(S& s, Ret& ret) {
 		return true;
 	}
 };
 
 template<class... Fields> struct StructuredAccessor: Fields... {
-	template<class F> decltype(F::data) get() {
+    template<class Field> struct Read {
+        template<class Stream>
+        static inline bool work(Field& f, Stream& s) {
+            return f.read(s);
+        }
+    };
+
+    template<class Field> struct Write {
+        template<class Stream>
+        static inline bool work(Field& f, Stream& s) {
+            return f.write(s);
+        }
+    };
+public:
+	template<class F> decltype(F::data)& get() {
 		return static_cast<F*>(this)->data;
 	}
 
 	template<class Stream>
 	bool extract(Stream& s) {
-		return StructuredReader<Fields...>::template read<0>(s, *this);
+		return StructuredWorker<Read, Fields...>::template work<0>(s, *this);
 	}
+
+    template<class Stream>
+    bool fill(Stream& s) {
+        return StructuredWorker<Write, Fields...>::template work<0>(s, *this);
+    }
+
+    template<class FirstField, class Stream>
+    bool fillFrom(Stream& s) {
+        return StructuredWorker<Write, Fields...>::template work<FirstField::offset + FirstField::length>(s, *this);
+    }
 };
 
 template<size_t off>
@@ -54,6 +80,11 @@ struct Field8 {
 	inline bool read(Stream& s) {
 		return s.read8(data);
 	}
+
+    template<class Stream>
+    inline bool write(Stream& s) {
+        return s.write8(data);
+    }
 };
 
 template<size_t off>
@@ -66,7 +97,30 @@ struct Field16 {
 	inline bool read(Stream& s) {
 		return s.read16net(data);
 	}
+
+    template<class Stream>
+    inline bool write(Stream& s) {
+        return s.write16net(data);
+    }
 };
+
+template<size_t off>
+struct Field16raw {
+    uint16_t data;
+    static constexpr auto offset = off;
+    static constexpr auto length = 2;
+
+    template<class Stream>
+    inline bool read(Stream& s) {
+        return s.read16raw(data);
+    }
+
+    template<class Stream>
+    inline bool write(Stream& s) {
+        return s.write16raw(data);
+    }
+};
+
 
 template<size_t off>
 struct Field32 {
@@ -78,6 +132,11 @@ struct Field32 {
 	inline bool read(Stream& s) {
 		return s.read32net(data);
 	}
+
+    template<class Stream>
+    inline bool write(Stream& s) {
+        return s.write32net(data);
+    }
 };
 
 template<size_t off>
@@ -87,6 +146,11 @@ struct EndMarker {
 
     template<class Stream>
     inline bool read(Stream& s) {
+        return true;
+    }
+
+    template<class Stream>
+    inline bool write(Stream& s) {
         return true;
     }
 };

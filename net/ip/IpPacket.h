@@ -22,6 +22,11 @@ namespace IpPacket {
 			inline bool read(Stream& s) {
 				return s.read32net(data.addr);
 			}
+
+			template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write32net(data.addr);
+            }
 		};
 
 		template<size_t off>
@@ -36,6 +41,14 @@ namespace IpPacket {
 				inline uint16_t getHeaderLength() {
 					return static_cast<uint16_t>((data & 0x0f00) >> 6);
 				}
+
+                inline void setHeaderLength(uint16_t length) {
+                    data = static_cast<uint16_t>((data & ~0x0f00) | ((length & ~3) << 6));
+                }
+
+                inline void clear() {
+                    data = 0x4000;
+                }
 			} data;
 
 			static constexpr auto offset = off;
@@ -50,6 +63,11 @@ namespace IpPacket {
 				s.patchNet(data.data);
 				return true;
 			}
+
+            template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write16net(data.data);
+            }
 		};
 
 		template<size_t off>
@@ -73,9 +91,25 @@ namespace IpPacket {
 					return !(data & moreFragmentsMask);
 				}
 
+                inline void setDontFragment(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | dontFragmentMask) : (data & ~dontFragmentMask));
+                }
+
+                inline void setMoreFragments(bool x) {
+                    data = static_cast<uint16_t>(x ? (data | moreFragmentsMask) : (data & ~moreFragmentsMask));
+                }
+
 				inline uint16_t getOffset() {
 					return data & offsetMask;
 				}
+
+                inline void setOffset(uint16_t offset) {
+                    data = static_cast<uint16_t>((data & ~offsetMask) | (offset & offsetMask));
+                }
+
+                inline void clear() {
+                    data = 0;
+                }
 			} data;
 
 			static constexpr auto offset = off;
@@ -85,6 +119,11 @@ namespace IpPacket {
 			inline bool read(Stream& s) {
 				return s.read16net(data.data);
 			}
+
+			template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write16net(data.data);
+            }
 		};
 	};
 
@@ -94,7 +133,7 @@ namespace IpPacket {
 	struct Fragmentation: SpecialFields::FragmentInfo<6> {};
 	struct Ttl: Field8<8> {};
 	struct Protocol: Field8<9> {};
-	struct Checksum: Field16<10> {};
+	struct Checksum: Field16raw<10> {};
 	struct SourceAddress: SpecialFields::IpAddressField<12> {};
 	struct DestinationAddress: SpecialFields::IpAddressField<16> {};
 }

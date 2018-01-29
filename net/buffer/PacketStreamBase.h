@@ -119,23 +119,6 @@ public:
 		return done;
 	}
 
-	inline bool skipAhead(uint16_t length)
-	{
-		while (length) {
-			if(spaceLeft() >= length) {
-				data += length;
-				break;
-			} else {
-				length = static_cast<uint16_t>(length - spaceLeft());
-
-				if(!takeNext())
-					return false;
-			}
-		}
-
-		return true;
-	}
-
 	inline bool isInitialized() {
 		return current != nullptr;
 	}

@@ -24,6 +24,11 @@ namespace ArpPacket {
 			inline bool read(Stream& s) {
 				return s.copyOut(reinterpret_cast<char*>(data.bytes), sizeof(data.bytes));
 			}
+
+            template<class Stream>
+            inline bool write(Stream& s) {
+                return s.copyIn(reinterpret_cast<char*>(data.bytes), sizeof(data.bytes));
+            }
 		};
 
 		template<size_t off>
@@ -42,6 +47,11 @@ namespace ArpPacket {
 				data = static_cast<Type>(temp);
 				return true;
 			}
+
+            template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write16net((uint16_t)data);
+            }
 		};
 	};
 

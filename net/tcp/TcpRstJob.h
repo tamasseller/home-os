@@ -51,25 +51,31 @@ class Network<S, Args...>::TcpCore::RstJob: public IpReplyJob<RstJob, InetChecks
             - (IpPacket::Length::offset + IpPacket::Length::length)
         )));
 
-        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags> tcpAccessor;
+        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags> requestAccessor;
 
-        NET_ASSERT(tcpAccessor.extract(reader));
+        NET_ASSERT(requestAccessor.extract(reader));
 
         auto payloadLength = static_cast<uint16_t>(ipAccessor.get<IpPacket::Length>()
-                          - (ipAccessor.get<IpPacket::Meta>().getHeaderLength() + tcpAccessor.get<Flags>().getDataOffset()));
+                          - (ipAccessor.get<IpPacket::Meta>().getHeaderLength() + requestAccessor.get<Flags>().getDataOffset()));
 
-        if(tcpAccessor.get<Flags>().hasSyn()) payloadLength++;
-        if(tcpAccessor.get<Flags>().hasFin()) payloadLength++;
+        if(requestAccessor.get<Flags>().hasSyn()) payloadLength++;
+        if(requestAccessor.get<Flags>().hasFin()) payloadLength++;
 
-		NET_ASSERT(reply.write16net(tcpAccessor.get<DestinationPort>()));
-		NET_ASSERT(reply.write16net(tcpAccessor.get<SourcePort>()));
+        StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags, WindowSize, Checksum, UrgentPointer> replyAccessor;
+        replyAccessor.get<SourcePort>() =               requestAccessor.get<DestinationPort>();
+        replyAccessor.get<DestinationPort>() =          requestAccessor.get<SourcePort>();
+        replyAccessor.get<SequenceNumber>() =           requestAccessor.get<Flags>().hasAck() ? requestAccessor.get<AcknowledgementNumber>() : 0;
+        replyAccessor.get<AcknowledgementNumber>() =    requestAccessor.get<SequenceNumber>() + payloadLength;
+        replyAccessor.get<WindowSize>() =               0;
+        replyAccessor.get<Checksum>() =                 0;
+        replyAccessor.get<UrgentPointer>() =            0;
 
-		NET_ASSERT(reply.write32net(tcpAccessor.get<Flags>().hasAck() ? tcpAccessor.get<AcknowledgementNumber>() : 0));		// seq number
-		NET_ASSERT(reply.write32net(tcpAccessor.get<SequenceNumber>() + payloadLength));				// ack number
+        replyAccessor.get<Flags>().clear();
+        replyAccessor.get<Flags>().setDataOffset(20);
+        replyAccessor.get<Flags>().setRst(true);
+        replyAccessor.get<Flags>().setAck(!requestAccessor.get<Flags>().hasAck());
 
-		NET_ASSERT(reply.write16net(tcpAccessor.get<Flags>().hasAck() ? 0x5004: 0x5014));	// Flags
-		NET_ASSERT(reply.write16net(0));		// Window size
-		NET_ASSERT(reply.write32net(0));		// Checksum and urgent pointer.
+        NET_ASSERT(replyAccessor.fill(reply));
 
 		return typename Base::FinalReplyInfo{IpProtocolNumbers::tcp, 0xff};
 	}

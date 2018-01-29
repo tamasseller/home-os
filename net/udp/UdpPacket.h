@@ -11,7 +11,7 @@ namespace UdpPacket {
     struct SourcePort: Field16<0> {};
     struct DestinationPort: Field16<2> {};
     struct Length: Field16<4> {};
-    struct Checksum: Field16<6> {};
+    struct Checksum: Field16raw<6> {};
     struct End: EndMarker<8> {};
 }
 

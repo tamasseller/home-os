@@ -1019,6 +1019,58 @@ TEST(NetPacket, StructuredAccessor) {
             	if(reader.read8(temp)) return bad;
             }
 
+            {
+                Accessor::PacketBuilder builder;
+                builder.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(1));
+
+                StructuredAccessor<X, Y, Z, W> data;
+                data.get<X>() = 0x50;
+                data.get<Y>() = 0x3eba;
+                data.get<Z>() = 0xad30dafa;
+                data.get<W>() = 0xca;
+                if(!data.fill(builder)) return bad;
+                builder.done();
+
+                Accessor::PacketStream reader(builder);
+                StructuredAccessor<X, Y, Z, W> check;
+                if(!check.extract(reader)) return bad;
+                if(check.get<X>() != 0x50) return bad;
+                if(check.get<Y>() != 0x3eba) return bad;
+                if(check.get<Z>() != 0xad30dafa) return bad;
+                if(check.get<W>() != 0xca) return bad;
+            }
+
+            {
+                Accessor::PacketBuilder builder;
+                builder.init(Accessor::pool.allocateDirect<Accessor::Pool::Quota::Tx>(1));
+
+                StructuredAccessor<Y, W> data;
+                data.get<Y>() = 0x3eba;
+                data.get<W>() = 0xca;
+                if(!data.fill(builder)) return bad;
+                builder.done();
+
+                Accessor::PacketStream reader(builder);
+                StructuredAccessor<Y, W> check;
+                if(!check.extract(reader)) return bad;
+                if(check.get<Y>() != 0x3eba) return bad;
+                if(check.get<W>() != 0xca) return bad;
+
+                Accessor::PacketStream modifier(builder);
+                StructuredAccessor<X, Z> pass2;
+                pass2.get<X>() = 0x50;
+                pass2.get<Z>() = 0xad30dafa;
+                if(!pass2.fill(modifier)) return bad;
+
+                Accessor::PacketStream reader2(builder);
+                StructuredAccessor<X, Y, Z, W> check2;
+                if(!check2.extract(reader2)) return bad;
+                if(check2.get<X>() != 0x50) return bad;
+                if(check2.get<Y>() != 0x3eba) return bad;
+                if(check2.get<Z>() != 0xad30dafa) return bad;
+                if(check2.get<W>() != 0xca) return bad;
+            }
+
 			return ok;
 		}
 	} task;
