@@ -78,7 +78,7 @@ TEST_GROUP(NetPacket) {
 	};
 
 	typedef Accessor::PacketBuilder::PacketWriterBase Writer;
-	typedef Accessor::PacketStream::PacketStreamBase Reader;
+	typedef Accessor::PacketStream::PacketReaderBase Reader;
 
 	template<const char* padding, class Data, bool (Writer::* write)(Data), bool(Reader::* read)(Data&)>
 	struct OverlapTask: TaskBase<OverlapTask<padding, Data, write, read>> {

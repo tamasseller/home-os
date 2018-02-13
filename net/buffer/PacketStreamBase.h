@@ -18,11 +18,13 @@ template<class S, class... Args>
 template<template<class> class ObserverTemplate>
 class Network<S, Args...>::PacketStreamBase:
 	public ObserverTemplate<PacketStreamBase<ObserverTemplate>>,
-	public PacketWriterBase<PacketStreamBase<ObserverTemplate>>
+	public PacketWriterBase<PacketStreamBase<ObserverTemplate>>,
+	public PacketReaderBase<PacketStreamBase<ObserverTemplate>>
 {
 	using Observer = ObserverTemplate<PacketStreamBase<ObserverTemplate>>;
 	friend Observer;
 	friend class PacketStreamBase::PacketWriterBase;
+	friend class PacketStreamBase::PacketReaderBase;
 
 	Block* current;
 	char *data, *limit;
@@ -36,33 +38,18 @@ class Network<S, Args...>::PacketStreamBase:
 		limit = data + current->getSize();
 	}
 
-	inline void updateDataPointers(size_t offset) {
-		data = current->getData() + offset;
-		limit = data + current->getSize() - offset;
-	}
-
-	inline bool advance() {
-		if(!current || current->isEndOfPacket())
-			return false;
-
-		if(Block* next = current->getNext())
-			current = next;
-		else
-			return false;
-
-		return true;
-	}
-
 	inline bool takeNext() {
 		if(data)
 			static_cast<Observer*>(this)->observeBlockAtLeave();
 
-		if(!advance()) {
+		if(!current || current->isEndOfPacket() || !current->getNext()) {
 			invalidate();
 			return false;
 		}
 
-		updateDataPointers();
+		current = current->getNext();
+		data = current->getData();
+		limit = data + current->getSize();
 		return true;
 	}
 
@@ -70,11 +57,10 @@ public:
 	inline PacketStreamBase() = default;
 
 	inline void init(const Packet& p){
-		current = Packet::Accessor::getFirst(p);
-
-		if(current)
-			updateDataPointers();
-		else
+		if((current = Packet::Accessor::getFirst(p)) != nullptr) {
+			data = current->getData();
+			limit = data + current->getSize();
+		} else
 			invalidate();
 	}
 
@@ -83,117 +69,12 @@ public:
         data = limit = nullptr;
     }
 
-	inline Chunk getChunk()
-	{
-		if(!spaceLeft()) {
-			if(!takeNext())
-				return Chunk {nullptr, 0};
-		}
-
-		return Chunk {data, spaceLeft()};
-	}
-
-	inline Chunk getFullChunk() {
-		return Chunk {current->getData(), current->getSize()};
-	}
-
-	inline void advance(size_t x) {
-		data += x;
-	}
-
-	inline uint16_t copyOut(char* output, uint16_t outputLength) {
-		uint16_t done = 0;
-		while(const uint16_t leftoverLength = static_cast<uint16_t>(outputLength - done)) {
-			if(const auto space = spaceLeft()) {
-				const size_t runLength = (space < leftoverLength) ? space : leftoverLength;
-				memcpy(output, data, runLength);
-				done = static_cast<uint16_t>(done + runLength);
-				output += runLength;
-				data += runLength;
-			} else {
-				if(!takeNext())
-					break;
-			}
-		}
-
-		return done;
-	}
-
 	inline bool isInitialized() {
 		return current != nullptr;
 	}
 
-	inline bool atEop() {
-		return !data || (!spaceLeft() && current->isEndOfPacket());
-	}
-
- 	inline bool read8(uint8_t &ret) {
-		if(spaceLeft() > 0) {
-			ret = *data++;
-			return true;
-		} else
-			return copyOut(reinterpret_cast<char*>(&ret), 1) == 1;
-	}
-
-	inline bool read16net(uint16_t &ret)
-	{
-		if(spaceLeft() > 1) {
-			uint16_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-			uint16_t b2 = static_cast<uint8_t>(*data++);
-			ret = static_cast<uint16_t>(b1 << 8 | b2);
-		} else {
-			if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
-			    return false;
-
-			ret = correctEndian(ret);
-		}
-
-        return true;
-	}
-
-	inline bool read32net(uint32_t &ret) {
-		if(spaceLeft() > 3) {
-			uint32_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-			uint32_t b2 = static_cast<uint8_t>(*data++);
-			uint32_t b3 = static_cast<uint8_t>(*data++);
-			uint32_t b4 = static_cast<uint8_t>(*data++);
-			ret = b1 << 24 | b2 << 16 | b3 << 8 | b4;
-		} else {
-			if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)
-			    return false;
-
-			ret = correctEndian(ret);
-		}
-
-		return true;
-	}
-
-	inline bool read16raw(uint16_t &ret) {
-        if(spaceLeft() > 1) {
-            uint16_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-            uint16_t b2 = static_cast<uint8_t>(*data++);
-            ret = correctEndian(static_cast<uint16_t>(b1 << 8 | b2));
-        } else {
-            if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
-                return false;
-        }
-
-        return true;
-	}
-
-	inline bool read32raw(uint32_t &ret) {
-        if(spaceLeft() > 3) {
-            uint32_t b1 = static_cast<uint8_t>(*data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-            uint32_t b2 = static_cast<uint8_t>(*data++);
-            uint32_t b3 = static_cast<uint8_t>(*data++);
-            uint32_t b4 = static_cast<uint8_t>(*data++);
-            ret = correctEndian(b1 << 24 | b2 << 16 | b3 << 8 | b4);
-        } else {
-            if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)
-                return false;
-        }
-
-        return true;
+	inline Chunk getFullChunk() {
+		return Chunk {current->getData(), current->getSize()};
 	}
 };
 

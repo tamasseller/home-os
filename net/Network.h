@@ -93,6 +93,7 @@ struct NetworkOptions {
 		template<class> class PacketInputChannelBase;
 		template<class> class PacketInputChannel;
 
+		template<class> class PacketReaderBase;
 		template<class> class PacketWriterBase;
 		template <class> class NullObserver;
 		template <class> class ChecksumObserver;
@@ -181,6 +182,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "buffer/PacketStream.h"
 #include "buffer/PacketBuilder.h"
 #include "buffer/PacketAssembler.h"
+#include "buffer/PacketReaderBase.h"
 #include "buffer/PacketStreamBase.h"
 #include "buffer/PacketWriterBase.h"
 #include "buffer/StructuredAccessor.h"

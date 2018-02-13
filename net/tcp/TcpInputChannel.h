@@ -37,6 +37,7 @@ public:
 
 	struct DataWaiter: public RxChannel::IoData {
 		inline TcpSocket* getSocket();
+		DataChain receivedData;
 	};
 
 private:
@@ -69,26 +70,19 @@ public:
 		getInputChannel()->init();
 	}
 
-	// If sequence number is correct:
-	//   - update lastAcked, and window, drop from unacked as needed, reset retransmission timer.
-	//   - if data length is not zero:
-	//   	- check if data fits the receive window (if not drop packet silently),
-	//   	- update seqnum and the window size with the length,
-	//   	- queue the socket for ACK packet transmission,
-	//   	- queue the data for reading
-	//   	- notify the reader.
-	//
-	// If the sequence number is wrong:
-	//   - increment fast retransmit dupack counter
-	//   - queue the socket for ACK packet transmission (with the old sequence number),
-	//   - drop packet.
-	//
 	inline bool takePacket(Packet p, ConnectionTag tag)
 	{
 		using namespace TcpPacket;
 
 		if(typename RxChannel::IoData* listener = this->findListener(tag)) {
-			auto socket = static_cast<DataWaiter*>(listener)->getSocket();
+			auto receiver = static_cast<DataWaiter*>(listener);
+			auto socket = receiver->getSocket();
+
+	        /*
+	         * RFC 793:
+	         *
+	         * 		"first check sequence number..."
+	         */
 
 			PacketStream reader(p);
 	    	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::Length>(reader);
@@ -97,40 +91,73 @@ public:
 
 	        NET_ASSERT(tcpAccessor.extract(reader));
 
+	        const auto headerLength = ipAccessor.template get<IpPacket::Meta>().getHeaderLength()
+	        								+ tcpAccessor.get<Flags>().getDataOffset();
+
+	        auto segSeq = tcpAccessor.get<SequenceNumber>();
+	        auto segLen = ipAccessor.template get<IpPacket::Length>() - headerLength;
+	        auto segEnd = segSeq + segLen - 1;
+
 	        const auto rcvWnd = socket->lastAdvertisedReceiveWindow;
 	        const auto rcvNxt = socket->expectedSequenceNumber;
 	        const auto rcvEnd = rcvNxt + rcvWnd;
-
-	        const auto segSeq = tcpAccessor.get<SequenceNumber>();
-	        const auto segLen = ipAccessor.template get<IpPacket::Length>()
-	                        		  - (ipAccessor.template get<IpPacket::Meta>().getHeaderLength()
-	                        		  + tcpAccessor.get<Flags>().getDataOffset());
-	        const auto segEnd = segSeq + segLen - 1;
 
 	        const bool headOk = (rcvNxt <= segSeq) && (segSeq < rcvEnd);
 	        const bool tailOk = (rcvNxt <= segEnd) && (segEnd < rcvEnd);
 
 	        const bool acceptable = (segLen && !rcvWnd) ? false : (headOk || tailOk);
 
+	        enum class Action {Drop, Ack, Keep, Reset} action = Action::Drop;
+
 	        if(acceptable) {
-	        	// TODO trim to window size (remove syn flag if trimmed off).
-	        	if((rcvNxt == segSeq) && segLen) {
+	        	auto headCutLength = headerLength;
+
+	        	if(segSeq < rcvNxt) {
+	        		// remove SYN flag as it is virtually trimmed off.
+	        		tcpAccessor.get<Flags>().setSyn(false);
+
+	        		const auto payloadCut = rcvNxt - segSeq;
+	        		headCutLength += payloadCut;
+	        		segLen -= payloadCut;
+	        		segSeq = rcvNxt;
+	        	}
+
+				p.template dropInitialBytes<Pool::Quota::Rx>(headCutLength);
+
+	        	if(rcvNxt < segEnd) {
+	        		// TODO trim end if necessary
+	        	}
+
+	        	if(rcvNxt == segSeq) {
+	    	        /*
+	    	         * RFC 793:
+	    	         *
+	    	         * 		"second check the RST bit..."
+	    	         */
 	        		if(!tcpAccessor.get<Flags>().hasRst()) {
+		    	        /*
+		    	         * RFC 793:
+		    	         *
+		    	         *		"third check security and precedence" -> bullshit
+		    	         *
+		    	         * 		"fourth, check the SYN bit..."
+		    	         */
 	        			if(!tcpAccessor.get<Flags>().hasSyn()) {
+	        				/*
+	        				 * RFC 793:
+	        				 *
+	        				 *		"fifth check the ACK field..."
+	        				 */
 	        				if(tcpAccessor.get<Flags>().hasAck()) {
 	        					const auto sndNxt = socket->nextSequenceNumber;
 	        					const auto sndUna = socket->lastReceivedAckNumber;
 
 	        					const auto segAck = tcpAccessor.get<AcknowledgementNumber>();
 
-	        					bool ok = true;
-
 	        					switch(socket->state) {
 									case TcpSocket::State::SynReceived:
 										if(!((sndUna <= segAck) && (segAck <= sndNxt))) {
-											// TODO "	If the segment acknowledgment is not acceptable,
-											//			form a reset segment	"
-											ok = false;
+											action = Action::Reset;
 											break;
 										}
 
@@ -143,7 +170,7 @@ public:
 									case TcpSocket::State::FinWait2:
 									case TcpSocket::State::Closing:
 										if(sndNxt < segAck) {
-											// TODO send ack
+											action = Action::Ack;
 										} else if (segAck <= sndUna){
 											// TODO handle dupack
 										} else {
@@ -158,33 +185,57 @@ public:
 											//			number of the last segment used to update SND.WND.	"
 										}
 
-										if(socket->state == TcpSocket::State::FinWait1) {
+										switch(socket->state) {
+										case TcpSocket::State::FinWait1:
 											// TODO "	if our FIN is now acknowledged then enter FIN-WAIT-2 and continue
 											//			processing in that state.
-										} else if(socket->state == TcpSocket::State::FinWait2) {
+											break;
+										case TcpSocket::State::FinWait2:
 											// TODO "	if the retransmission queue is empty, the user's CLOSE can be
 											//			acknowledged ("ok") but do not delete the TCB.
-										} else if(socket->state == TcpSocket::State::Closing) {
+											break;
+										case TcpSocket::State::Closing:
 											// TODO "	if the ACK acknowledges our FIN then enter the TIME-WAIT state,
-											//			otherwise ignore the segment.
-										} else if(socket->state == TcpSocket::State::LastAck) {
+											//			otherwise ignore the segment.											break;
+										case TcpSocket::State::LastAck:
 											// TODO "	The only thing that can arrive in this state is an
 											//			acknowledgment of our FIN.  If our FIN is now acknowledged,
-											//			delete the TCB, enter the CLOSED state, and return.
+											//			delete the TCB, enter the CLOSED state, and return.											break;
+										default:
+											break;
 										}
+
 										break;
 									default:
 										NET_ASSERT(false);
 	        					}
 
-								// TODO process data if in ESTABLISHED, FIN-WAIT-1 or FIN-WAIT-2, ignore otherwise.
+	        					/*
+	        					 * RFC 793:
+	        					 *
+	        					 * 		"sixth, check the URG bit" -> nope.
+	        					 *
+	        					 * 		"seventh, process the segment text..."
+	        					 */
+	        					if(segLen) {
+	        						switch(socket->state) {
+									case TcpSocket::State::FinWait1:
+									case TcpSocket::State::FinWait2:
+									case TcpSocket::State::Established:
+										action = Action::Keep;
+										break;
+									default:
+										break;
 
-								// TODO process FIN.
+	        						}
 
-	        					if(ok) {
-									// TODO put on ack queue.
-									this->RxChannel::jobDone(listener);
-									return true;
+	        						/*
+	        						 * RFC 793:
+	        						 *
+	        						 *		"eighth, check the FIN bit..."
+	        						 */
+
+	        						// TODO check FIN bit.
 	        					}
 	        				}
 	        			} else {
@@ -214,13 +265,32 @@ public:
 	        				break;
 	        			}
 	        		}
+	        	} else {
+	        		// TODO handle out of order segments.
 	        	}
 	        } else if(!tcpAccessor.get<Flags>().hasRst()) {
-	        	// TODO put on ack queue.
+	        	action = Action::Ack;
+	        }
+
+	        switch(action) {
+	        case Action::Ack:
+	        	// TODO add socket to ack job.
+
+		        /* no break here, to allow fall-through for cleanup */
+	        case Action::Drop:
+		        p.template dispose<Pool::Quota::Rx>();
+	        	break;
+	        case Action::Keep:
+				receiver->receivedData.put(p);
+				this->RxChannel::jobDone(listener);
+	        	// TODO add socket to ack job.
+	        	break;
+	        case Action::Reset:
+	        	// TODO add packet to rst job.
+	        	break;
 	        }
 
 	        state.increment(&DiagnosticCounters::Tcp::inputProcessed);
-	        p.template dispose<Pool::Quota::Rx>();
 	        return true;
 		}
 

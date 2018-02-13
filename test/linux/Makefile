@@ -77,8 +77,10 @@ SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetIpReception.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
+
 endif
 SOURCES += $(ROOT)/test/NetTcp.cpp
+
 
 # Testing utilities.
 

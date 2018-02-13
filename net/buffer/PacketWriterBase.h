@@ -12,8 +12,8 @@
 
 template<class S, class... Args>
 template <class Child>
-class Network<S, Args...>::PacketWriterBase {
-public:
+struct Network<S, Args...>::PacketWriterBase
+{
 	uint16_t copyIn(const char* input, uint16_t inputLength)
 	{
 		auto* self = static_cast<Child*>(this);

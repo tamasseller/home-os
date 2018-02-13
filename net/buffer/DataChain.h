@@ -109,6 +109,4 @@ public:
 
 };
 
-
-
 #endif /* DATACHAIN_H_ */

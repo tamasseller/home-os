@@ -88,9 +88,6 @@ class Network<S, Args...>::TcpSocket:
         LastAck
     };
 
-    /// Acknowledged packets (payload only).
-    PacketChain receivedData;
-
     /// Unacknowledged data for which a retransmission may be needed.
     PacketChain unackedPackets;
 
@@ -183,8 +180,33 @@ public:
     	return *static_cast<typename TcpCore::template TcpRx<TcpSocket>*>(this);
     }
 
+    inline const char* getStatus() {
+    	switch(state) {
+    	case State::SynSent:
+    		return "SYN-SENT";
+    	case SynReceived:
+    		return "SYN-RECEIVED";
+    	case Established:
+    		return "ESTABLISHED";
+    	case FinWait1:
+    		return "FIN-WAIT-1";
+    	case FinWait2:
+    		return "FIN-WAIT-2";
+    	case CloseWait:
+    		return "CLOSE-WAIT";
+    	case Closing:
+    		return "CLOSING";
+    	case LastAck:
+    		return "LASTACK";
+    	default:
+    		// As per RFC 793.
+    		return "error:  connection illegal for this process";
+    	}
+    }
+
     inline void init() {
     	getTx().init();
+    	getRx().init();
     }
 
     inline void abandon	() {
