@@ -81,8 +81,8 @@ namespace TcpPacket {
 
     struct SourcePort: Field16<0> {};
     struct DestinationPort: Field16<2> {};
-    struct SequenceNumber: Field32<4> {};
-    struct AcknowledgementNumber: Field32<8> {};
+    struct SequenceNumber: Field32<4> {};				// TODO make SeqNum class that handles comparison correctly
+    struct AcknowledgementNumber: Field32<8> {};		// TODO make SeqNum class that handles comparison correctly
     struct Flags: SpecialFields::FlagsAndOffset<12> {};
     struct WindowSize: Field16<14> {};
     struct Checksum: Field16raw<16> {};

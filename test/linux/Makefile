@@ -12,7 +12,6 @@ INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
 ifeq ('x','')
 
 
-
 # Atomic list related tests.
 
 SOURCES += $(ROOT)/test/LimitedCTree.cpp

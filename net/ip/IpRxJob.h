@@ -83,8 +83,11 @@ private:
     }
 
 public:
+    inline IpRxJob() = default;
+    inline IpRxJob(const Initializer&) { init(); }
+
     // Internal!
-    bool onBlocking()
+    inline bool onBlocking()
     {
         return !fetchPacket();
     }

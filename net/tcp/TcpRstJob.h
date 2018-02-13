@@ -43,20 +43,14 @@ class Network<S, Args...>::TcpCore::RstJob: public IpReplyJob<RstJob, InetChecks
 
         PacketStream reader(request);
 
-        StructuredAccessor<IpPacket::Meta, IpPacket::Length> ipAccessor;         // TODO Move blocks like this into utility functions.
-        NET_ASSERT(ipAccessor.extract(reader));
-
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(
-            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
-            - (IpPacket::Length::offset + IpPacket::Length::length)
-        )));
+    	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::Length>(reader);
 
         StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags> requestAccessor;
 
         NET_ASSERT(requestAccessor.extract(reader));
 
-        auto payloadLength = static_cast<uint16_t>(ipAccessor.get<IpPacket::Length>()
-                          - (ipAccessor.get<IpPacket::Meta>().getHeaderLength() + requestAccessor.get<Flags>().getDataOffset()));
+        auto payloadLength = static_cast<uint16_t>(ipAccessor.template get<IpPacket::Length>()
+                          - (ipAccessor.template get<IpPacket::Meta>().getHeaderLength() + requestAccessor.get<Flags>().getDataOffset()));
 
         if(requestAccessor.get<Flags>().hasSyn()) payloadLength++;
         if(requestAccessor.get<Flags>().hasFin()) payloadLength++;

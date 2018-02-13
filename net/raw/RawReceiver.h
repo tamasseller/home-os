@@ -11,9 +11,8 @@
 #include "Network.h"
 
 template<class S, class... Args>
-class Network<S, Args...>::RawReceiver: public Os::template IoRequest<
-		IpRxJob<RawReceiver, typename RawCore::InputChannel>,
-		&IpRxJob<RawReceiver, typename RawCore::InputChannel>::onBlocking>
+class Network<S, Args...>::RawReceiver:
+		public Os::template IoRequest<IpRxJob<RawReceiver, typename RawCore::InputChannel>>
 {
     friend class RawReceiver::IpRxJob;
 
@@ -39,6 +38,9 @@ class Network<S, Args...>::RawReceiver: public Os::template IoRequest<
     }
 
 public:
+    inline RawReceiver() = default;
+    inline RawReceiver(const Initializer&) { init(); }
+
     void init() {
         RawReceiver::IpRxJob::init();
         RawReceiver::IoRequest::init();

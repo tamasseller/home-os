@@ -35,7 +35,13 @@ template<template<class> class Work> struct StructuredWorker<Work> {
 	}
 };
 
-template<class... Fields> struct StructuredAccessor: Fields... {
+template<class... Fields> struct GetLastField {};
+template<class F, class... Rest> struct GetLastField<F, Rest...>: GetLastField<Rest...> {};
+template<class F> struct GetLastField<F> {
+	typedef F LastField;
+};
+
+template<class... Fields> struct StructuredAccessor: GetLastField<Fields...>, Fields... {
     template<class Field> struct Read {
         template<class Stream>
         static inline bool work(Field& f, Stream& s) {
@@ -49,6 +55,7 @@ template<class... Fields> struct StructuredAccessor: Fields... {
             return f.write(s);
         }
     };
+
 public:
 	template<class F> decltype(F::data)& get() {
 		return static_cast<F*>(this)->data;

@@ -59,7 +59,9 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 
 		state.increment(&DiagnosticCounters::Udp::outputQueued);
 	}
+
 public:
+	inline UdpTransmitter() = default;
 
 	inline void setSourcePort(uint16_t srcPort) {
 		this->srcPort = srcPort;

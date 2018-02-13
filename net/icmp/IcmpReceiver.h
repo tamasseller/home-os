@@ -12,9 +12,7 @@
 
 template<class S, class... Args>
 class Network<S, Args...>::IcmpReceiver:
-    public Os::template IoRequest<IpRxJob<
-    	IcmpReceiver, typename IcmpCore::InputChannel>,
-    	&IpRxJob<IcmpReceiver, typename IcmpCore::InputChannel>::onBlocking>
+    	public Os::template IoRequest<IpRxJob<IcmpReceiver, typename IcmpCore::InputChannel>>
 {
 	friend typename IcmpReceiver::IoRequest::IpRxJob;
 
@@ -23,6 +21,9 @@ class Network<S, Args...>::IcmpReceiver:
     }
 
 public:
+    inline IcmpReceiver() = default;
+    inline IcmpReceiver(const Initializer&) { init(); }
+
 	void init() {
 	    IcmpReceiver::IpRxJob::init();
 		IcmpReceiver::IoRequest::init();

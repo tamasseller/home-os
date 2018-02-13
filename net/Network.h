@@ -12,6 +12,7 @@
 #include "core/ArpTable.h"
 #include "core/AddressIp4.h"
 #include "core/BufferPool.h"
+#include "core/Initializer.h"
 #include "core/SharedTable.h"
 #include "core/AddressEthernet.h"
 #include "core/NetErrorStrings.h"
@@ -89,6 +90,7 @@ struct NetworkOptions {
 		class DstPortTag;
 		class ConnectionTag;
 
+		template<class> class PacketInputChannelBase;
 		template<class> class PacketInputChannel;
 
 		template<class> class PacketWriterBase;

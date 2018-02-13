@@ -64,13 +64,14 @@ public:
 
 template<class S, class... Args>
 template<class Tag>
-class Network<S, Args...>::PacketInputChannel: public Os::template SynchronousIoChannelBase<PacketInputChannel<Tag>>
+class Network<S, Args...>::PacketInputChannelBase:
+	public Os::template SynchronousIoChannelBase<PacketInputChannelBase<Tag>>
 {
-	friend class PacketInputChannel::SynchronousIoChannelBase;
+	friend class PacketInputChannelBase::SynchronousIoChannelBase;
 
 public:
 	class IoData: Tag, public Os::IoJob::Data {
-		friend class PacketInputChannel;
+		friend class PacketInputChannelBase;
 		friend class pet::LinkedList<IoData>;
 		IoData* next;
 
@@ -78,8 +79,6 @@ public:
 		Tag &accessTag() {
 			return *this;
 		}
-
-		PacketChain packets;
 	};
 
 private:
@@ -106,20 +105,32 @@ protected:
 	}
 
 public:
+	inline bool hasListener(Tag t = Tag())
+	{
+		return findListener(t) != nullptr;
+	}
+};
+
+
+template<class S, class... Args>
+template<class Tag>
+class Network<S, Args...>::PacketInputChannel: public PacketInputChannelBase<Tag>
+{
+public:
+	struct IoData: PacketInputChannel::PacketInputChannelBase::IoData {
+		PacketChain packets;
+	};
+
+public:
 	inline bool takePacket(Packet p, Tag t = Tag())
 	{
-		if(IoData* listener = findListener(t)) {
+		if(IoData* listener = static_cast<IoData*>(this->findListener(t))) {
 			listener->packets.put(p);
 			this->jobDone(listener);
 			return true;
 		}
 
 		return false;
-	}
-
-	inline bool hasListener(Tag t = Tag())
-	{
-		return findListener(t) != nullptr;
 	}
 };
 

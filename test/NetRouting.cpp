@@ -153,7 +153,6 @@ TEST(NetRoutingTable, Reception) {
 			if(!uut.add(Uut::Route(i2, AddressIp4::make(192, 168, 1, 7), 0, AddressIp4::make(192, 168, 1, 1)), true))
 				return bad;
 
-
 			auto a = uut.findRouteWithSource(i1, AddressIp4::make(169, 254, 0, 2));
 			if(a) return bad;
 

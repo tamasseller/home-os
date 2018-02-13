@@ -13,8 +13,7 @@
 template<class S, class... Args>
 class Network<S, Args...>::UdpReceiver:
     public Os::template IoRequest<
-    		IpRxJob<UdpReceiver, typename UdpCore::InputChannel>,
-    		&IpRxJob<UdpReceiver, typename UdpCore::InputChannel>::onBlocking>
+    		IpRxJob<UdpReceiver, typename UdpCore::InputChannel>>
 {
 	friend class UdpReceiver::IpRxJob;
 
@@ -28,18 +27,12 @@ class Network<S, Args...>::UdpReceiver:
     }
 
     inline void preprocess(Packet) {
-        StructuredAccessor<IpPacket::Meta, IpPacket::SourceAddress> ipAccessor;// TODO Move blocks like this into utility functions.
-        NET_ASSERT(ipAccessor.extract(*this));
-
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(
-            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
-            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
-        )));
+    	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::SourceAddress>(*this);
 
         StructuredAccessor<UdpPacket::SourcePort, UdpPacket::Length, UdpPacket::End> udpAccessor;
         NET_ASSERT(udpAccessor.extract(*this));
 
-        this->peerAddress = ipAccessor.get<IpPacket::SourceAddress>();
+        this->peerAddress = ipAccessor.template get<IpPacket::SourceAddress>();
         this->peerPort = udpAccessor.get<UdpPacket::SourcePort>();
         this->length = static_cast<uint16_t>(udpAccessor.get<UdpPacket::Length>() - UdpPacket::End::offset);
 
@@ -47,6 +40,9 @@ class Network<S, Args...>::UdpReceiver:
     }
 
 public:
+    inline UdpReceiver() = default;
+    inline UdpReceiver(const Initializer&) { init(); }
+
     AddressIp4 getPeerAddress() const {
         return peerAddress;
     }

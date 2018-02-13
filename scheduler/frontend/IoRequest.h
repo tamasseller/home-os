@@ -92,6 +92,8 @@ protected:
 	class NormalRequestLauncher;
 	class TimeoutRequestLauncher;
 
+
+
 public:
 	inline void init() {
 		Registry<IoRequestCommon>::registerObject(this);
@@ -156,7 +158,7 @@ public:
 };
 
 template<class... Args>
-template<class Job, bool (Job::*onBlocking)()>
+template<class Job>
 class Scheduler<Args...>::IoRequest:
 		public Job,
 		public IoRequestCommon
@@ -208,7 +210,7 @@ class Scheduler<Args...>::IoRequest:
     	if(this->result != IoJob::Result::NotYet)
     		return this;
 
-    	if(onBlocking && !(static_cast<Job*>(this)->*onBlocking)())
+    	if(!static_cast<Job*>(this)->onBlocking())
     		return this;
 
         return this->isOccupied() ? nullptr : this;

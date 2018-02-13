@@ -15,6 +15,8 @@ class Network<S, Args...>::RawTransmitter: public IpTransmitterBase<RawTransmitt
 	friend class RawTransmitter::IpTransmitterBase::IpTxJob;
 	static inline bool onPreparationDone(Launcher *launcher, IoJob* item) { return false; }
 public:
+    inline RawTransmitter() = default;
+    inline RawTransmitter(const Initializer&) { init(); }
 
 	inline bool prepare(AddressIp4 dst, size_t inLineSize, size_t indirectCount = 0)
 	{

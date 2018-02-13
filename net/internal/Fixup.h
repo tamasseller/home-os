@@ -102,6 +102,20 @@ struct Network<S, Args...>::Fixup {
 
 		state.increment(&DiagnosticCounters::Tcp::outputQueued);
 	}
+
+	template<class Stream, class... Fields>
+	static inline auto extractAndSkip(Stream& stream) {
+		StructuredAccessor<IpPacket::Meta, Fields...> accessor;
+
+        NET_ASSERT(accessor.extract(stream));
+
+        NET_ASSERT(stream.skipAhead(static_cast<uint16_t>(
+            accessor.template get<IpPacket::Meta>().getHeaderLength()
+            - (decltype(accessor)::LastField::offset + decltype(accessor)::LastField::length)
+        )));
+
+        return accessor;
+	}
 };
 
 #endif /* IPFIXUP_H_ */

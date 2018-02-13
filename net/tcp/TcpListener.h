@@ -10,9 +10,7 @@
 
 template<class S, class... Args>
 class Network<S, Args...>::TcpListener:
-    protected Os::template IoRequest<
-    	IpRxJob<TcpListener, typename TcpCore::ListenerChannel>,
-    	&IpRxJob<TcpListener, typename TcpCore::ListenerChannel>::onBlocking>
+    protected Os::template IoRequest<IpRxJob<TcpListener, typename TcpCore::ListenerChannel>>
 {
 	friend class TcpListener::IpRxJob;
 
@@ -39,26 +37,30 @@ class Network<S, Args...>::TcpListener:
     {
         using namespace TcpPacket;
 
-        StructuredAccessor<IpPacket::Meta, IpPacket::SourceAddress> ipAccessor;         // TODO Move blocks like this into utility functions.
-        NET_ASSERT(ipAccessor.extract(*static_cast<PacketStream*>(this)));
-
-        NET_ASSERT(this->skipAhead(static_cast<uint16_t>(
-            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
-            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
-        )));
+    	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::SourceAddress>(*this);
 
         StructuredAccessor<SourcePort, SequenceNumber> tcpAccessor;
         NET_ASSERT(tcpAccessor.extract(*static_cast<PacketStream*>(this)));
 
         this->peerPort = tcpAccessor.get<SourcePort>();
         this->initialReceivedSequenceNumber = tcpAccessor.get<SequenceNumber>();
-        this->peerAddress = ipAccessor.get<IpPacket::SourceAddress>();
+        this->peerAddress = ipAccessor.template get<IpPacket::SourceAddress>();
         this->packet = packet;
 
         state.increment(&DiagnosticCounters::Tcp::inputProcessed);
     }
 
+	bool check() {
+		if(this->isOccupied())
+			this->wait();
+
+		return error == nullptr;
+	}
+
 public:
+    inline TcpListener() = default;
+    inline TcpListener(const Initializer&) { init(); }
+
     using TcpListener::IoRequest::wait;
 
     AddressIp4 getPeerAddress() const {
@@ -98,6 +100,9 @@ public:
 			return false;
 		}
 
+		if(!check())
+			return false;
+
 		state.increment(&DiagnosticCounters::Tcp::inputConnectionAccepted);
 
 		uint32_t initialSendSequenceNumber = 0; // TODO time based generator.
@@ -114,6 +119,9 @@ public:
 		socket.lastReceivedAckNumber = initialSendSequenceNumber;
 		socket.nextSequenceNumber = initialSendSequenceNumber;
 		socket.peerWindowSize = 0;
+
+		if(!socket.getRx().launch(&TcpSocket::TcpRx::startReception))
+			return false;
 
 		socket.sendSynAck();
 

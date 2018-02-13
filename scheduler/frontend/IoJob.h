@@ -158,6 +158,15 @@ private:
 	        return true;
 	}
 
+	/**
+	 * Default implementation for IoRequest blocking hook.
+	 *
+	 * This default implementation causes the IoRequest to block the task unconditionally.
+	 */
+	inline bool onBlocking() {  				// TODO write test case for overridden hook method.
+		return true;
+	}
+
 public:
 	inline IoJob(): Sleeper(&IoJob::timedOut), Event(&IoJob::handleRequest) {}
 

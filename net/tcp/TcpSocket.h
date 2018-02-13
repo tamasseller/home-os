@@ -19,6 +19,7 @@ class Network<S, Args...>::TcpSocket:
 	friend typename TcpCore::template TcpRx<TcpSocket>;
 	friend typename TcpCore::InputChannel::WindowWaiter;
 	friend typename TcpCore::InputChannel::DataWaiter;
+	friend typename TcpCore::InputChannel;
 	friend typename TcpCore::RetransmitJob;
 	friend pet::LinkedList<TcpSocket>;
 	friend TcpListener;
@@ -111,16 +112,16 @@ class Network<S, Args...>::TcpSocket:
     uint16_t peerWindowSize;
 
     /// RFC793 SND.UNA - The last accepted ACK number.
-    uint32_t lastReceivedAckNumber;
+    uint32_t lastReceivedAckNumber; // TODO make SeqNum class that handles comparison correctly
 
     /// RFC793 SND.NXT - The next sequence number to be used for TX.
-    uint32_t nextSequenceNumber;
+    uint32_t nextSequenceNumber; // TODO make SeqNum class that handles comparison correctly
 
     /// RFC793 SND.WL1 - The sequence number of last accepted window update segment.
-    uint32_t lastWindowUpdateSeqNum;
+    uint32_t lastWindowUpdateSeqNum; // TODO make SeqNum class that handles comparison correctly
 
     /// RFC793 SND.WL2 - The acknowledgment number of last accepted window update segment.
-    uint32_t lastWindowUpdateAckNum;
+    uint32_t lastWindowUpdateAckNum; // TODO make SeqNum class that handles comparison correctly
 
     /*
      *  RFC793 Figure 5 (Receive Sequence Space):
@@ -135,7 +136,7 @@ class Network<S, Args...>::TcpSocket:
      */
 
     /// RFC793 RCV.NXT - The sequence number expected for the next acceptable packet.
-    uint32_t expectedSequenceNumber;
+    uint32_t expectedSequenceNumber; // TODO make SeqNum class that handles comparison correctly
 
     /// RFC793 RCV.WND - receive window
     uint16_t lastAdvertisedReceiveWindow;
@@ -171,6 +172,9 @@ class Network<S, Args...>::TcpSocket:
     }
 
 public:
+    inline TcpSocket() = default;
+    inline TcpSocket(const Initializer&) { init(); }
+
     auto &getTx() {
     	return *static_cast<typename TcpCore::template TcpTx<TcpSocket>*>(this);
     }
@@ -181,12 +185,11 @@ public:
 
     inline void init() {
     	getTx().init();
-    	// getRx().init();
     }
 
     inline void abandon	() {
     	getTx().abandon();
-    	// getRx().abandon();
+    	getRx().abandon();
     }
 };
 

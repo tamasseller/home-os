@@ -175,9 +175,8 @@ TEST(NetUdp, DropNoMatchingListener) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::UdpReceiver r;
+            Net::UdpReceiver r(initializer);
 
-            r.init();
             r.receive(0xf001);
 
             expectDurPur(2);
@@ -214,9 +213,8 @@ TEST(NetUdp, ReceiveSimple) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::UdpReceiver r;
+            Net::UdpReceiver r(initializer);
 
-            r.init();
             r.receive(1234);
 
             receiveSimple();
@@ -253,9 +251,8 @@ TEST(NetUdp, ReceiveNoChecksum) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::UdpReceiver r;
+            Net::UdpReceiver r(initializer);
 
-            r.init();
             r.receive(1234);
 
             receiveNoChecksum();
@@ -290,9 +287,8 @@ TEST(NetUdp, ReceiveBad) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::UdpReceiver r;
+            Net::UdpReceiver r(initializer);
 
-            r.init();
             r.receive(1234);
 
             receiveSimple();
@@ -417,9 +413,8 @@ TEST(NetUdp, ReceiveMultiple) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::UdpReceiver r;
+            Net::UdpReceiver r(initializer);
 
-            r.init();
             r.receive(1234);
 
             doIndirect([](){
@@ -512,7 +507,6 @@ TEST(NetUdp, SendSimple) {
     work(task);
 }
 
-#if 1
 TEST(NetUdp, Echo) {
     struct Task: public TestTask<Task> {
 
@@ -585,4 +579,3 @@ TEST(NetUdp, Echo) {
 
     work(task);
 }
-#endif

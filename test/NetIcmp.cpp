@@ -385,9 +385,8 @@ TEST(NetIcmp, IcmpReceiveReplyWithListener) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IcmpReceiver r;
+            Net::IcmpReceiver r(initializer);
 
-            r.init();
             r.receive();
 
             receiveReply();
@@ -420,9 +419,7 @@ TEST(NetIcmp, IcmpReceiveMultipleRepliesWithListenerAtOnce) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::IcmpReceiver r;
-
-            r.init();
+            Net::IcmpReceiver r(initializer);
             r.receive();
 
             doIndirect([](){

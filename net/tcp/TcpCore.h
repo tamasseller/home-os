@@ -21,6 +21,7 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
 	class RstJob;
 
 	template<class> class TcpTx;
+	template<class> class TcpRxJob;
 	template<class> class TcpRx;
 
 	RetransmitJob retransmitJob;
@@ -69,18 +70,12 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
 		using namespace TcpPacket;
 	    PacketStream reader(packet);
 
-        StructuredAccessor<IpPacket::Meta, IpPacket::SourceAddress> ipAccessor;// TODO Move blocks like this into utility functions.
-        NET_ASSERT(ipAccessor.extract(reader));
+    	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::SourceAddress>(reader);
 
-        NET_ASSERT(reader.skipAhead(static_cast<uint16_t>(
-            ipAccessor.get<IpPacket::Meta>().getHeaderLength()
-            - (IpPacket::SourceAddress::offset + IpPacket::SourceAddress::length)
-        )));
-
-        StructuredAccessor<SourcePort, DestinationPort, Flags> tcpAccessor;
+    	StructuredAccessor<SourcePort, DestinationPort, Flags> tcpAccessor;
         NET_ASSERT(tcpAccessor.extract(reader));
 
-		if(!inputChannel.takePacket(packet, ConnectionTag(ipAccessor.get<IpPacket::SourceAddress>(), tcpAccessor.get<SourcePort>(), tcpAccessor.get<DestinationPort>()))) {
+		if(!inputChannel.takePacket(packet, ConnectionTag(ipAccessor.template get<IpPacket::SourceAddress>(), tcpAccessor.get<SourcePort>(), tcpAccessor.get<DestinationPort>()))) {
 			if(tcpAccessor.get<Flags>().hasRst()) {
 				packet.template dispose<Pool::Quota::Rx>();
 			} else {

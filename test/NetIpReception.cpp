@@ -89,9 +89,7 @@ TEST(NetIpReception, ReceiveRawWithListener) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::RawReceiver r;
-
-            r.init();
+            Net::RawReceiver r(initializer);
             r.receive();
 
             receiveSimple();
@@ -119,9 +117,7 @@ TEST(NetIpReception, ReceiveRawRestart) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::RawReceiver r;
-
-            r.init();
+            Net::RawReceiver r(initializer);
 
             for(int i=0; i<3; i++) {
                 r.receive();
@@ -152,9 +148,7 @@ TEST(NetIpReception, Misusage) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::RawReceiver r;
-
-            r.init();
+            Net::RawReceiver r(initializer);
 
             if(checkContent(r, 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
 
@@ -188,9 +182,8 @@ TEST(NetIpReception, ReceiveRawMultiple) {
         bool run() {
             auto initialRxUsage = Accessor::pool.statRxUsed();
 
-            Net::RawReceiver r;
+            Net::RawReceiver r(initializer);
 
-            r.init();
             r.receive();
 
             doIndirect([](){

@@ -108,8 +108,8 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runNoRoute() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
+
                         if(tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
@@ -142,8 +142,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runUnresolved() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         expectArpReq(4);
 
@@ -174,8 +173,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runResolvedByHand() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         expectArpReq(1);
 
@@ -217,8 +215,7 @@ TEST_GROUP(NetIpTransmitter) {
                     bool run() {
                         auto initialRxUsage = Accessor::pool.statRxUsed();
 
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         expectArpReq(1);
 
@@ -286,8 +283,8 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runSuccessful() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
+
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
 
@@ -324,8 +321,8 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runThroughDefaultRoute() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
+
                         if(!tx.prepare(AddressIp4::make(1, 2, 3, 4), 6))
                             return Task::bad;
 
@@ -355,10 +352,9 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runLonger() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
+                        typename Net::RawTransmitter tx(initializer);
                         static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
 
-                        tx.init();
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), strlen(text)))
                             return Task::bad;
 
@@ -387,10 +383,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runWaitForBuffers() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx1, tx2;
-
-                        tx1.init();
-                        tx2.init();
+                        typename Net::RawTransmitter tx1(initializer), tx2(initializer);
 
                         static constexpr auto nBytesAvailable = Net::blockMaxPayload * (64 * 75 / 100);
 
@@ -438,10 +431,8 @@ TEST_GROUP(NetIpTransmitter) {
 			static inline void runMulti() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
+                        typename Net::RawTransmitter tx(initializer);
                         static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
-
-                        tx.init();
 
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 6))
                             return Task::bad;
@@ -477,10 +468,8 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runIndirect() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
+                        typename Net::RawTransmitter tx(initializer);
                         static constexpr const char* text = "The quick brown fox jumps over the lazy dog";
-
-                        tx.init();
 
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0, 1))
                             return Task::bad;
@@ -518,9 +507,7 @@ TEST_GROUP(NetIpTransmitter) {
                     }
 
                     bool run() {
-                        typename Net::RawTransmitter tx;
-
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         if(!tx.prepare(AddressIp4::make(10, 10, 10, 1), 0, 1))
                             return Task::bad;
@@ -586,8 +573,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runFunnyHeaders() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                    	typename Net::RawTransmitter tx;
-                    	tx.init();
+                    	typename Net::RawTransmitter tx(initializer);
 
                     	uint16_t sizes[4] = {
                     			Net::blockMaxPayload - 1,
@@ -635,10 +621,7 @@ TEST_GROUP(NetIpTransmitter) {
                              AddressIp4::make(10, 10, 10, 2)   // No ARP entry, triggers cancel in ARP request buffer allocation.
                         };
                         for(AddressIp4 target: targets) {
-                            typename Net::RawTransmitter tx1, tx2;
-
-                            tx1.init();
-                            tx2.init();
+                            typename Net::RawTransmitter tx1(initializer), tx2(initializer);
 
                             static constexpr auto nBytesAvailable = Net::blockMaxPayload * (64 * 75 / 100);
 
@@ -680,8 +663,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runTimeoutInArpRx() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         expectArpReq(1);
 
@@ -705,8 +687,7 @@ TEST_GROUP(NetIpTransmitter) {
             static inline void runCancelInArpTx() {
                 struct Task: public TestTask<Task> {
                     bool run() {
-                        typename Net::RawTransmitter tx;
-                        tx.init();
+                        typename Net::RawTransmitter tx(initializer);
 
                         expectArpReq(1);
 
