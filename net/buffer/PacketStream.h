@@ -24,7 +24,7 @@ public:
 		this->init(p);
 	}
 
-	inline void start(...) {}
+	inline void startSumming(...) {}
 	inline void patchNet(...) {}
 };
 

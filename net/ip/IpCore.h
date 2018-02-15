@@ -51,7 +51,7 @@ class Network<S, Args...>::IpCore: PacketProcessor {
 	    case IpProtocolNumbers::tcp:
 	    case IpProtocolNumbers::udp: {
 	            auto payloadLength = static_cast<uint16_t>(accessor.get<Length>() - accessor.get<Meta>().getHeaderLength());
-	            reader.start(payloadLength);
+	            reader.startSumming(payloadLength);
 	            reader.patchNet(static_cast<uint16_t>(accessor.get<SourceAddress>().addr >> 16));
 	            reader.patchNet(static_cast<uint16_t>(accessor.get<SourceAddress>().addr & 0xffff));
 	            reader.patchNet(static_cast<uint16_t>(accessor.get<DestinationAddress>().addr >> 16));

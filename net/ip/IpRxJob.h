@@ -53,8 +53,8 @@ private:
     	 * and return true to indicate that there is data to be processed.
     	 */
         Packet packet;
-        if(data.packets.peek(packet)) {
-			static_cast<PacketStream*>(this)->init(packet);
+        if(data.packets.peek(packet)) {							// XXX this is racy as fuck ()
+			static_cast<PacketStream*>(this)->init(packet);		// TODO fix race with disabling IpCore
 			static_cast<Child*>(this)->preprocess(packet);
 			return true;
         }

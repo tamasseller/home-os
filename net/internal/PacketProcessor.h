@@ -33,15 +33,6 @@ class Network<S, Args...>::PacketProcessor: Os::Event {
 		}
 	};
 
-	template<void (*worker)(Packet)>
-	struct StaticWrapper {
-		static inline void trampoline(typename Os::Event* event, uintptr_t arg) {
-			static_cast<PacketProcessor*>(event)->process(arg, [event](Packet packet){
-				(*worker)(packet);
-			});
-		}
-	};
-
 protected:
 	typedef void (*Callback)(typename Os::Event*, uintptr_t);
 
@@ -49,12 +40,6 @@ protected:
 	static constexpr Callback make() {
 		return &Wrapper<T, worker>::trampoline;
 	}
-
-	template<void (*worker)(Packet)>
-	static constexpr Callback makeStatic() {
-		return &StaticWrapper<worker>::trampoline;
-	}
-
 
 public:
 	inline PacketProcessor(Callback callback): Os::Event(callback) {}

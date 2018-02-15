@@ -21,13 +21,13 @@ struct Network<S, Args...>::PacketReaderBase
 				return Chunk {nullptr, 0};
 		}
 
-		return Chunk {self->data, self->spaceLeft()};
+		return Chunk {self->start, self->spaceLeft()};
 	}
 
 	inline void advance(size_t x)
 	{
 		auto* self = static_cast<Child*>(this);
-		self->data += x;
+		self->start += x;
 	}
 
 	inline uint16_t copyOut(char* output, uint16_t outputLength)
@@ -38,10 +38,10 @@ struct Network<S, Args...>::PacketReaderBase
 		while(const uint16_t leftoverLength = static_cast<uint16_t>(outputLength - done)) {
 			if(const auto space = self->spaceLeft()) {
 				const size_t runLength = (space < leftoverLength) ? space : leftoverLength;
-				memcpy(output, self->data, runLength);
+				memcpy(output, self->start, runLength);
 				done = static_cast<uint16_t>(done + runLength);
 				output += runLength;
-				self->data += runLength;
+				self->start += runLength;
 			} else {
 				if(!self->takeNext())
 					break;
@@ -55,7 +55,7 @@ struct Network<S, Args...>::PacketReaderBase
 	{
 		auto* self = static_cast<Child*>(this);
 
-		return !self->data || (!self->spaceLeft() && self->current->isEndOfPacket());
+		return !self->start || (!self->spaceLeft() && self->current->isEndOfPacket());
 	}
 
  	inline bool read8(uint8_t &ret)
@@ -63,7 +63,7 @@ struct Network<S, Args...>::PacketReaderBase
  		auto* self = static_cast<Child*>(this);
 
 		if(self->spaceLeft() > 0) {
-			ret = *self->data++;
+			ret = *self->start++;
 			return true;
 		} else
 			return copyOut(reinterpret_cast<char*>(&ret), 1) == 1;
@@ -74,8 +74,8 @@ struct Network<S, Args...>::PacketReaderBase
 		auto* self = static_cast<Child*>(this);
 
 		if(self->spaceLeft() > 1) {
-			uint16_t b1 = static_cast<uint8_t>(*self->data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-			uint16_t b2 = static_cast<uint8_t>(*self->data++);
+			uint16_t b1 = static_cast<uint8_t>(*self->start++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
+			uint16_t b2 = static_cast<uint8_t>(*self->start++);
 			ret = static_cast<uint16_t>(b1 << 8 | b2);
 		} else {
 			if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
@@ -92,10 +92,10 @@ struct Network<S, Args...>::PacketReaderBase
 		auto* self = static_cast<Child*>(this);
 
 		if(self->spaceLeft() > 3) {
-			uint32_t b1 = static_cast<uint8_t>(*self->data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-			uint32_t b2 = static_cast<uint8_t>(*self->data++);
-			uint32_t b3 = static_cast<uint8_t>(*self->data++);
-			uint32_t b4 = static_cast<uint8_t>(*self->data++);
+			uint32_t b1 = static_cast<uint8_t>(*self->start++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
+			uint32_t b2 = static_cast<uint8_t>(*self->start++);
+			uint32_t b3 = static_cast<uint8_t>(*self->start++);
+			uint32_t b4 = static_cast<uint8_t>(*self->start++);
 			ret = b1 << 24 | b2 << 16 | b3 << 8 | b4;
 		} else {
 			if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)
@@ -112,8 +112,8 @@ struct Network<S, Args...>::PacketReaderBase
 		auto* self = static_cast<Child*>(this);
 
         if(self->spaceLeft() > 1) {
-            uint16_t b1 = static_cast<uint8_t>(*self->data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-            uint16_t b2 = static_cast<uint8_t>(*self->data++);
+            uint16_t b1 = static_cast<uint8_t>(*self->start++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
+            uint16_t b2 = static_cast<uint8_t>(*self->start++);
             ret = correctEndian(static_cast<uint16_t>(b1 << 8 | b2));
         } else {
             if(copyOut(reinterpret_cast<char*>(&ret), 2) != 2)
@@ -128,10 +128,10 @@ struct Network<S, Args...>::PacketReaderBase
 		auto* self = static_cast<Child*>(this);
 
         if(self->spaceLeft() > 3) {
-            uint32_t b1 = static_cast<uint8_t>(*self->data++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
-            uint32_t b2 = static_cast<uint8_t>(*self->data++);
-            uint32_t b3 = static_cast<uint8_t>(*self->data++);
-            uint32_t b4 = static_cast<uint8_t>(*self->data++);
+            uint32_t b1 = static_cast<uint8_t>(*self->start++);                    // TODO move net/native order unaligned memory access abstraction to OS platform dependent module.
+            uint32_t b2 = static_cast<uint8_t>(*self->start++);
+            uint32_t b3 = static_cast<uint8_t>(*self->start++);
+            uint32_t b4 = static_cast<uint8_t>(*self->start++);
             ret = correctEndian(b1 << 24 | b2 << 16 | b3 << 8 | b4);
         } else {
             if(copyOut(reinterpret_cast<char*>(&ret), 4) != 4)

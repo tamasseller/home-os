@@ -59,7 +59,7 @@ namespace IpPacket {
 				if(!s.read16net(data.data) || !data.versionIs4() || (data.getHeaderLength() < 20))
 					return false;
 
-				s.start(static_cast<uint16_t>(((data.data & 0x0f00) >> 6) - 2));
+				s.startSumming(static_cast<uint16_t>(data.getHeaderLength() - 2));
 				s.patchNet(data.data);
 				return true;
 			}

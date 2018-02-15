@@ -79,6 +79,7 @@ SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
 endif
+#SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetTcp.cpp
 
 

@@ -23,10 +23,10 @@ struct Network<S, Args...>::PacketWriterBase
 		while(const uint16_t leftoverLength = static_cast<uint16_t>(inputLength - done)) {
 			if(const auto space = self->spaceLeft()) {
 				const size_t runLength = (space < leftoverLength) ? space : leftoverLength;
-				memcpy(self->data, input, runLength);
+				memcpy(self->start, input, runLength);
 				done = static_cast<uint16_t>(done + runLength);
 				input += runLength;
-				self->data += runLength;
+				self->start += runLength;
 			} else {
 				if(!self->takeNext())
 					break;
@@ -72,7 +72,7 @@ struct Network<S, Args...>::PacketWriterBase
 
         while (length) {
             if(self->spaceLeft() >= length) {
-                self->data += length;
+                self->start += length;
                 break;
             } else {
                 length = static_cast<uint16_t>(length - self->spaceLeft());

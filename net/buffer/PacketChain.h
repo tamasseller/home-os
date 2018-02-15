@@ -11,18 +11,13 @@
 #include "Network.h"
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketChain {
-	Block *head, *tail;
-
-public:
-	inline PacketChain(): head(nullptr), tail(nullptr) {}
-
+struct Network<S, Args...>::PacketChain: Chain {
 	bool peek(Packet &ret)
 	{
-		if(!head)
+		if(!this->head)
 			return false;
 
-		ret.init(head);
+		ret.init(this->head);
 		return true;
 	}
 
@@ -31,10 +26,10 @@ public:
 		if(!peek(ret))
 			return false;
 
-		Block *last = head->findEndOfPacket();
+		Block *last = this->head->findEndOfPacket();
 
-		if(!(head = last->getNext()))
-			tail = nullptr;
+		if(!(this->head = last->getNext()))
+			this->tail = nullptr;
 
 		last->terminate();
 		return true;
@@ -44,42 +39,15 @@ public:
 	{
 		Block *first = Packet::Accessor::getFirst(packet);
 		Block *last = first->findEndOfPacket();
-		last->terminate();
-
-		if(head)
-			tail->setNext(first);
-		else
-			head = first;
-
-		tail = last;
-	}
-
-	template<typename Pool::Quota quota>
-	void dropAll() {
-		if(head) {
-			typename Pool::Deallocator deallocator(head);
-
-	        for(Block* current = head->getNext(); current;) {
-	            Block* next = current->getNext();
-
-	            current->cleanup();
-                deallocator.take(current);
-
-	            current = next;
-	        }
-
-			deallocator.template deallocate<quota>(&state.pool);
-
-			head = tail = nullptr;
-		}
+		Chain::put(first, last);
 	}
 
 	inline void reset() {
-		head = nullptr;
+		this->head = nullptr;
 	}
 
 	inline bool isEmpty() {
-		return head == nullptr;
+		return this->head == nullptr;
 	}
 
 	static PacketChain flip(Block* first) {

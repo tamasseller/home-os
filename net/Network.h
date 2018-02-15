@@ -82,6 +82,7 @@ struct NetworkOptions {
 		template<uint16_t, class, class = void> struct InterfaceManager;
 
 		class Block;
+		class Chain;
 		class DataChain;
 		class PacketChain;
 		class PacketBuilder;
@@ -93,6 +94,7 @@ struct NetworkOptions {
 		template<class> class PacketInputChannelBase;
 		template<class> class PacketInputChannel;
 
+		class PacketStreamState;
 		template<class> class PacketReaderBase;
 		template<class> class PacketWriterBase;
 		template <class> class NullObserver;
@@ -176,6 +178,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #define NET_ASSERT(x)	Os::assert((x), "Internal error at " __FILE__ "@" STR(__LINE__))
 
 #include "buffer/Block.h"
+#include "buffer/Chain.h"
 #include "buffer/Packet.h"
 #include "buffer/DataChain.h"
 #include "buffer/PacketChain.h"
@@ -185,6 +188,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "buffer/PacketReaderBase.h"
 #include "buffer/PacketStreamBase.h"
 #include "buffer/PacketWriterBase.h"
+#include "buffer/PacketStreamState.h"
 #include "buffer/StructuredAccessor.h"
 #include "buffer/SummedPacketStream.h"
 #include "buffer/PacketTransmissionRequest.h"

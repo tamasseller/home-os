@@ -773,6 +773,51 @@ TEST(NetPacket, DataChain) {
     work(task);
 }
 
+TEST(NetPacket, DataChainConsumeBlock) {
+    struct Task: TaskBase<Task> {
+    	bool helloDestroyed = false;
+    	bool worldDestroyed = false;
+
+    	static inline void destroy(void* user, const char* data, uint32_t length) {
+    		if(data == hello)
+    			reinterpret_cast<Task*>(user)->helloDestroyed = true;
+    		else if(data == world)
+    			reinterpret_cast<Task*>(user)->worldDestroyed = true;
+    	}
+
+        bool run() {
+            Accessor::DataChain chain;
+            Accessor::PacketStream reader;
+
+            init(1);
+			if(builder.copyIn(hello, 5) != 5) return bad;
+			if(!builder.write8(' ')) return bad;
+			if(builder.copyIn(world, 5) != 5) return bad;
+			if(!builder.write8('\n')) return bad;
+			builder.done();
+			chain.put(builder);
+
+			init(3);
+            if(!builder.addByReference(hello, strlen(hello), destroy, this)) return bad;
+            if(builder.copyIn(" cruel ", 7) != 7) return bad;
+            if(!builder.addByReference(world, strlen(world), destroy, this)) return bad;
+            builder.done();
+            chain.put(builder);
+
+            if(strncmp(chain.get()->getData(), "hello world", 11) != 0) return bad;
+            if(strcmp(chain.get()->getData(), "hello") != 0) return bad;
+            if(strncmp(chain.get()->getData(), " cruel ", 7) != 0) return bad;
+            if(strcmp(chain.get()->getData(), "world") != 0) return bad;
+            if(chain.get() != nullptr) return bad;
+            if(chain.get() != nullptr) return bad;
+
+            return ok;
+        }
+    } task;
+
+    work(task);
+}
+
 TEST(NetPacket, ValidatorSimple) {
 	struct Task: TaskBase<Task> {
 	        bool run() {
@@ -794,12 +839,12 @@ TEST(NetPacket, ValidatorSimple) {
 	            if(!stream.read16net(ret)) return bad;	// header length kind of read
 	            if(ret != 0x4110) return bad;
 
-	            stream.start(2);						// check the rest of the header
+	            stream.startSumming(2);						// check the rest of the header
 
 	            if(!stream.finish()) return bad;		// finish block and check against already read part
 	            if(stream.result() == static_cast<uint16_t>(~0x4110u)) return bad;
 
-	            stream.start(10); // 'hellowor' + checksum
+	            stream.startSumming(10); // 'hellowor' + checksum
 	            if(!stream.finish()) return bad;
 	            if(stream.result()) return bad;
 
@@ -837,7 +882,7 @@ TEST(NetPacket, GeneratorSimple) {
 	            uint16_t ret;
 	            if(!stream.read16net(ret)) return bad;	// read some header info
 	            if(ret != 0x4200) return bad;
-	            stream.start(6);						// set to check rest of header
+	            stream.startSumming(6);						// set to check rest of header
 
 	            stream.patchNet(static_cast<uint16_t>(0x4200));
 	            	//update digester with already read data.
@@ -846,7 +891,7 @@ TEST(NetPacket, GeneratorSimple) {
 
 	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0xbdef))) return bad;
 
-	            stream.start(8); // 'hellowor'
+	            stream.startSumming(8); // 'hellowor'
 	            stream.finish();
 	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0x4c44))) return bad;
 
@@ -1087,7 +1132,7 @@ namespace detailsOfStructuredAccessorReal {
 			if((data & 0xf000) != 0x4000)
 				return false;
 
-			s.start(((data & 0x0f00) >> 6) - 2);
+			s.startSumming(((data & 0x0f00) >> 6) - 2);
 			s.patchNet(data);
 			return true;
 		}

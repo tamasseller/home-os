@@ -19,62 +19,43 @@ template<template<class> class ObserverTemplate>
 class Network<S, Args...>::PacketStreamBase:
 	public ObserverTemplate<PacketStreamBase<ObserverTemplate>>,
 	public PacketWriterBase<PacketStreamBase<ObserverTemplate>>,
-	public PacketReaderBase<PacketStreamBase<ObserverTemplate>>
+	public PacketReaderBase<PacketStreamBase<ObserverTemplate>>,
+	public PacketStreamState
 {
 	using Observer = ObserverTemplate<PacketStreamBase<ObserverTemplate>>;
 	friend Observer;
 	friend class PacketStreamBase::PacketWriterBase;
 	friend class PacketStreamBase::PacketReaderBase;
 
-	Block* current;
-	char *data, *limit;
-
-	constexpr inline size_t spaceLeft() const {
-	    return limit - data;
-	}
-
-	inline void updateDataPointers() {
-		data = current->getData();
-		limit = data + current->getSize();
-	}
-
 	inline bool takeNext() {
-		if(data)
+		if(this->start)
 			static_cast<Observer*>(this)->observeBlockAtLeave();
 
-		if(!current || current->isEndOfPacket() || !current->getNext()) {
-			invalidate();
+		if(!this->current || this->current->isEndOfPacket() || !this->current->getNext()) {
+			this->invalidate();
 			return false;
 		}
 
-		current = current->getNext();
-		data = current->getData();
-		limit = data + current->getSize();
+		this->updateDataPointers(this->current->getNext());
 		return true;
 	}
 
 public:
+	using PacketStreamState::invalidate;
 	inline PacketStreamBase() = default;
 
-	inline void init(const Packet& p){
-		if((current = Packet::Accessor::getFirst(p)) != nullptr) {
-			data = current->getData();
-			limit = data + current->getSize();
-		} else
-			invalidate();
-	}
-
-    void invalidate() {
-        current = nullptr;
-        data = limit = nullptr;
+    // Internal!
+    inline bool onBlocking()
+    {
+        return this->isEmpty();
     }
 
-	inline bool isInitialized() {
-		return current != nullptr;
+	inline void init(const Packet& p){
+		this->updateDataPointers(Packet::Accessor::getFirst(p));
 	}
 
 	inline Chunk getFullChunk() {
-		return Chunk {current->getData(), current->getSize()};
+		return Chunk {this->current->getData(), this->current->getSize()};
 	}
 };
 

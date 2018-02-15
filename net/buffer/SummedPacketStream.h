@@ -21,7 +21,7 @@ struct Network<S, Args...>::ChecksumObserver: InetChecksumDigester
 
 	inline size_t getOffset() {
 		auto stream = static_cast<Child*>(this);
-		return stream->data - stream->current->getData();
+		return stream->start - stream->current->getData();
 	}
 
 	inline void updateDigester(Chunk chunk)
@@ -72,7 +72,7 @@ public:
 		return totalLength;
 	}
 
-	void start(size_t newLength)
+	void startSumming(size_t newLength)
 	{
 		InetChecksumDigester::reset();
 

@@ -9,12 +9,7 @@
 #define DATACHAIN_H_
 
 template<class S, class... Args>
-class Network<S, Args...>::DataChain {
-	Block *head, *tail;
-
-public:
-	inline DataChain(): head(nullptr), tail(nullptr) {}
-
+struct Network<S, Args...>::DataChain: Chain {
 	class Packetizatation: public Packet {
 		friend DataChain;
 		Block* last;
@@ -23,11 +18,11 @@ public:
 
 	bool packetize(Packetizatation& p, uint16_t length)
 	{
-		if(!head)
+		if(!this->head)
 			return false;
 
-		p.init(head);
-		Block* last = head;
+		p.init(this->head);
+		Block* last = this->head;
 
 		while(true) {
 			auto size = last->getSize();
@@ -68,18 +63,18 @@ public:
 		if(offset != p.savedLength) {
 			revert(p);
 			last->increaseOffset(offset);
-			head = last;
+			this->head = last;
 		} else {
-			head = last->getNext();
-			if(!head)
-				tail = nullptr;
+			this->head = last->getNext();
+			if(!this->head)
+				this->tail = nullptr;
 		}
 
-		if(first != head) {
+		if(first != this->head) {
 			first->cleanup();
 			typename Pool::Deallocator deallocator(first);
 
-	        for(Block* current = first->getNext(); current != head;) {
+	        for(Block* current = first->getNext(); current != this->head;) {
 	            Block* next = current->getNext();
 
 	            current->cleanup();
@@ -96,17 +91,29 @@ public:
 	{
 		Block *first = Packet::Accessor::getFirst(packet);
 		Block *last = first->findEndOfPacket();
-		last->terminate();
 		last->clearEndOfPacket();
-
-		if(head)
-			tail->setNext(first);
-		else
-			head = first;
-
-		tail = last;
+		Chain::put(first, last);
 	}
 
+	inline Block* get()
+	{
+		if(this->head) {
+			Block* ret = this->head;
+
+			if(this->head == this->tail)
+				this->head = this->tail = nullptr;
+			else
+				this->head = this->head->getNext();
+
+			return ret;
+		}
+
+		return nullptr;
+	}
+
+	inline bool isEmpty() const {
+		return this->head == nullptr;
+	}
 };
 
 #endif /* DATACHAIN_H_ */

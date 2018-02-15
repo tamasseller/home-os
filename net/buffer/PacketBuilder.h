@@ -18,14 +18,14 @@ class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketW
 	static constexpr uint16_t maxLength = static_cast<uint16_t>(Block::dataSize);
 
 	typename Pool::Allocator allocator;
-	char *data, *limit;
+	char *start, *limit;
 
 	constexpr inline uint16_t spaceLeft() const {
-		return static_cast<uint16_t>(limit - data);
+		return static_cast<uint16_t>(limit - start);
 	}
 
 	inline void finalizeCurrent() {
-	    if(data)
+	    if(start)
 	        this->current->setSize(static_cast<uint16_t>(maxLength - spaceLeft()));
 	}
 
@@ -33,8 +33,8 @@ class Network<S, Args...>::PacketBuilder: public PacketAssembler, public PacketW
 		if(Block* next = allocator.get()) {
 			finalizeCurrent();
 			PacketAssembler::addBlock(next);
-			data = next->getData();
-			limit = data + maxLength;
+			start = next->getData();
+			limit = start + maxLength;
 			return true;
 		}
 
@@ -50,8 +50,8 @@ public:
 	inline void init(const typename Pool::Allocator& allocator) {
 		this->allocator = allocator;
 		PacketAssembler::init(this->allocator.get());
-		data = this->current->getData();
-		limit = data + maxLength;
+		start = this->current->getData();
+		limit = start + maxLength;
 	}
 
 	inline void done() {
@@ -74,7 +74,7 @@ public:
         }
 
         block->setExternal(data, length, destructor, userData);
-        this->data = this->limit = nullptr;
+        this->start = this->limit = nullptr;
         return true;
     }
 

@@ -282,6 +282,12 @@ public:
 		}
 	}
 
+	template<Quota quota>
+	inline void freeSingle(Data* data) {
+		Block* block = reinterpret_cast<Block*>(data);
+		reclaim<quota>(block, block, 1);
+	}
+
 	inline BufferPool(): Os::Event(&BufferPool::blocksReclaimed) {}
 };
 

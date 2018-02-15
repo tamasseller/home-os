@@ -13,10 +13,29 @@
 
 template<class S, class... Args>
 template<class Socket>
-struct Network<S, Args...>::TcpCore::TcpRxJob: Os::IoJob, TcpCore::InputChannel::DataWaiter
+struct Network<S, Args...>::TcpCore::TcpRxJob:
+	public PacketReaderBase<TcpRxJob<Socket>>,
+	PacketStreamState,
+	Os::IoJob,
+	InputChannel::DataWaiter
 {
 	typedef TcpRx<Socket> Self;
 	typedef typename InputChannel::DataWaiter Data;
+
+	friend class TcpRxJob::PacketReaderBase;
+
+	inline bool takeNext() {
+		if(this->current)
+			state.pool.template freeSingle<Pool::Quota::Rx>(this->current);
+
+		if(Block* next = this->receivedData.get()) { // XXX this is racy as fuck TODO fix race with disabling IpCore
+			this->updateDataPointers(next);
+			return true;
+		} else {
+			this->updateDataPointers(nullptr);
+			return false;
+		}
+	}
 
     static bool received(Launcher *launcher, IoJob* item, Result result)
     {
@@ -26,11 +45,8 @@ struct Network<S, Args...>::TcpCore::TcpRxJob: Os::IoJob, TcpCore::InputChannel:
             // self->fetchPacket();
             return true;
         } else {
-            Packet packet;
-
-        	// self->invalidateAllStates();
-
-            // self->data.packets.template dropAll<Pool::Quota::Rx>();
+        	self->PacketStreamState::invalidate();
+        	static_cast<typename InputChannel::DataWaiter*>(self)->receivedData.template dropAll<Pool::Quota::Rx>();
             return false;
         }
     }

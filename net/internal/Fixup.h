@@ -62,7 +62,7 @@ struct Network<S, Args...>::Fixup {
 		stream.finish();
 		headerChecksum.patch(stream.getReducedState());
 
-		stream.start(0xffff);
+		stream.startSumming(0xffff);
 		stream.finish();
 		payloadChecksum.patch(stream.getReducedState());
 
