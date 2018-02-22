@@ -32,7 +32,7 @@ class Network<S, Args...>::PacketStreamBase:
 			static_cast<Observer*>(this)->observeBlockAtLeave();
 
 		if(!this->current || this->current->isEndOfPacket() || !this->current->getNext()) {
-			this->invalidate();
+			this->updateDataPointers(nullptr);
 			return false;
 		}
 
@@ -41,7 +41,6 @@ class Network<S, Args...>::PacketStreamBase:
 	}
 
 public:
-	using PacketStreamState::invalidate;
 	inline PacketStreamBase() = default;
 
     // Internal!
@@ -52,6 +51,10 @@ public:
 
 	inline void init(const Packet& p){
 		this->updateDataPointers(Packet::Accessor::getFirst(p));
+	}
+
+	inline void invalidate() {
+		this->updateDataPointers(nullptr);
 	}
 
 	inline Chunk getFullChunk() {

@@ -55,7 +55,7 @@ struct Network<S, Args...>::PacketReaderBase
 	{
 		auto* self = static_cast<Child*>(this);
 
-		return !self->start || (!self->spaceLeft() && self->current->isEndOfPacket());
+		return !self->start || (!self->spaceLeft() && self->getCurrentBlock()->isEndOfPacket());
 	}
 
  	inline bool read8(uint8_t &ret)

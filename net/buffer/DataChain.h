@@ -125,6 +125,11 @@ struct Network<S, Args...>::DataChain: Chain {
 		return nullptr;
 	}
 
+	inline Block* peek()
+	{
+		return this->head;
+	}
+
 	inline bool isEmpty() const {
 		return this->head == nullptr;
 	}

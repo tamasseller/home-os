@@ -15,7 +15,7 @@ template<class S, class... Args>
 template<class Socket>
 struct Network<S, Args...>::TcpCore::TcpRxJob:
 	public PacketReaderBase<TcpRxJob<Socket>>,
-	PacketStreamState,
+	ChunkReaderState,
 	Os::IoJob,
 	InputChannel::DataWaiter
 {
@@ -48,10 +48,11 @@ struct Network<S, Args...>::TcpCore::TcpRxJob:
     }
 
 	inline bool takeNext() {
-		if(this->current)
-			state.pool.template freeSingle<Pool::Quota::Rx>(this->current);
+		if(this->isInitialized())
+			if(Block* current = this->localData.get())
+				state.pool.template freeSingle<Pool::Quota::Rx>(current);
 
-		if(Block* next = this->localData.get()) {
+		if(Block* next = this->localData.peek()) {
 			this->updateDataPointers(next);
 			return true;
 		} else {
@@ -60,12 +61,16 @@ struct Network<S, Args...>::TcpCore::TcpRxJob:
 		}
 	}
 
+	inline Block* getCurrentBlock() {
+		return this->current;
+	}
+
     static bool received(Launcher *launcher, IoJob* item, Result result)
     {
         auto self = static_cast<Self*>(item);
 
         if(result == Result::Canceled) {
-        	self->PacketStreamState::invalidate();
+        	self->ChunkReaderState::updateDataPointers(nullptr);
         	self->receivedData.template dropAll<Pool::Quota::Rx>();
         	self->localData.template dropAll<Pool::Quota::Rx>();
             return false;

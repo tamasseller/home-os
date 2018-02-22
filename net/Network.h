@@ -94,6 +94,7 @@ struct NetworkOptions {
 		template<class> class PacketInputChannelBase;
 		template<class> class PacketInputChannel;
 
+		class ChunkReaderState;
 		class PacketStreamState;
 		template<class> class PacketReaderBase;
 		template<class> class PacketWriterBase;

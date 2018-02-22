@@ -9,9 +9,9 @@
 #define PACKETSTREAMSTATE_H_
 
 template<class S, class... Args>
-class Network<S, Args...>::PacketStreamState {
+class Network<S, Args...>::ChunkReaderState
+{
 protected:
-	Block* current = nullptr; // TODO eliminate
 	char *start = nullptr, *limit = nullptr;
 
 	constexpr inline size_t spaceLeft() const {
@@ -19,22 +19,28 @@ protected:
 	}
 
 	inline void updateDataPointers(Block* current) {
-		this->current = current;
 		start = current ? current->getData() : nullptr;
 		limit = current ? (start + current->getSize()) : nullptr;
 	}
 
-    inline void invalidate() { // TODO eliminate
-        current = nullptr;
-        start = limit = nullptr;
-    }
-
 	inline bool isInitialized() {
-		return current != nullptr;
+		return start != nullptr;
 	}
 };
 
+template<class S, class... Args>
+class Network<S, Args...>::PacketStreamState: protected ChunkReaderState
+{
+protected:
+	Block* current = nullptr;
 
+	inline void updateDataPointers(Block* current) {
+		ChunkReaderState::updateDataPointers(this->current = current);
+	}
 
+	inline Block* getCurrentBlock() {
+		return this->current;
+	}
+};
 
 #endif /* PACKETSTREAMSTATE_H_ */
