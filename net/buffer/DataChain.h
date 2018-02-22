@@ -87,6 +87,20 @@ struct Network<S, Args...>::DataChain: Chain {
 		}
 	}
 
+	inline void sweepOutTo(DataChain& other)
+	{
+		if(this->head) {
+			if(other.tail)
+				other.tail->setNext(this->head);
+			else
+				other.head = this->head;
+
+			other.tail = this->tail;
+
+			this->tail = this->head = nullptr;
+		}
+	}
+
 	inline void put(Packet packet)
 	{
 		Block *first = Packet::Accessor::getFirst(packet);

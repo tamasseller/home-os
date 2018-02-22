@@ -342,7 +342,9 @@ TEST(NetTcp, EstablishIncomingAndReceiveFoobar) {
             receiveAckAfterSyn();
             receiveFoobar();
 
-            checkContent(s.getRx(), 'f', 'o', 'o', 'b', 'a', 'r');
+            s.getRx().wait();
+
+            if(!checkContent(s.getRx(), 'f', 'o', 'o', 'b', 'a', 'r')) return Task::bad;
             uint8_t x;
             if(s.getRx().read8(x)) return Task::bad;
 
