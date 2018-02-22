@@ -109,16 +109,16 @@ class Network<S, Args...>::TcpSocket:
     uint16_t peerWindowSize;
 
     /// RFC793 SND.UNA - The last accepted ACK number.
-    uint32_t lastReceivedAckNumber; // TODO make SeqNum class that handles comparison correctly
+    SeqNum lastReceivedAckNumber;
 
     /// RFC793 SND.NXT - The next sequence number to be used for TX.
-    uint32_t nextSequenceNumber; // TODO make SeqNum class that handles comparison correctly
+    SeqNum nextSequenceNumber;
 
     /// RFC793 SND.WL1 - The sequence number of last accepted window update segment.
-    uint32_t lastWindowUpdateSeqNum; // TODO make SeqNum class that handles comparison correctly
+    SeqNum lastWindowUpdateSeqNum;
 
     /// RFC793 SND.WL2 - The acknowledgment number of last accepted window update segment.
-    uint32_t lastWindowUpdateAckNum; // TODO make SeqNum class that handles comparison correctly
+    SeqNum lastWindowUpdateAckNum;
 
     /*
      *  RFC793 Figure 5 (Receive Sequence Space):
@@ -133,7 +133,7 @@ class Network<S, Args...>::TcpSocket:
      */
 
     /// RFC793 RCV.NXT - The sequence number expected for the next acceptable packet.
-    uint32_t expectedSequenceNumber; // TODO make SeqNum class that handles comparison correctly
+    SeqNum expectedSequenceNumber;
 
     /// RFC793 RCV.WND - receive window
     uint16_t lastAdvertisedReceiveWindow;

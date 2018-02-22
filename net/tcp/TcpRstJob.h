@@ -58,7 +58,7 @@ class Network<S, Args...>::TcpCore::RstJob: public IpReplyJob<RstJob, InetChecks
         StructuredAccessor<SourcePort, DestinationPort, SequenceNumber, AcknowledgementNumber, Flags, WindowSize, Checksum, UrgentPointer> replyAccessor;
         replyAccessor.get<SourcePort>() =               requestAccessor.get<DestinationPort>();
         replyAccessor.get<DestinationPort>() =          requestAccessor.get<SourcePort>();
-        replyAccessor.get<SequenceNumber>() =           requestAccessor.get<Flags>().hasAck() ? requestAccessor.get<AcknowledgementNumber>() : 0;
+        replyAccessor.get<SequenceNumber>() =           requestAccessor.get<Flags>().hasAck() ? requestAccessor.get<AcknowledgementNumber>() : SeqNum(0);
         replyAccessor.get<AcknowledgementNumber>() =    requestAccessor.get<SequenceNumber>() + payloadLength;
         replyAccessor.get<WindowSize>() =               0;
         replyAccessor.get<Checksum>() =                 0;

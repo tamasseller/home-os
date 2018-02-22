@@ -8,6 +8,7 @@
 #ifndef NETWORK_H_
 #define NETWORK_H_
 
+#include "core/SeqNum.h"
 #include "core/Routing.h"
 #include "core/ArpTable.h"
 #include "core/AddressIp4.h"

@@ -77,12 +77,30 @@ namespace TcpPacket {
                 return s.write16net(data.data);
             }
         };
+
+        template<size_t off>
+        struct SeqNumField {
+            static constexpr auto offset = off;
+            static constexpr auto length = 4;
+
+        	SeqNum data;
+
+            template<class Stream>
+            inline bool read(Stream& s) {
+                return s.read32net(data.value);
+            }
+
+            template<class Stream>
+            inline bool write(Stream& s) {
+                return s.write32net(data.value);
+            }
+        };
     };
 
     struct SourcePort: Field16<0> {};
     struct DestinationPort: Field16<2> {};
-    struct SequenceNumber: Field32<4> {};				// TODO make SeqNum class that handles comparison correctly
-    struct AcknowledgementNumber: Field32<8> {};		// TODO make SeqNum class that handles comparison correctly
+    struct SequenceNumber: SpecialFields::SeqNumField<4> {};
+    struct AcknowledgementNumber: SpecialFields::SeqNumField<8> {};
     struct Flags: SpecialFields::FlagsAndOffset<12> {};
     struct WindowSize: Field16<14> {};
     struct Checksum: Field16raw<16> {};

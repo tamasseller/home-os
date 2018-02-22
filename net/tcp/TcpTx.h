@@ -30,10 +30,10 @@ struct Network<S, Args...>::TcpCore::TcpTx:
 
 	    switch(socket->state) {
             case TcpSocket::State::SynReceived:
-            	socket->nextSequenceNumber += 1;
+            	socket->nextSequenceNumber += SeqNum(1);
                 break;
             default:
-            	socket->nextSequenceNumber += uint16_t(payload);
+            	socket->nextSequenceNumber += SeqNum(uint32_t(payload));
                 break;
 	    }
 
