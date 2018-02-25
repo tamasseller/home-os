@@ -12,39 +12,8 @@
 
 Net::Buffers packetBuffers;
 
-class UdpEchoTask: Os::Task {
-	friend class Os::Task;
-	size_t stack[64*1024*1024];
-
-	Net::UdpReceiver rx;
-	Net::UdpTransmitter tx;
-
-	void run() {
-		rx.init();
-        rx.receive(1234);
-        tx.init(1234);
-
-        while(true) {
-            rx.wait();
-
-           	tx.prepare(rx.getPeerAddress(), rx.getPeerPort(), rx.getLength());
-           	Os::assert(!tx.getError(), tx.getError());
-
-            while(!rx.atEop()) {
-                Net::Chunk c = rx.getChunk();
-                Os::assert(tx.fill(c.start, (uint16_t)c.length), "WTF?");
-                rx.advance((uint16_t)c.length);
-            }
-
-            tx.send();
-        }
-	}
-
-public:
-	void start() {
-		Os::Task::start<UdpEchoTask, &UdpEchoTask::run>(&stack, sizeof(stack));
-	}
-} udpEchoTask;
+void startUdpEchoTask();
+void startTcpEchoTask();
 
 class MainTask: Os::Task
 {
@@ -58,7 +27,8 @@ class MainTask: Os::Task
 
 		Net::template getEthernetInterface<LinuxTapDevice>()->setTapPeerAddress("172.23.45.1");
 
-		udpEchoTask.start();
+		startUdpEchoTask();
+		startTcpEchoTask();
 
 		for(int i=0; i<5 * 60 * 1000; i++) {
 			std::stringstream ss;
@@ -114,6 +84,17 @@ class MainTask: Os::Task
 
 			ss << "\tTx queued:\t\t" << stats.udp.outputQueued << std::endl;
 			ss << "\t\tWaiting:\t" << stats.udp.getTxWaiting() << std::endl;
+
+			ss << std::endl << "TCP stats: " << std::endl;
+
+			ss << "\tReceived:\t\t" << stats.tcp.inputReceived << std::endl;
+			ss << "\t\tBad format:\t" << stats.tcp.inputFormatError << std::endl;
+			ss << "\t\tUser recvd:\t" << stats.tcp.inputProcessed << std::endl;
+			ss << "\t\tNo listener:\t" << stats.tcp.inputNoPort << std::endl;
+
+			ss << "\tTx queued:\t\t" << stats.tcp.outputQueued << std::endl;
+			ss << "\t\tWaiting:\t" << stats.tcp.getTxWaiting() << std::endl;
+
 
 			const char* str = ss.str().c_str();
 			write(STDOUT_FILENO, str, strlen(str));

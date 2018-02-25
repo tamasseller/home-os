@@ -20,10 +20,12 @@ class Network<S, Args...>::TcpListener:
     Packet packet;
     uint32_t initialReceivedSequenceNumber;
     uint16_t peerPort;
+    uint16_t peerMss;
 
     inline void reset() {
         peerAddress = AddressIp4::allZero;
     	peerPort = 0;
+    	peerMss = 536;
     }
 
     inline void dispose(Packet packet) {
@@ -38,14 +40,47 @@ class Network<S, Args...>::TcpListener:
         using namespace TcpPacket;
 
     	auto ipAccessor = Fixup::template extractAndSkip<PacketStream, IpPacket::SourceAddress>(*this);
+    	auto &stream = *static_cast<PacketStream*>(this);
 
-        StructuredAccessor<SourcePort, SequenceNumber> tcpAccessor;
-        NET_ASSERT(tcpAccessor.extract(*static_cast<PacketStream*>(this)));
+        StructuredAccessor<SourcePort, SequenceNumber, Flags, End> tcpAccessor;
+        NET_ASSERT(tcpAccessor.extract(stream));
 
         this->peerPort = tcpAccessor.get<SourcePort>();
         this->initialReceivedSequenceNumber = tcpAccessor.get<SequenceNumber>();
         this->peerAddress = ipAccessor.template get<IpPacket::SourceAddress>();
         this->packet = packet;
+        this->peerMss = 536;
+
+        auto optionBytes = tcpAccessor.get<Flags>().getDataOffset() - 20;
+
+        while(optionBytes) {
+        	uint8_t kind;
+			NET_ASSERT(stream.read8(kind));
+
+        	switch(kind) {
+        	case 0:
+        	case 1:
+        		optionBytes -= 1;
+        		break;
+        	default:
+        		uint8_t length;
+        		NET_ASSERT(stream.read8(length));
+
+        		if(length <= optionBytes) {
+        			optionBytes -= length;
+        		} else {
+        			stream.skipAhead(static_cast<uint16_t>(optionBytes - 2));
+        			optionBytes = 0;
+        			break;
+        		}
+
+        		if(kind == 2 && length == 4) {
+        			NET_ASSERT(stream.read16net(this->peerMss));
+        		} else {
+        			stream.skipAhead(static_cast<uint16_t>(length - 2));
+        		}
+        	}
+        }
 
         state.increment(&DiagnosticCounters::Tcp::inputProcessed);
     }
@@ -119,6 +154,8 @@ public:
 		socket.lastReceivedAckNumber = initialSendSequenceNumber;
 		socket.nextSequenceNumber = initialSendSequenceNumber;
 		socket.peerWindowSize = 0;
+
+		socket.maximumTxSegmentSize = peerMss;
 
 		if(!socket.getRx().launch(&TcpSocket::TcpRx::startReception))
 			return false;

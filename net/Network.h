@@ -227,6 +227,7 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "tcp/TcpRx.h"
 #include "tcp/TcpTx.h"
 #include "tcp/TcpCore.h"
+#include "tcp/TcpAckJob.h"
 #include "tcp/TcpRstJob.h"
 #include "tcp/TcpSocket.h"
 #include "tcp/TcpListener.h"

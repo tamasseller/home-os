@@ -8,6 +8,8 @@ INCLUDE_DIRS += $(ROOT)/net
 INCLUDE_DIRS += $(ROOT)/scheduler
 
 SOURCES += main.cpp
+SOURCES += UdpEcho.cpp
+SOURCES += TcpEcho.cpp
 
 SOURCES += $(ROOT)/scheduler/ports/gcc-linux-um/Profile.cpp
 
@@ -51,6 +53,8 @@ CXXFLAGS += -fsanitize=bool
 CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
 CXXFLAGS += -fsanitize=undefined
+
+LIBS += ubsan gcov
 
 CXXFLAGS += -rdynamic								# Allows meaningful backtraces 
 CXXFLAGS += --coverage								# Generate program flow data and inject profiling code

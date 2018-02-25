@@ -18,6 +18,7 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
 	typedef PacketInputChannel<DstPortTag> ListenerChannel;
 	class InputChannel;
 	class RetransmitJob;
+	class AckJob;
 	class RstJob;
 
 	template<class> class TcpTx;
@@ -25,6 +26,7 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
 	template<class> class TcpRx;
 
 	RetransmitJob retransmitJob;
+	AckJob ackJob;
 	RstJob rstJob;
 	ListenerChannel listenerChannel;
     InputChannel inputChannel;

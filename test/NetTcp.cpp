@@ -95,6 +95,23 @@ TEST_GROUP(NetTcp)
     	);
     }
 
+    static inline void expectAck(uint8_t seq, uint8_t ack) {
+    	Net::template getEthernetInterface<DummyIf>()->expectN(1,
+			/*            dst                 |                src                | etherType */
+			0x00, 0xac, 0xce, 0x55, 0x1b, 0x1e, 0xee, 0xee, 0xee, 0xee, 0xee, 0x00, 0x08, 0x00,
+			/* bullsh |  length   | frag. id  | flags+off | TTL |proto|  checksum */
+			0x45, 0x00, 0x00, 0x28, 0x00, 0x00, 0x40, 0x00, 0xff, 0x06, 0x53, 0xb1,
+			/* source IP address  | destination IP address */
+			0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x1,
+			/* srcport|  dstport  |    Sequence number    */
+			0x56, 0x78, 0x12, 0x34, 0x00, 0x00, 0x00, seq,
+			/*     Ack number     | off+flags | wnd size */
+			0x00, 0x00, 0x00, ack, 0x50, 0x10, 0x04, 0x00,
+			/* checksum                                          | urgent bs */
+			0x1b - ((seq + ack > 0xa) ? 1 : 0), 0xa - seq - ack, 0x00, 0x00
+    	);
+    }
+
     static inline void receiveFoobar() {
     	Net::template getEthernetInterface<DummyIf>()->receive(
 			/*            dst                 |                src                | etherType */
@@ -340,6 +357,8 @@ TEST(NetTcp, EstablishIncomingAndReceiveFoobar) {
             s.getTx().wait();
 
             receiveAckAfterSyn();
+
+            expectAck(1, 7);
             receiveFoobar();
 
             s.getRx().wait();
@@ -357,8 +376,8 @@ TEST(NetTcp, EstablishIncomingAndReceiveFoobar) {
             if(Net::getCounterStats().tcp.inputNoPort != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputConnectionDenied != 0) return Task::bad;
             if(Net::getCounterStats().tcp.inputConnectionAccepted != 1) return Task::bad;
-//            if(Net::getCounterStats().tcp.outputQueued != 2) return Task::bad;
-//            if(Net::getCounterStats().tcp.outputSent != 2) return Task::bad;
+            if(Net::getCounterStats().tcp.outputQueued != 2) return Task::bad;
+            if(Net::getCounterStats().tcp.outputSent != 2) return Task::bad;
             if(strcmp(s.getStatus(), "ESTABLISHED") != 0) return Task::bad;
 
             s.abandon();

@@ -105,6 +105,7 @@ namespace TcpPacket {
     struct WindowSize: Field16<14> {};
     struct Checksum: Field16raw<16> {};
     struct UrgentPointer: Field16<18> {};
+    struct End: EndMarker<20> {};
 
     typedef StructuredAccessor<SourcePort, DestinationPort, SequenceNumber,
     		AcknowledgementNumber, Flags, WindowSize, Checksum, UrgentPointer> FullHeaderAccessor;

@@ -21,6 +21,7 @@ class Network<S, Args...>::TcpSocket:
 	friend typename TcpCore::InputChannel::DataWaiter;
 	friend typename TcpCore::InputChannel;
 	friend typename TcpCore::RetransmitJob;
+	friend typename TcpCore::AckJob;
 	friend pet::LinkedList<TcpSocket>;
 	friend TcpListener;
 
@@ -138,6 +139,9 @@ class Network<S, Args...>::TcpSocket:
     /// RFC793 RCV.WND - receive window
     uint16_t lastAdvertisedReceiveWindow;
 
+    uint16_t maximumTxSegmentSize;
+    uint16_t maximumRxSegmentSize;
+
     State state = State::Closed;
 
     // TODO timers: retransmission, zero window probe
@@ -178,6 +182,10 @@ public:
 
     auto &getRx() {
     	return *static_cast<typename TcpCore::template TcpRx<TcpSocket>*>(this);
+    }
+
+    inline bool isOk() {
+    	return state == Established;
     }
 
     inline const char* getStatus() {

@@ -171,18 +171,35 @@ public:
 									case TcpSocket::State::Closing:
 										if(sndNxt < segAck) {
 											action = Action::Ack;
-										} else if (segAck <= sndUna){
+										} else if (segAck < sndUna){
 											// TODO handle dupack
 										} else {
+											//
+											// RFC 793:
+											//
+											//		"If SND.UNA < SEG.ACK =< SND.NXT, the send
+											//		window should be updated."
+											//
+											if((sndUna < segAck) && (segAck <= sndNxt)) {
+												//
+												// RFC 793:
+												//
+												// 	"If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ
+												//	 and SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND,
+												//   set SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK."
+												//
+												const auto sndWl1 = socket->lastWindowUpdateSeqNum;
+												const auto sndWl2 = socket->lastWindowUpdateAckNum;
+
+												if(sndWl1 < segSeq || (sndWl1 == segSeq && sndWl2 <= segAck)) {
+													socket->lastWindowUpdateSeqNum = segSeq;
+													socket->lastWindowUpdateAckNum = segAck;
+													socket->peerWindowSize = tcpAccessor.get<WindowSize>();
+												}
+											}
+
+											socket->expectedSequenceNumber = segSeq + segLen;
 											socket->lastReceivedAckNumber = segAck;
-											// TODO "	If SND.UNA < SEG.ACK =< SND.NXT, the send window
-											//			should be updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1
-											//			= SEG.SEQ and SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND,
-											//			set SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
-											//			Note that SND.WND is an offset from SND.UNA, that SND.WL1
-											//			records the sequence number of the last segment used to
-											//			update SND.WND, and that SND.WL2 records the acknowledgment
-											//			number of the last segment used to update SND.WND.	"
 										}
 
 										switch(socket->state) {
@@ -274,8 +291,7 @@ public:
 
 	        switch(action) {
 	        case Action::Ack:
-	        	// TODO add socket to ack job.
-
+	        	state.tcpCore.ackJob.handle(*socket);
 		        /* no break here, to allow fall-through for cleanup */
 	        case Action::Drop:
 		        p.template dispose<Pool::Quota::Rx>();
@@ -283,10 +299,10 @@ public:
 	        case Action::Keep:
 				receiver->receivedData.put(p);
 				this->RxChannel::jobDone(listener);
-	        	// TODO add socket to ack job.
+				state.tcpCore.ackJob.handle(*socket);
 	        	break;
 	        case Action::Reset:
-	        	// TODO add packet to rst job.
+	        	state.tcpCore.rstJob.handlePacket(p);
 	        	break;
 	        }
 

@@ -49,7 +49,7 @@ struct Network<S, Args...>::TcpCore::TcpTx:
 
 	    switch(socket->state) {
             case TcpSocket::State::SynReceived:
-                accessor.template get<Flags>().setDataOffset(20); // TODO mss option
+                accessor.template get<Flags>().setDataOffset(20 + 4); // TODO mss option
                 accessor.template get<Flags>().setSyn(true);
                 accessor.template get<Flags>().setAck(true);
                 break;
@@ -60,13 +60,18 @@ struct Network<S, Args...>::TcpCore::TcpTx:
 
         NET_ASSERT(accessor.fill(this->accessPacket()));
 
+        NET_ASSERT(this->accessPacket().write8(2));
+        NET_ASSERT(this->accessPacket().write8(4));
+        NET_ASSERT(this->accessPacket().write16net(this->getSocket()->maximumTxSegmentSize));
+
 		return TcpTx::IpTransmitterBase::IpTxJob::template startTransmission<InetChecksumDigester>(
 				launcher, item, IpProtocolNumbers::tcp, 0x40 /* TODO */);
 	}
 
-	inline void sendSynAck(uint8_t ttl = 64)
+	inline void sendSynAck(uint16_t mss = 536)
 	{
-		const size_t size = 20; // TODO MSS option.
+		this->getSocket()->maximumRxSegmentSize = mss;
+		const size_t size = 20 + 4;
 
 		bool later = this->launch(
 				&TcpTx::IpTransmitterBase::IpTxJob::startPreparation,
