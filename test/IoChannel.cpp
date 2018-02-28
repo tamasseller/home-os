@@ -64,8 +64,10 @@ TEST(IoChannelTimeout) {
 
 				if(checkJobs() != i) return bad;
 
-				return ok;
+				return ok; // XXX WTF?
 			}
+
+			return ok;
 		}
 	} task;
 

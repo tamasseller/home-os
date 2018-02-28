@@ -23,13 +23,13 @@ TEST(AtomicListReissue) {
 	OsRr::SharedAtomicList list;
 
 	struct Element: OsRr::SharedAtomicList::Element {
-		OsRr::Atomic<int> data = 0;
+		home::Atomic<int> data = 0;
 		uintptr_t argMax = 0;
 		void work(uintptr_t arg) {
 			if(argMax < arg)
 				argMax = arg;
 
-			data.increment(static_cast<int>(arg));
+			AtomicUtils::increment(data, static_cast<int>(arg));
 		}
 	};
 

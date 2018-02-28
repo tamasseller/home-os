@@ -7,9 +7,10 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/net
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/scheduler
-INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-linux-um
+INCLUDE_DIRS += $(ROOT)/arch/gcc-linux-um
 
 ifeq ('x','')
+endif
 
 
 # Atomic list related tests.
@@ -64,7 +65,7 @@ SOURCES += $(ROOT)/test/IoChannel.cpp
 
 
 # Networking related tests.
-#endif
+
 SOURCES += $(ROOT)/test/NetTcp.cpp
 SOURCES += $(ROOT)/test/NetUdp.cpp
 SOURCES += $(ROOT)/test/NetIcmp.cpp
@@ -78,15 +79,12 @@ SOURCES += $(ROOT)/test/NetIpReception.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
-endif
-SOURCES += $(ROOT)/test/NetTcp.cpp
-
 
 # Testing utilities.
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/scheduler/ports/gcc-linux-um/Profile.cpp
+SOURCES += $(ROOT)/arch/gcc-linux-um/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp
@@ -117,7 +115,6 @@ CXXFLAGS += -Wno-unused
 CXXFLAGS += -Werror
 CXXFLAGS += -Wconversion
 CXXFLAGS += -Wuseless-cast
-CXXFLAGS += -Wcast-align
 CXXFLAGS += -fsanitize=shift
 CXXFLAGS += -fsanitize=integer-divide-by-zero
 CXXFLAGS += -fsanitize=unreachable
@@ -126,7 +123,6 @@ CXXFLAGS += -fsanitize=null
 CXXFLAGS += -fsanitize=return
 CXXFLAGS += -fsanitize=signed-integer-overflow
 CXXFLAGS += -fsanitize=bounds
-CXXFLAGS += -fsanitize=alignment
 CXXFLAGS += -fsanitize=object-size
 CXXFLAGS += -fsanitize=float-divide-by-zero
 CXXFLAGS += -fsanitize=float-cast-overflow
@@ -135,7 +131,6 @@ CXXFLAGS += -fsanitize=returns-nonnull-attribute
 CXXFLAGS += -fsanitize=bool
 CXXFLAGS += -fsanitize=enum
 CXXFLAGS += -fsanitize=vptr
-CXXFLAGS += -fsanitize=undefined
 
 LIBS += ubsan gcov
 

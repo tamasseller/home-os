@@ -90,8 +90,6 @@ struct SchedulerOptions {
 		using TickType = typename Profile::TickType;
 		class ErrorStrings;
 
-		template<class Data> class Atomic;
-
 		class Task;
 		class Mutex;
 		class SharedAtomicList;
@@ -258,8 +256,6 @@ using Scheduler = SchedulerOptions::Configurable<Args...>;
 #include "syscall/ErrorStrings.h"
 #include "syscall/ObjectRegistry.h"
 
-
-#include "internal/Atomic.h"
 #include "internal/SharedAtomicList.h"
 #include "internal/Event.h"
 #include "internal/Timeout.h"

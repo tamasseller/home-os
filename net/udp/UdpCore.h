@@ -40,8 +40,8 @@ struct Network<S, Args...>::UdpCore: Network<S, Args...>::RxPacketHandler {
 		 * 		no checksum  (for debugging or for higher level  protocols that don't care)."
 		 */
 		if(accessor.get<UdpPacket::Checksum>() != 0) {
-			reader.patch(correctEndian(static_cast<uint16_t>(length)));
-			reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
+			reader.patch(home::reverseBytes16(static_cast<uint16_t>(length)));
+			reader.patch(home::reverseBytes16(static_cast<uint16_t>(IpProtocolNumbers::udp)));
 
 			if(!reader.finish() || reader.result())
 				goto formatError;

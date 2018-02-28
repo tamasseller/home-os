@@ -7,8 +7,8 @@ INCLUDE_DIRS += $(ROOT)
 INCLUDE_DIRS += $(ROOT)/net
 INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/scheduler
-INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-m0
-INCLUDE_DIRS += $(ROOT)/scheduler/ports/gcc-cortex-common
+INCLUDE_DIRS += $(ROOT)/arch/gcc-cortex-m0
+INCLUDE_DIRS += $(ROOT)/arch/gcc-cortex-common
 
 ifeq ('x','')
 endif
@@ -76,7 +76,7 @@ SOURCES += $(ROOT)/test/NetIpTransmission.cpp
 
 SOURCES += $(ROOT)/test/common/CommonTestUtils.cpp
 
-SOURCES += $(ROOT)/scheduler/ports/gcc-cortex-m0/Profile.cpp
+SOURCES += $(ROOT)/arch/gcc-cortex-m0/Profile.cpp
 
 SOURCES += $(PET)/1test/TestRunner.cpp
 SOURCES += $(PET)/1test/TraceOutput.cpp

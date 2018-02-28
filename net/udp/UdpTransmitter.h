@@ -37,9 +37,9 @@ class Network<S, Args...>::UdpTransmitter: public IpTransmitterBase<UdpTransmitt
 	{
 	    using namespace UdpPacket;
 
-		checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::udp)));
-		checksum.patch(correctEndian(static_cast<uint16_t>(payloadLength)));
-		checksum.patch(correctEndian(static_cast<uint16_t>(payloadLength)));
+		checksum.patch(home::reverseBytes16(static_cast<uint16_t>(IpProtocolNumbers::udp)));
+		checksum.patch(home::reverseBytes16(static_cast<uint16_t>(payloadLength)));
+		checksum.patch(home::reverseBytes16(static_cast<uint16_t>(payloadLength)));
 
         StructuredAccessor<Length, Checksum> accessor;
         accessor.get<Length>() = static_cast<uint16_t>(payloadLength);

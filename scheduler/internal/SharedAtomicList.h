@@ -22,6 +22,9 @@
 
 #include "Scheduler.h"
 
+#include "Atomic.h"
+#include "internal/AtomicUtils.h"
+
 namespace home {
 
 template<class... Args>
@@ -30,7 +33,7 @@ class Scheduler<Args...>::SharedAtomicList
 public:
 	class Element {
 		friend class SharedAtomicList;
-		Atomic<uintptr_t> arg;
+		Atomic<uintptr_t> arg = 0;
 		Element* next;
 	};
 
@@ -49,7 +52,7 @@ public:
 				 */
 				current = current->next;
 
-				arg = ret->arg.reset();
+				arg = AtomicUtils::reset(ret->arg);
 
 				return ret;
 			}
@@ -78,7 +81,7 @@ public:
 		/*
 		 * Take over the current list atomically.
 		 */
-		Element* current = first.reset();
+		Element* current = AtomicUtils::reset(first);
 
 		/*
 		 * The list is in reverse order, in order to enable sane

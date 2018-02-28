@@ -122,7 +122,6 @@ public:
 	typedef Block Storage[nBlocks];
 
 private:
-	template<class Value> using Atomic = typename Os::template Atomic<Value>;
 	struct ReservationQueue;
 	struct AtomicPool;
 

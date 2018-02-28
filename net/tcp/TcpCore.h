@@ -53,8 +53,8 @@ struct Network<S, Args...>::TcpCore: Network<S, Args...>::RxPacketHandler
         if(!tcpAccessor.extract(reader) || (length < tcpAccessor.get<Flags>().getDataOffset()))
 			goto formatError;
 
-		reader.patch(correctEndian(static_cast<uint16_t>(length)));
-		reader.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
+		reader.patch(home::reverseBytes16(static_cast<uint16_t>(length)));
+		reader.patch(home::reverseBytes16(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
 
 		if(!reader.finish() || reader.result())
 			goto formatError;

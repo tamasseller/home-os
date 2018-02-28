@@ -36,7 +36,6 @@ namespace home {
 
 class ProfileLinuxUm {
 public:
-	template<class Data> class Atomic;
 	typedef uint32_t TickType;
 	class Task {
 		friend ProfileLinuxUm;
@@ -154,37 +153,6 @@ inline uintptr_t ProfileLinuxUm::sync(T ... ops) {
 	kill(getpid(), SIGUSR1);
 	return realCurrentTask()->returnValue;
 }
-
-template<class Data>
-class ProfileLinuxUm::Atomic {
-	volatile Data data;
-public:
-	inline Atomic(): data(0) {}
-
-	inline Atomic(Data value) {
-		data = value;
-	}
-
-	inline operator Data() {
-		return data;
-	}
-
-	template<class Op, class... Args>
-	inline Data operator()(Op&& op, Args... args)
-	{
-		Data old, result;
-
-		do {
-			old = this->data;
-
-			if(!op(old, result, args...))
-				break;
-
-		} while(!__sync_bool_compare_and_swap(&this->data, old, result));
-
-		return old;
-	}
-};
 
 }
 

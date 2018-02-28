@@ -9,6 +9,7 @@
 #define SUMMEDPACKETSTREAM_H_
 
 #include "Network.h"
+#include "Access.h"
 
 template<class S, class... Args>
 template<class Child>
@@ -84,7 +85,7 @@ public:
 	}
 
 	void patchNet(uint16_t n) {
-		this->patch(Network<S, Args...>::correctEndian(n));
+		this->patch(home::reverseBytes16(n));
 	}
 };
 

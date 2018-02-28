@@ -67,7 +67,7 @@ struct Network<S, Args...>::Fixup {
 		payloadChecksum.patch(stream.getReducedState());
 
 		auto length = stream.getLength() - l2headerLength;
-		headerChecksum.patch(correctEndian(static_cast<uint16_t>(length)));
+		headerChecksum.patch(home::reverseBytes16(static_cast<uint16_t>(length)));
 
 		stream.goToEnd();
 		return static_cast<uint16_t>(length);
@@ -93,8 +93,8 @@ struct Network<S, Args...>::Fixup {
 	{
 		using namespace TcpPacket;
 
-	    checksum.patch(correctEndian(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
-		checksum.patch(correctEndian(static_cast<uint16_t>(payload)));
+	    checksum.patch(home::reverseBytes16(static_cast<uint16_t>(IpProtocolNumbers::tcp)));
+		checksum.patch(home::reverseBytes16(static_cast<uint16_t>(payload)));
 
 		StructuredAccessor<Checksum> accessor;
 		accessor.get<Checksum>() = checksum.result();

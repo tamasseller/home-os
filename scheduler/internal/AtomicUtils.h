@@ -24,46 +24,48 @@
 
 namespace home {
 
-template<class... Args>
-template<class Data>
-struct Scheduler<Args...>::Atomic: Profile::template Atomic<Data>
-{
-	inline Atomic(): Profile::template Atomic<Data>(0) {}
-	inline Atomic(Data value): Profile::template Atomic<Data>(value) {}
+template<class Data> class Atomic;
 
-	Data increment() {
-		return (*this)([](Data old, Data& result){
+struct AtomicUtils
+{
+	template<class Data>
+	static inline Data increment(Atomic<Data>& x) {
+		return x([](Data old, Data& result){
 			result = static_cast<Data>(old + 1);
 			return true;
 		});
 	}
 
-	Data increment(Data amount) {
-		return (*this)([](Data old, Data& result, Data amount){
+	template<class Data>
+	static inline Data increment(Atomic<Data>& x, Data amount) {
+		return x([](Data old, Data& result, Data amount){
 			result = static_cast<Data>(old + amount);
 			return true;
 		}, amount);
 	}
 
-	Data decrement() {
-		return (*this)([](Data old, Data& result){
+	template<class Data>
+	static inline Data decrement(Atomic<Data>& x) {
+		return x([](Data old, Data& result){
 			result = static_cast<Data>(old - 1);
 			return true;
 		});
 	}
 
-	Data reset() {
-		return (*this)([](Data old, Data& result){
+	template<class Data>
+	static inline Data reset(Atomic<Data>& x) {
+		return x([](Data old, Data& result){
 			result = 0;
 			return true;
 		});
 	}
 
-	bool compareAndSwap(Data expected, Data update)
+	template<class Data>
+	static inline bool compareAndSwap(Atomic<Data>& x, Data expected, Data update)
 	{
 	    bool done = false;
 
-		return expected == (*this)([&done, expected, update](Data old, Data& result){
+		return expected == x([&done, expected, update](Data old, Data& result) {
 			if(old == expected) {
 			    done = true;
 				result = update;

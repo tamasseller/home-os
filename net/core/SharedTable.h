@@ -25,12 +25,12 @@
 template<class Os, class Data, size_t nItems>
 struct SharedTable
 {
-        class Entry: Os::template Atomic<uintptr_t>, DataContainer<Data> {
+        class Entry: Atomic<uintptr_t>, DataContainer<Data> {
             friend class SharedTable;
 
             static constexpr uintptr_t validFlag = (uintptr_t)1 << (sizeof(uintptr_t) * 8 - 1);
 
-            typename Os::template Atomic<uintptr_t> &getFlags() {
+            Atomic<uintptr_t> &getFlags() {
                 return *this;
             }
 

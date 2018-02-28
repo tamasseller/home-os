@@ -29,7 +29,7 @@ private:
 	using Callback = typename IoJob::Callback;
 
 	LinkAddressingManager* const resolver;
-    typename Os::template Atomic<uint16_t> nBuffersRequested;
+    Atomic<uint32_t> nBuffersRequested;
 	uint16_t headerSize;
 
     static inline bool buffersAcquired(Launcher *launcher, IoJob* item, Result result)
@@ -39,7 +39,7 @@ private:
 
     	self->takeRxBuffers(static_cast<typename Pool::IoData*>(self)->allocator);
 
-    	if(uint16_t n = self->nBuffersRequested.reset()) {
+    	if(auto n = uint16_t(AtomicUtils::reset(self->nBuffersRequested))) {
         	return state.pool.template allocateDirectOrDeferred<Pool::Quota::Rx>(
         			launcher,
         			&Interface::buffersAcquired,
@@ -53,7 +53,8 @@ private:
     {
 		auto self = static_cast<Interface*>(item);
 
-		self->request.size = self->nBuffersRequested.reset();
+
+		self->request.size = uint16_t(AtomicUtils::reset(self->nBuffersRequested));
         self->request.quota = Pool::Quota::Rx;
 
    		launcher->launch(&state.pool, &Interface::buffersAcquired, static_cast<typename Pool::IoData*>(self));
@@ -84,7 +85,7 @@ public:
         typename Pool::Allocator ret = state.pool.template allocateDirect<Pool::Quota::Rx>(n);
 
         if(!ret.hasMore()) {
-            this->nBuffersRequested.increment(n);
+            AtomicUtils::increment(this->nBuffersRequested, uint32_t(n));
             this->launch(&Interface::acquireBuffers);
         } else {
             this->takeRxBuffers(ret);

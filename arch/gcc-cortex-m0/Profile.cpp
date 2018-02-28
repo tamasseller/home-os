@@ -18,13 +18,14 @@
  *******************************************************************************/
 
 #include "Profile.h"
+#include "Atomic.h"
 
 home::ProfileCortexM0::Task* volatile home::ProfileCortexM0::currentTask;
 home::ProfileCortexM0::Task* volatile home::ProfileCortexM0::oldTask;
 void* home::ProfileCortexM0::suspendedPc;
 void* home::ProfileCortexM0::mspAtStart;
 
-volatile bool home::ProfileCortexM0::exclusiveMonitor = false;
+volatile bool home::detail::exclusiveMonitor = false;
 
 volatile uint32_t home::ProfileCortexM0::tick = 0;
 

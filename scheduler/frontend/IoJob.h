@@ -142,7 +142,7 @@ private:
 	}
 
 	bool acquire() {
-	    return channel.compareAndSwap(nullptr, reinterpret_cast<IoChannel*>(-1));
+	    return AtomicUtils::compareAndSwap(channel, static_cast<IoChannel*>(nullptr), reinterpret_cast<IoChannel*>(-1));
 	}
 
 	template<class Method, class... C>

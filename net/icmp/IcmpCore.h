@@ -59,7 +59,7 @@ struct Network<S, Args...>::IcmpCore: Network<S, Args...>::RxPacketHandler {
 			reader.advance(static_cast<uint16_t>(chunk.length));
 		}
 
-		sum.patch(correctEndian(typeCode));
+		sum.patch(home::reverseBytes16(typeCode));
 
 		if(sum.result() != 0)
 			goto formatError;

@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 
-#include "../gcc-cortex-common/Atomic.h"
+#include "../gcc-cortex-common/AtomicCommon.h"
 #include "../gcc-cortex-common/Scb.h"
 #include "../gcc-cortex-common/Svc.h"
 
@@ -37,31 +37,12 @@ class ProfileCortexM0 {
 	friend void ::SVC_Handler();
 	friend void ::SysTick_Handler();
 
-	template<class Value> inline static bool storeExclusive(volatile Value*, Value);
-
-	template<class Value>
-	static inline Value loadExclusive(volatile Value* addr)
-	{
-		exclusiveMonitor = true;
-		Value ret = *addr;
-		asm volatile("":::"memory");
-		return ret;
-	}
-
-	static inline void clearExclusive()
-	{
-		exclusiveMonitor = false;
-		asm volatile("":::"memory");
-	}
-
 public:
 	class Task {
 		friend ProfileCortexM0;
 		void* sp;
 	};
 
-	template<class Data>
-	using Atomic = CortexCommon::Atomic<Data, &loadExclusive, &storeExclusive, &clearExclusive>;
 
 	typedef uint32_t TickType;
 	typedef uint32_t ClockType;
@@ -72,8 +53,6 @@ private:
 
 	static volatile uint32_t tick;
 	static void (*tickHandler)();
-
-	static volatile bool exclusiveMonitor;
 
 	static Task* volatile currentTask;
 	static Task* volatile oldTask;
@@ -183,33 +162,6 @@ public:
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-
-template<class Value>
-inline bool ProfileCortexM0::storeExclusive(volatile Value* addr, Value in)
-{
-	static_assert(sizeof(Value) == 4, "unimplemented atomic access width");
-	uintptr_t temp = 0;
-	bool ret;
-
-	asm volatile(
-		"	.thumb					\n"
-		"	.syntax unified			\n"
-		"	cpsid i					\n"	// Atomically:
-		"	ldrb %[ret], [%[mon]]	\n"	// 		1. load the monitor.
-		"	cmp %[ret], #0			\n" //  	2. check if contended.
-		"	beq 1f					\n" //	 	3. skip next if it is.
-		"	str %[in], [%[adr]]		\n" // 		4. store the new value.
-		"1: strb %[tmp], [%[mon]]	\n" // 		5. reset monitor.
-		"	cpsie i\n"
-			: [ret] "=&l" (ret)
-			: [mon] "l"   (&exclusiveMonitor),
-			  [tmp] "l"   (temp),
-			  [adr] "l"   (addr),
-			  [in]  "l"   (in) : "memory"
-		);
-
-	return ret;
-}
 
 inline void ProfileCortexM0::initialize(Task* task, void (*entry)(void*), void (*exit)(),
 		void* stack, uint32_t stackSize, void* arg)

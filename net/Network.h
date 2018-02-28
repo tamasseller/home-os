@@ -33,7 +33,6 @@ struct NetworkOptions {
 	PET_CONFIG_VALUE(TxBufferLimit, size_t);
 	PET_CONFIG_VALUE(RxBufferLimit, size_t);
 	PET_CONFIG_VALUE(TicksPerSecond, size_t);
-	PET_CONFIG_VALUE(MachineLittleEndian, bool);
 	PET_CONFIG_VALUE(UseDiagnosticCounters, bool);
 	PET_CONFIG_TYPE(Interfaces);
 
@@ -52,7 +51,6 @@ struct NetworkOptions {
 
 		PET_EXTRACT_VALUE(routingTableEntries, RoutingTableEntries, 4, Options);
 		PET_EXTRACT_VALUE(arpRequestRetry, ArpRequestRetry, 3, Options);
-		PET_EXTRACT_VALUE(swapBytes, MachineLittleEndian, true, Options);
 		PET_EXTRACT_VALUE(useDiagnosticCounters, UseDiagnosticCounters, false, Options);
 		PET_EXTRACT_VALUE(bufferSize, BufferSize, 64, Options);
 		PET_EXTRACT_VALUE(bufferCount, BufferCount, 64, Options);
@@ -155,9 +153,6 @@ struct NetworkOptions {
 
 		struct BufferStats;
 
-		static inline constexpr uint32_t correctEndian(uint32_t);
-		static inline constexpr uint16_t correctEndian(uint16_t);
-
 		static inline void init(Buffers &buffers);
 
 		static inline bool addRoute(const Route& route, bool setUp = false);
@@ -208,7 +203,6 @@ using Network = NetworkOptions::Configurable<S, Args...>;
 #include "internal/Misc.h"
 #include "internal/State.h"
 #include "internal/Fixup.h"
-#include "internal/Endian.h"
 #include "internal/Interface.h"
 #include "internal/InterfaceManager.h"
 #include "internal/PacketProcessor.h"

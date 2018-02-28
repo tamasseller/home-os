@@ -17,21 +17,21 @@
  *
  *******************************************************************************/
 
-#ifndef ATOMIC_H_
-#define ATOMIC_H_
+#ifndef ATOMICCOMMON_H_
+#define ATOMICCOMMON_H_
 
 namespace home {
 
 namespace CortexCommon {
 
 template<class Value, Value (*ldrex)(volatile Value*), bool (*strex)(volatile Value*, Value), void (*clrex)()>
-class Atomic
+class AtomicCommon
 {
 	volatile Value data;
 public:
-	inline Atomic(): data(0) {}
+	inline AtomicCommon(): data(0) {}
 
-	inline Atomic(Value value) {
+	inline AtomicCommon(Value value) {
 		data = value;
 		clrex();        // TODO is this ok (for example: preempted between write and clrex)?
 	}
@@ -62,4 +62,4 @@ public:
 
 }
 
-#endif /* ATOMIC_H_ */
+#endif /* ATOMICCOMMON_H_ */

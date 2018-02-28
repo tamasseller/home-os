@@ -74,11 +74,11 @@ public:
 		 * indefinitely.
 		 */
 
-		criticality.increment();
+		AtomicUtils::increment(criticality);
 
 		SharedAtomicList::push(event, combiner);
 
-		uintptr_t result = criticality.decrement();
+		uintptr_t result = AtomicUtils::decrement(criticality);
 
 		/*
 		 * The race condition here, introduced by using the value of the previous

@@ -60,8 +60,9 @@ TEST_GROUP(NetSharedTable) {
                 x->access().k = k;
                 x->access().v = v;
                 x->finalize();
-                return true;
             }
+
+            return true;
         }
 
         inline int get(int k) {

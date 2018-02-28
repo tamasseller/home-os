@@ -889,11 +889,11 @@ TEST(NetPacket, GeneratorSimple) {
 
 	            stream.finish();						// go through the rest of the header
 
-	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0xbdef))) return bad;
+	            if(stream.getReducedState() != home::reverseBytes16(static_cast<uint16_t>(~0xbdef))) return bad;
 
 	            stream.startSumming(8); // 'hellowor'
 	            stream.finish();
-	            if(stream.getReducedState() != Accessor::correctEndian(static_cast<uint16_t>(~0x4c44))) return bad;
+	            if(stream.getReducedState() != home::reverseBytes16(static_cast<uint16_t>(~0x4c44))) return bad;
 
 	            uint8_t ret8;
 	            if(!stream.read8(ret8)) return bad;
