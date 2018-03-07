@@ -35,7 +35,7 @@ namespace home {
 template<class... Args>
 class Scheduler<Args...>::SharedBlocker: public Blocker
 {
-	virtual void priorityChanged(Blockable* b, typename Policy::Priority old) override {
+	virtual void priorityChanged(Blockable* b, uint8_t old) override {
 	    /*
 	     * If the priority of a blocked task is changed the ordering of
 	     * the list get compromised, so the offending task is removed
@@ -50,7 +50,7 @@ class Scheduler<Args...>::SharedBlocker: public Blocker
 	    /*
 	     * Ordering based on the defined priorities of the tasks.
 	     */
-	    return a.getTask()->getPriority() < b.getTask()->getPriority();
+	    return a.getTask()->priority < b.getTask()->priority;
 	}
 
 protected:

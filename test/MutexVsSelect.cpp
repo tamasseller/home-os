@@ -96,10 +96,10 @@ TEST(MutexVsSelect)
 		}
 	} t4(sem, tp);
 
-	t1.start(0);
-	t2.start(1);
-	t3.start(2);
-	t4.start(3);
+	t1.start(uint8_t(0));
+	t2.start(uint8_t(1));
+	t3.start(uint8_t(2));
+	t4.start(uint8_t(3));
 	mutex.init();
 	sem.init(false);
 

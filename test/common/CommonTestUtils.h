@@ -29,9 +29,6 @@
 
 using namespace home;
 
-#include "policy/RoundRobinPrioPolicy.h"
-#include "policy/RealtimePolicy.h"
-
 #include "TestStackPool.h"
 #include "TestOsDefinitions.h"
 

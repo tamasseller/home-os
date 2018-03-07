@@ -28,7 +28,7 @@ namespace home {
  * Task front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blockable
+class Scheduler<Args...>::Task: Profile::Task, Sleeper, Blockable
 {
 		template<class Child, void (Child::*entry)()>
 		static void entryStub(void* self) {
@@ -36,20 +36,13 @@ class Scheduler<Args...>::Task: Policy::Priority, Profile::Task, Sleeper, Blocka
 		}
 
 		friend Scheduler<Args...>;
-		friend PolicyBase;
+		friend Policy;
 
 		Blocker* blockedBy = nullptr;
+		uint8_t priority;
 
 		static Task* getTaskVirtual(Blockable* self) {
 			return static_cast<Task*>(self);
-		}
-
-		typename Policy::Priority &accessPriority() {
-			return *static_cast<typename Policy::Priority*>(this);
-		}
-
-		typename Policy::Priority getPriority() const {
-			return *static_cast<const typename Policy::Priority*>(this);
 		}
 
 		static void wakeVirtual(Sleeper* sleeper)

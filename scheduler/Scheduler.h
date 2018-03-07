@@ -28,8 +28,6 @@
 
 #include "meta/Configuration.h"
 
-#include "policy/RoundRobinPolicy.h"
-
 namespace home {
 
 /*
@@ -46,6 +44,7 @@ struct SchedulerOptions {
 	PET_CONFIG_VALUE(EnableRegistry, bool);
 	PET_CONFIG_VALUE(EnableDeadlockDetection, bool);
 	PET_CONFIG_VALUE(NumberOfSleepers, ScalabilityHint);
+	PET_CONFIG_VALUE(PriorityLevels, uint8_t);
 	PET_CONFIG_TYPE(HardwareProfile);
 	PET_CONFIG_TEMPLATE(SchedulingPolicy);
 
@@ -55,8 +54,8 @@ struct SchedulerOptions {
 		PET_EXTRACT_VALUE(registryEnabled, EnableAssert, assertEnabled, Options);
 		PET_EXTRACT_VALUE(deadlockDetectionEnabled, EnableDeadlockDetection, assertEnabled, Options);
 		PET_EXTRACT_VALUE(sleeperStorageOption, NumberOfSleepers, ScalabilityHint::Few, Options);
+		PET_EXTRACT_VALUE(priorityLimit, PriorityLevels, 4, Options);
 		PET_EXTRACT_TYPE(Profile, HardwareProfile, void, Options);
-		PET_EXTRACT_TEMPLATE(PolicyTemplate, SchedulingPolicy, RoundRobinPolicy, Options);
 
 		/*
 		 * Internal types.
@@ -71,6 +70,7 @@ struct SchedulerOptions {
 
 		class IoRequestCommon;
 
+		class Priority;
 		class Policy;
 		template<ScalabilityHint, class = void> class SleeperBase;
 		template<ScalabilityHint, class = void> class SleepListBase;
@@ -119,7 +119,6 @@ struct SchedulerOptions {
 		 * Helper type and template aliases.
 		 */
 		template<class Object> using Registry = ObjectRegistry<Object, registryEnabled>;
-		using PolicyBase = PolicyTemplate<Task, Blockable>;
 		using SleepList = class SleepListBase<sleeperStorageOption>;
 
 		/*

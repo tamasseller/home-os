@@ -35,7 +35,7 @@ class Scheduler<Args...>::PreemptionEvent: public Event {
 
 				Task* currentTask = static_cast<Task*>(platformTask);
 
-				if(currentTask->getPriority() < newTask->getPriority())
+				if(currentTask->priority < newTask->priority)
 					return;
 
 				state.policy.addRunnable(currentTask);

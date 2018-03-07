@@ -87,10 +87,10 @@ namespace {
 }
 
 TEST(SemaphoreFromIrq) {
-	t1.start(0);
-	t2.start(0);
-	t3.start(1);
-	t4.start(1);
+	t1.start(uint8_t(0));
+	t2.start(uint8_t(0));
+	t3.start(uint8_t(1));
+	t4.start(uint8_t(1));
 	sem.init(false);
 
 	CommonTestUtils::registerIrq(irq);

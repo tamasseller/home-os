@@ -343,8 +343,8 @@ TEST(IoRequestVsMutexPrioChange)
 
 	DummyProcess<OsRrPrio>::instance.init();
 	m.init();
-	tLow.start(1);
-	tHigh.start(0);
+	tLow.start(uint8_t(1));
+	tHigh.start(uint8_t(0));
 	CommonTestUtils::start<OsRrPrio>();
 	CHECK(!tLow.error);
 }

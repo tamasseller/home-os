@@ -84,7 +84,7 @@ class Scheduler<Args...>::WaitableSet final: Blocker, Registry<WaitableSet>::Obj
 		this->WaitableSet::canceled(blockable, nullptr);
 	}
 
-	virtual void priorityChanged(Blockable*, typename Policy::Priority old) override final
+	virtual void priorityChanged(Blockable*, uint8_t old) override final
 	{
 		for(uintptr_t i = 0; i < nWaiters; i++)
 			waiters[i].blocker->priorityChanged(waiters + i, old);

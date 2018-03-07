@@ -25,7 +25,22 @@
 namespace home {
 
 template<class... Args>
-class Scheduler<Args...>::Policy: Blocker, PolicyBase {
+class Scheduler<Args...>::Policy: Blocker {
+	static constexpr uintptr_t maxLevels = sizeof(uintptr_t) * 8;
+	static_assert(priorityLimit < maxLevels, "Too many priority levels (maximum allowed: native word size in bits)");
+
+private:
+	uintptr_t cache = 0;
+	pet::DoubleList<Blockable> tasks[priorityLimit];
+
+	bool findCurrentLevel(uintptr_t& ret) {
+		ret = clz(cache);
+		return ret < priorityLimit;
+	}
+
+	static inline uintptr_t mask(uintptr_t level) {
+		return (uintptr_t)1 << (maxLevels - level - 1);
+	}
 
 	/*
 	 * These two methods are never called during normal operation, so
@@ -64,36 +79,55 @@ class Scheduler<Args...>::Policy: Blocker, PolicyBase {
 	 * LCOV_EXCL_STOP is placed here.
 	 */
 
-	virtual void priorityChanged(Blockable* b, typename PolicyBase::Priority old) override final {
-		assert(b->getTask() == b, ErrorStrings::policyNonTask);
-		PolicyBase::priorityChanged(static_cast<Task*>(b), old);
+	virtual void priorityChanged(Blockable* b, uint8_t old) override final {
+		auto task = static_cast<Task*>(b);
+
+		assert(task->getTask() == task, ErrorStrings::policyNonTask);
+
+		tasks[old].remove(task);
+
+		if(!tasks[old].front())
+			cache &= ~mask(old);
+
+		uintptr_t level = task->priority;
+		tasks[level].fastAddBack(task);
+		cache |= mask(level);
 	}
 
 public:
-	using Priority = typename PolicyBase::Priority;
+	Task* popNext() {
+		uintptr_t level;
+
+		if(!findCurrentLevel(level))
+			return nullptr;
+
+		Task* task = static_cast<Task*>(tasks[level].popFront());
+
+		if(!tasks[level].front())
+			cache &= ~mask(level);
+
+		task->blockedBy = nullptr;
+		return task;
+	}
 
 	Task* peekNext() {
-		return static_cast<Task*>(PolicyBase::peekNext());
+		uintptr_t level;
+
+		if(!findCurrentLevel(level))
+			return nullptr;
+
+		return static_cast<Task*>(tasks[level].front());
 	}
 
 	void addRunnable(Task* task) {
-		PolicyBase::addRunnable(task);
+		uintptr_t level = task->priority;
+		tasks[level].fastAddBack(task);
+		cache |= mask(level);
 		task->blockedBy = this;
 	}
 
-	Task* popNext() {
-		if(Blockable* element = PolicyBase::popNext()) {
-			Task* task = static_cast<Task*>(element);
-			task->blockedBy = nullptr;
-			return task;
-		}
-
-		return nullptr;
-	}
-
-	template<class... InitArgs>
-	inline static void initialize(Task* task, InitArgs... initArgs) {
-		PolicyBase::initialize(task, initArgs...);
+	inline static void initialize(Task* task, uint8_t prio = priorityLimit - 1) {
+		task->priority = prio;
 		task->blockedBy = nullptr;
 	}
 };

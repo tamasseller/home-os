@@ -52,8 +52,8 @@ namespace {
 }
 
 TEST(SemaphoreCounting) {
-	t1.start(0);
-	t2.start(0);
+	t1.start();
+	t2.start();
 	sem.init(false);
 
 	CommonTestUtils::registerIrq(irq);

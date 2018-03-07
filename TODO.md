@@ -10,8 +10,9 @@ API
 Internals
 ---------
 
- - Get rid of pluggable scheduling policy stuff.
- - Implement fair scheduling policy (needs hires timing).
+ - Implement timporal quantity handling abstraction.
+ - Implement high resolution time handling.
+ - Implement fair scheduling policy .
  - Make highest prority task inhibit async messages.
  - Add detection of elevated (syscall/async) context method to arch.
  - Use isElevated method to handle aborting properly (also reenable processing if highest prio).

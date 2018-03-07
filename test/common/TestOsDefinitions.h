@@ -22,21 +22,21 @@
 
 using OsRr = Scheduler<
         SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
-        SchedulerOptions::SchedulingPolicy<RoundRobinPolicy>,
+        SchedulerOptions::PriorityLevels<4>,
         SchedulerOptions::EnableAssert<true>,
         SchedulerOptions::NumberOfSleepers<SchedulerOptions::ScalabilityHint::Many>
 >;
 
 using OsRrPrio = Scheduler<
         SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
-        SchedulerOptions::SchedulingPolicy<RoundRobinPrioPolicy>,
+        SchedulerOptions::PriorityLevels<4>,
         SchedulerOptions::EnableAssert<true>,
         SchedulerOptions::EnableRegistry<false>
 >;
 
 using OsRt4 = Scheduler<
         SchedulerOptions::HardwareProfile<PlatformHardwareProfile>,
-        SchedulerOptions::SchedulingPolicy<RealtimePolicy<4>::Policy>,
+        SchedulerOptions::PriorityLevels<4>,
         SchedulerOptions::EnableAssert<true>
 >;
 

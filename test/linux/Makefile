@@ -9,9 +9,6 @@ INCLUDE_DIRS += $(ROOT)/test
 INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/arch/gcc-linux-um
 
-ifeq ('x','')
-endif
-
 
 # Atomic list related tests.
 
@@ -49,11 +46,6 @@ SOURCES += $(ROOT)/test/Error.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
-
-
-# Policy sanity checking.
-
-SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
 
@@ -78,6 +70,9 @@ SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetIpReception.cpp
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
+
+ifeq ('x','')
+endif
 
 
 # Testing utilities.

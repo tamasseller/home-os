@@ -80,7 +80,7 @@ class Scheduler<Args...>::Blocker
 	 * @NOTE This is a usual virtual method, only called through regular
      *       virtual method dispatching.
 	 */
-	virtual void priorityChanged(Blockable* blockable, typename PolicyBase::Priority oldPrio) = 0;
+	virtual void priorityChanged(Blockable* blockable, uint8_t oldPrio) = 0;
 
 	/**
 	 * Get a (possibly indirect) blocker that can be acquired.
@@ -315,7 +315,7 @@ uintptr_t Scheduler<Args...>::doRelease(uintptr_t blockerPtr, uintptr_t arg)
 
     if(blocker->ActualBlocker::release(arg)) {
         if (Task *newTask = state.policy.peekNext()) {
-            if (!currentTask || (newTask->getPriority() < currentTask->getPriority()))
+            if (!currentTask || (newTask->priority < currentTask->priority))
                 switchToNext<true>();
         }
     }

@@ -39,7 +39,7 @@ class Scheduler<Args...>::IoRequestCommon:
     typename IoJob::Callback hijackedMethod;
 	typename IoJob::Result result = IoJob::Result::NotYet;
 
-	virtual void priorityChanged(Blockable* b, typename Policy::Priority old) override {
+	virtual void priorityChanged(Blockable* b, uint8_t old) override {
 		/*
 		 * There is a single blocked entity at most, thus nothing
 		 * needs to be done about the priority change.

@@ -28,19 +28,16 @@ namespace home {
  * Mutex front-end object.
  */
 template<class... Args>
-class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex>::ObjectBase
+class Scheduler<Args...>::Mutex: SharedBlocker, Registry<Mutex>::ObjectBase
 {
 	friend Scheduler<Args...>;
 	static constexpr uintptr_t blockedReturnValue = 0;
 
 	template<bool, class=void> class DeadlockDetectionSwitch;
 
-	typename Policy::Priority &accessPriority() {
-		return *static_cast<typename Policy::Priority*>(this);
-	}
-
 	Task *owner = nullptr;
 	uintptr_t relockCounter = 0;
+	uint8_t savedPriority;
 
 	/*
 	 * This method is never called during normal operation, so
@@ -78,9 +75,9 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 		 * Raise the priority of the owner to avoid priority inversion.
 		 * The original priority will be restored once the mutex is unlocked.
 		 */
-		if(task->getPriority() < owner->getPriority()) {
-			auto oldPrio = owner->getPriority();
-			owner->accessPriority() = task->getPriority();
+		if(task->priority < owner->priority) {
+			auto oldPrio = owner->priority;
+			owner->priority = task->priority;
 
 			if(owner->blockedBy)
 				owner->blockedBy->priorityChanged(owner, oldPrio);
@@ -100,7 +97,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 			 * raises the priority of the _currentTask_ through the
 			 * ownership relation.
 			 */
-			accessPriority() = task->getPriority();
+			savedPriority = task->priority;
 		} else {
 			relockCounter++;
 		}
@@ -122,7 +119,7 @@ class Scheduler<Args...>::Mutex: Policy::Priority, SharedBlocker, Registry<Mutex
 			 * is sure to not be handled by the policy currently, so the
 			 * priority can be set directly.
 			 */
-			currentTask->accessPriority() = this->accessPriority();
+			currentTask->priority = this->savedPriority;
 
 			/*
 			 * We know that the sleeper obtained here is actually a task,

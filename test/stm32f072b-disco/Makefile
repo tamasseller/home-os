@@ -10,8 +10,6 @@ INCLUDE_DIRS += $(ROOT)/scheduler
 INCLUDE_DIRS += $(ROOT)/arch/gcc-cortex-m0
 INCLUDE_DIRS += $(ROOT)/arch/gcc-cortex-common
 
-ifeq ('x','')
-endif
 
 # Atomic list related tests.
 
@@ -48,11 +46,6 @@ SOURCES += $(ROOT)/test/Error.cpp
 SOURCES += $(ROOT)/test/Sleep.cpp
 SOURCES += $(ROOT)/test/Yield.cpp
 SOURCES += $(ROOT)/test/TaskStart.cpp
-
-
-# Policy sanity checking.
-
-SOURCES += $(ROOT)/test/Policy.cpp
 SOURCES += $(ROOT)/test/PolicyPrio.cpp
 
 
@@ -65,12 +58,13 @@ SOURCES += $(ROOT)/test/IoRequest.cpp
 
 # Networking related tests.
 
+ifeq ('x','')
 SOURCES += $(ROOT)/test/NetSharedTable.cpp
 SOURCES += $(ROOT)/test/NetBufferPool.cpp
 SOURCES += $(ROOT)/test/NetPacket.cpp
 SOURCES += $(ROOT)/test/NetChecksum.cpp
 SOURCES += $(ROOT)/test/NetIpTransmission.cpp
-
+endif
 
 # Testing utilities.
 
