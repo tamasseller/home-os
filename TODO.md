@@ -1,91 +1,38 @@
 API
 ---
 
- - Implement ReaderWriterLock (possibly with upgrade option).
+ - Create separate configuration object and make Scheduler and Network use that single config object instead of the options themselfs.
+ - Create central header file that insists on including some user provided sysconfig header, and expects a config object in it that is then used to define Scheduler and Network.
+ - Separate implementation of stuff that are not to be inlined (core things behind syscall and async) from the rest.
+ - Move implementations of internally used method to separate .impl.h files.
+ - Make a single cpp file per component (net, scheduler) that includes all the .impl.h files and contains explicit specializations.
  
 Internals
 ---------
 
- - Add option for direct syscall address passing, if enabled should prohibit
-   instantiation of syscall table to enable omitting unused syscalls from binary.
- - Implement arbitrary base-class option (for add names to things and the like).
- - Implement event tracing callback interface.
- - Implement fair scheduling policy (needs hires timing)
+ - Get rid of pluggable scheduling policy stuff.
+ - Implement fair scheduling policy (needs hires timing).
+ - Make highest prority task inhibit async messages.
+ - Add detection of elevated (syscall/async) context method to arch.
+ - Use isElevated method to handle aborting properly (also reenable processing if highest prio).
+ - Refactor the select interface into an epoll like one and also handle return value and index of the waker properly (needed for IoRequest).
+ - TCP: implement in-task sending (with wait for window).
+ - TCP: add retranmission timeout for window waiting (also implements zero window probing?).
+ - TCP: implement connection close signaling.
+ - TCP: implement waiting for connection closing (with retransmission timeout).
+ - NET: move implementation of inet checksum to arch.
+ - NET: add support for checksum offloading.
+ - NET: add support for receiving broadcast packets.
+ - NET: move well-known constants (ip protocol numbers, ethertypes, fixed packet sizes) to some central header.
+ - NET: add ip reassembly support.
+ - Reform IoJob/IoRequest (CRTP IoJobBase maybe?) to enable more flexibility in controlling what is done in async context and what in task.
+ - Add random generator option.
+ - NET: Use random generator for ip id fields and tcp initial seq nums.
+ - NET: implement receive window size handling (check if windows shrinking is applicable, if it is then use the amount of globally available memory to maximize performance)
 
 Backend
 -------
 
- - Clean up linux context handling.
- - Optimize cortex-m0 syscall (seemingly no need for four param syscall, use {r0-4} instead of {r12, r0-4})
+ - Optimize cortex-m syscall (seemingly no need for four param syscall, use {r0-4} instead of {r12, r0-4})
  - Find some way to keep track of high-res task running time.
- - Port to cortex-m3 (with real exclusive access instructions).
- - Port to cortex-m4f (with non-lazy float context saving).
- - Port to cortex-m7 (probably should be about the same as m4f).
-
-Documentation
--------------
-
- - Overview:
-   - Preemption levels (task, syscall, user interrupt)
-   - Event list based communication
-   - Generic blocker things
-   - Multi wait scenario
-   - Continuation
- - Doxy comments
-   - Blocker.h
-   - SemaphoreLikeBlocker.h
-   - AsyncBlocker.h
-   - WaitableSet.h
-   - Sleeping.h
-   - SharedBlocker.h
-   - Policy.h
-   - Blockable.h
-   - IoRequest.h
-   - IoChannel.h
-   - Task.h
-   - Mutex.h
-     - Explanation Blocker private base (inhibit select)
-   - BinarySemaphore.h
-   - CountingSemaphore.h
-   - Preemption.h
-   - Event.h
-   - EventList.h
-   - SharedAtomicList.h
-   - Atomic.h
-   - Timeout.h
-   - RealtimePolicy.h
-   - RoundRobinPrioPolicy.h
-   - RoundRobinPolicy.h
-   - Syscall.h
-   - ObjectRegistry.h
-   - LimitedCTree.h
-   - Helpers.h
-   - ErrorStrings.h
- - Tests:
-   - MutexDeadlock.cpp
-   - SemaphoreFromIrq.cpp
-   - TaskStart.cpp
-   - SemaphorePrio.cpp
-   - IoChannelTimeout.cpp
-   - Yield.cpp
-   - PolicyPrio.cpp
-   - TestLimitedCTreeHostOnly.cpp
-   - SemaphorePassaround.cpp
-   - Error.cpp
-   - MutexMany.cpp
-   - SemaphoreCounting.cpp
-   - SharedAtomicListSimple.cpp
-   - MutexVsSelect.cpp
-   - MutexSingle.cpp
-   - SemaphoreTimeout.cpp
-   - Sleep.cpp
-   - IoChannel.cpp
-   - MutexSingleBusy.cpp
-   - MutexPriorityInversion.cpp
-   - Abort.cpp
-   - Select.cpp
-   - Timeout.cpp
-   - SemaphoreLock.cpp
-   - LimitedCTree.cpp
-   - SharedAtomicListReissue.cpp
-   - Policy.cpp
+ - Port to cortex-m3 and up (with real exclusive access instructions).
